@@ -100,9 +100,12 @@ tokens. Each condition has a metric, an operator, a threshold and a severity (`b
 | [factory/triggers/](factory/triggers/) | Requirement sources: the connector interface and `FolderTrigger` |
 | [factory/projects.py](factory/projects.py) | The project registry |
 | [factory/dispatch.py](factory/dispatch.py) | Which projects are due, the background workers that scan them, and the launchd plist |
-| [config/defaults.json](config/defaults.json) | Default trigger, mode, limits, parallelism, gate commands, agent models and effort, and plan |
+| [factory/budget.py](factory/budget.py) | Token counting for the per-run and daily caps |
+| [factory/notify.py](factory/notify.py) | macOS and Teams notifications |
+| [config/defaults.json](config/defaults.json) | Default trigger, mode, limits, parallelism, gate commands, agents, budgets, notifications and plan |
 | `config/projects.json` | The registered projects and the active one (not in git) |
-| `<project>/.cortana/settings.json` | That project's changes to the defaults, written by the Settings tab |
+| `<project>/.cortana/settings.json` | That project's changes to the defaults, written by the setup wizard and Settings tab |
+| `config/agents/<name>.md` | Your edited agent prompts, written by Settings → Agents → Prompt (not in git). Shared by all projects |
 | `<project>/runs/<id>/` | Per run: `workspace/` (the generated project, its own git repo), `reports/`, `logs/`, `gates/`, `state.json`, `SUMMARY.md` |
 
 **Upgrading:** settings used to live in `config/settings.json`. On the first start, Cortana moves that file
@@ -118,7 +121,33 @@ login. It also removes `ANTHROPIC_API_KEY` and other API or provider variables f
 - After a crash, a run resumes from the last finished stage; in a parallel phase, only the unfinished stages rerun.
 
 **Guardrails:** agents run in `acceptEdits` mode inside their workspace. Shell commands are limited to each
-agent's tool allowlist, and anything else is denied automatically.
+agent's tool allowlist, and anything else is denied automatically. An allowlist you edit in Settings is
+checked against a safe pattern: built-in tools such as `Read` or `Edit`, or `Bash(command *)` for one named
+command. Bare `Bash`, `Bash(*)`, shells, and network or system commands such as `curl`, `ssh`, `rm` and
+`sudo` are refused.
+
+**Agents:** each agent can be switched off in Settings.
+- Deterministic mode skips a disabled agent's stages.
+- Full auto never offers them to the Orchestrator, and their required gates are waived.
+- Settings warns when a gate depends on a disabled agent. You can't disable the Orchestrator in full auto,
+  or every agent in the plan.
+- Three presets set every agent's model and effort in one click, and you can adjust each agent afterwards:
+  - **Fast:** Sonnet and Haiku at low effort.
+  - **Balanced:** the shipped defaults.
+  - **Max quality:** Opus at high or xhigh effort.
+
+**Budgets** (off by default) count every token type, as the Overview's Spent tokens does:
+- **Token cap per run:** a run that reaches it fails, with the reason in its details.
+- **Daily token cap:** when all runs together reach it, the factory pauses until midnight. Raising the cap
+  lifts the pause on the next scan.
+- A stage that crosses either cap is stopped within a few seconds, rather than when it finishes.
+- **Pause when usage is near the limit:** when the CLI warns that the subscription window is nearly used up,
+  the run pauses after the current stage and resumes after the window resets.
+
+**Notifications:** a macOS notification when a run is done, failed, blocked or paused, with a toggle for
+each event. If you add a Teams incoming-webhook URL, which must be an https URL on `webhook.office.com`,
+`logic.azure.com` or `powerplatform.com`, Cortana also posts a card there. Nothing is sent to Teams
+without one.
 
 ## Dashboard
 
@@ -137,9 +166,13 @@ follows the project you pick. The top bar also has:
 - **Run now:** starts a scan of this project in the background. The project's lock prevents a second scan
   while one is running.
 
+When a project is opened for the first time, a **setup wizard** walks you through its settings: Mode,
+Agents preset, Budgets, Service and Done. Nothing is saved until you press Finish, and Skip setup keeps
+the defaults. Run it again from Settings → Run setup again.
+
 The project's tabs refresh every 5 seconds:
 - **Overview:**
-  - Factory status and key figures.
+  - Factory status and key figures, including today's token use against the daily cap.
   - **Spent tokens** over time, filterable by model, effort, project and time range, and stacked by token
     type or by model.
   - Live agents (one card per stage running now, including a gate being measured), the agent roster and the
@@ -151,21 +184,28 @@ The project's tabs refresh every 5 seconds:
   listing its conditions with the latest measured values. Pick a run to see its live progress, and in
   full-auto mode the path the Orchestrator took. Below, every stage's agent, model, effort, task, output and
   gate, grouped by phase.
-- **Settings:**
-  - The project name and folder, and **Switch project**.
-  - The **trigger**, with the scan interval for `folder-interval` and the fallback interval for
-    `folder-watch`.
-  - The SDLC mode.
-  - Limits on rework loops, stages per run, stage time and stages at once.
-  - Gate settings: test and coverage commands, what a missing tool means, where security findings come from,
-    and per-stage worktrees.
-  - The model and effort for each agent.
-  - A plan editor: add phases, add a parallel stage to a phase, move a stage to another phase, reorder
-    phases and stages, change each stage's agent, task, output and verdict gate, and edit a quality gate's
-    conditions.
+- **Settings:** grouped sections with a side navigation (a scrolling row on phones), and one save bar for
+  all of them:
+  - **Project:** the project name and folder, **Switch project**, the **trigger** (with the scan interval
+    for `folder-interval` and the fallback interval for `folder-watch`), the SDLC mode, and the limits on
+    rework loops, stages per run, stage time and stages at once.
+  - **Agents & plan:**
+    - Presets, and for each agent its model, effort, an on/off switch and its tool allowlist.
+    - Each agent's prompt can be viewed and edited. A saved prompt is written to `config/agents/<name>.md`
+      and takes effect immediately; **Reset to default** deletes it.
+    - Gate settings: test and coverage commands, what a missing tool means, where security findings come
+      from, and per-stage worktrees.
+    - The plan editor: add phases, add a parallel stage to a phase, move a stage to another phase, reorder
+      phases and stages, change each stage's agent, task, output and verdict gate, and edit a quality gate's
+      conditions.
+  - **Limits & alerts:** budgets and notifications, with a test button.
+  - **System:**
+    - Whether the service is installed and running, with Install, Start, Stop and Uninstall buttons. These
+      act immediately.
+    - The last 20 lines of `logs/launchd.log`.
 
-The server listens on localhost only. Settings changes need a JSON request with a custom header, so other
-web pages can't make them. The dollar figures are the API-equivalent list price; your subscription is what
+The server listens on localhost only. Every change, including settings, prompts, service actions and test
+notifications, needs a JSON POST with a custom header, so other web pages can't make them. The dollar figures are the API-equivalent list price; your subscription is what
 is billed.
 
 ## Service
@@ -208,9 +248,11 @@ from `config/projects.json`:
 
 Run the script again after adding a `folder-watch` project. When the service is installed, the dashboard
 does this for you whenever the watched folders change. `scripts/uninstall-service.sh` removes the service.
+Settings → Service runs the same scripts, and starts or stops the agent with `launchctl`.
 
-Environment variables: `CORTANA_DISPATCH_INTERVAL` (60 s), `CORTANA_MAX_ATTEMPTS` (3), `CORTANA_CLAUDE_BIN`
-(path to the CLI), and `CORTANA_HOME`, which pins the dashboard and the orchestrator to one project folder
+Environment variables: `CORTANA_DISPATCH_INTERVAL` (60 s), `CORTANA_MAX_ATTEMPTS` (3), `CORTANA_BUDGET_POLL`
+(how often a running stage is checked against the token caps, 5 s), `CORTANA_CLAUDE_BIN` (path to the CLI),
+and `CORTANA_HOME`, which pins the dashboard and the orchestrator to one project folder
 for testing.
 
 The orchestrator finds the CLI on `PATH`, then in `~/.local/bin`, then uses the copy bundled with the

@@ -20,8 +20,10 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
+import budget
 import dispatch
 import gates
+import notify
 import projects
 import settings
 import streamlog
@@ -31,6 +33,9 @@ HERE = Path(__file__).resolve().parent
 PAGE = HERE / "dashboard" / "index.html"
 INSTALL_SCRIPT = HERE.parent / "scripts" / "install-service.sh"
 LABEL = dispatch.LABEL
+SCRIPTS = HERE.parent / "scripts"
+LAUNCHD_LOG = HERE.parent / "logs" / "launchd.log"
+SERVICE_ACTIONS = ("install", "start", "stop", "uninstall")
 TASK_LINE = re.compile(r"^\s*[-*]\s+\[([ xX])\]\s+(?:(T\d+)[:.)]?\s*)?(.+)$", re.M)
 TOKEN_KEYS = ("input", "cache_write", "cache_read", "output")
 _service_cache = {"at": 0.0, "value": None}
@@ -51,8 +56,8 @@ def pid_alive(pid) -> bool:
         return False
 
 
-def service_status() -> dict:
-    if time.time() - _service_cache["at"] > 30:  # launchctl is slow-ish; check twice a minute
+def service_status(fresh: bool = False) -> dict:
+    if fresh or time.time() - _service_cache["at"] > 30:  # launchctl is slow-ish; check twice a minute
         loaded = subprocess.run(["launchctl", "print", f"gui/{os.getuid()}/{LABEL}"],
                                 capture_output=True).returncode == 0
         _service_cache.update(at=time.time(), value={"installed": dispatch.PLIST_PATH.exists(), "loaded": loaded,
@@ -71,6 +76,59 @@ def sync_service() -> str | None:
         else f"Couldn't update the service: {(out.stderr or out.stdout).strip()[:300]}"
 
 
+def service_view(fresh: bool = False) -> dict:
+    try:
+        log_tail = LAUNCHD_LOG.read_text(errors="replace").splitlines()[-20:]
+    except OSError:
+        log_tail = []
+    return dict(service_status(fresh), label=LABEL, plist=str(dispatch.PLIST_PATH), log_path=str(LAUNCHD_LOG),
+                log=log_tail, interval=dispatch.DISPATCH_SECONDS)
+
+
+def service_action(action: str) -> tuple:
+    """Runs one service action with the install scripts or launchctl. Returns (ok, message)."""
+    target, status = f"gui/{os.getuid()}", service_status(fresh=True)
+    if action == "install":
+        cmd = [str(SCRIPTS / "install-service.sh")]
+    elif action == "uninstall":
+        cmd = [str(SCRIPTS / "uninstall-service.sh")]
+    elif action == "start":
+        if not status["installed"]:
+            return False, "Install the service first."
+        if status["loaded"]:
+            return True, "The service is already running."
+        cmd = ["launchctl", "bootstrap", target, str(dispatch.PLIST_PATH)]
+    elif action == "stop":
+        if not status["loaded"]:
+            return True, "The service is already stopped."
+        cmd = ["launchctl", "bootout", f"{target}/{LABEL}"]
+    else:
+        return False, "Unknown action."
+    try:
+        out = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
+    except (OSError, subprocess.SubprocessError) as e:
+        return False, str(e)
+    finally:
+        _service_cache["at"] = 0
+    if out.returncode != 0:
+        return False, (out.stdout + out.stderr).strip()[-600:] or f"{action} failed"
+    return True, {"install": "Installed and started.", "uninstall": "Uninstalled.", "start": "Started.",
+                  "stop": "Stopped."}[action]
+
+
+def budget_view(conf: dict, runs: list, beat: dict) -> dict:
+    run_cap, day_cap = budget.caps(conf)
+    now, today = datetime.now().isoformat(), budget.day_tokens(runs)
+    paused_until = beat.get("budget_paused_until")
+    capped = day_cap and today >= day_cap  # a raised cap lifts the pause on the next scan
+    near = beat.get("near_limit_until")
+    return {"run_cap": run_cap, "daily_cap": day_cap, "today": today,
+            "resets": budget.next_reset().isoformat(),
+            "paused_until": paused_until if capped and paused_until and paused_until > now else None,
+            "near_limit_until": near if near and near > now else None,
+            "pause_near_limit": bool((conf.get("budgets") or {}).get("pause_near_limit"))}
+
+
 def agents_view(conf: dict) -> list:
     catalog = settings.agent_catalog()
     order = list(conf["agents"]) + [n for n in catalog if n not in conf["agents"]]
@@ -79,7 +137,8 @@ def agents_view(conf: dict) -> list:
         if name not in catalog:
             continue
         a = settings.effective_agent(conf, catalog, name)
-        out.append(dict({k: a.get(k) for k in ("name", "title", "role", "model", "effort", "tools")},
+        out.append(dict({k: a.get(k) for k in ("name", "title", "role", "model", "effort", "tools", "enabled",
+                                               "prompt_override")},
                         writes_code=settings.writes_code(catalog, {"agent": name})))
     return out
 
@@ -254,7 +313,7 @@ def state() -> dict:
     svc["watched"] = str(root / "input") in svc.pop("watching")
     return {**base, "project": conf.get("project", "Cortana"), "home": str(root),
             "factory": beat, "service": svc, "agents": agents_view(conf), "trigger": trig,
-            "busy": dispatch.busy(root),
+            "busy": dispatch.busy(root), "budget": budget_view(conf, runs, beat),
             "settings": {k: conf.get(k) for k in ("mode", "pipeline", "max_iterations", "max_stations",
                                                   "station_timeout_min", "max_parallel", "worktrees", "gates")},
             "metrics": gates.METRICS,
@@ -266,15 +325,22 @@ def settings_payload() -> dict:
     conf = settings.load(root)
     catalog = settings.agent_catalog()
     conf["trigger"] = settings.trigger(conf)
+    runs_dir = root / "runs" if root else None
     return {"settings": conf, "defaults": settings.defaults(),
             "options": {"models": settings.MODELS, "efforts": settings.EFFORTS, "modes": settings.MODES,
                         "router": settings.ROUTER, "triggers": settings.TRIGGERS,
                         "metrics": gates.METRICS, "ops": list(gates.OPS),
                         "severities": gates.SEVERITIES, "levels": gates.LEVELS,
-                        "unavailable": gates.UNAVAILABLE, "security_sources": gates.SECURITY_SOURCES},
-            "catalog": {n: dict({k: a.get(k) for k in ("title", "role", "model", "effort", "tools")},
+                        "unavailable": gates.UNAVAILABLE, "security_sources": gates.SECURITY_SOURCES,
+                        "presets": settings.presets(), "notify_events": settings.NOTIFY_EVENTS,
+                        "tool_pattern": settings.SAFE_TOOL.pattern,
+                        "unsafe_commands": sorted(settings.UNSAFE_COMMANDS)},
+            "catalog": {n: dict({k: a.get(k) for k in ("title", "role", "model", "effort", "tools", "prompt_override")},
                                 writes_code=settings.writes_code(catalog, {"agent": n}))
                         for n, a in catalog.items()},
+            "warnings": settings.warnings(settings.validate(conf)[0]),
+            "budget": budget_view(conf, [r for r in map(read_json, runs_dir.glob("*/state.json")) if r]
+                                  if runs_dir else [], read_json(runs_dir / ".factory.json", {}) if runs_dir else {}),
             "home": home_status(root) if root else None, "service": service_status(),
             "env_override": bool(os.environ.get("CORTANA_HOME"))}
 
@@ -350,6 +416,63 @@ def submit(body: dict) -> tuple:
     return 200, {"ok": True, "name": name, "trigger": kind, "started": started}
 
 
+def prompt_view(name: str) -> dict | None:
+    catalog = settings.agent_catalog()
+    if name not in catalog:
+        return None
+    a = catalog[name]
+    return {"agent": name, "title": a.get("title", name), "prompt": a["prompt"], "default": a["default_prompt"],
+            "overridden": a["prompt_override"], "path": str(settings.PROMPTS_DIR / f"{name}.md")}
+
+
+def post_settings(body: dict) -> tuple:
+    root = settings.home()
+    if not root:
+        return 409, {"ok": False, "errors": ["Pick a project first."]}
+    clean, errors = settings.validate(body)
+    if errors:
+        return 400, {"ok": False, "errors": errors}
+    settings.save(clean, root)
+    return 200, dict(settings_payload(), ok=True, note=sync_service())
+
+
+def post_service(body: dict) -> tuple:
+    action = body.get("action")
+    if action not in SERVICE_ACTIONS:
+        return 400, {"ok": False, "errors": ["Unknown service action."]}
+    ok, message = service_action(action)
+    return (200 if ok else 500), {"ok": ok, "message": message, "service": service_view(fresh=True)}
+
+
+def post_prompt(body: dict) -> tuple:
+    name, text = body.get("agent"), body.get("prompt")
+    if name not in settings.agent_catalog():
+        return 400, {"ok": False, "errors": ["Unknown agent."]}
+    if body.get("reset"):
+        text = ""
+    if not isinstance(text, str) or len(text) > 50_000:
+        return 400, {"ok": False, "errors": ["The prompt must be text of at most 50,000 characters."]}
+    settings.save_prompt(name, text)
+    return 200, dict(prompt_view(name), ok=True)
+
+
+def post_notify_test(body: dict) -> tuple:
+    errors = []
+    conf = dict(settings.load(), notify=settings._validate_notify(body.get("notify") or {}, errors))
+    if errors:
+        return 400, {"ok": False, "errors": errors}
+    if not conf["notify"]["macos"] and not conf["notify"]["teams_webhook"]:
+        return 400, {"ok": False, "errors": ["Turn on macOS notifications or add a Teams webhook first."]}
+    problems = notify.send(conf, "test", "Test notification", "Notifications from Cortana work.", force=True)
+    return (500 if problems else 200), {"ok": not problems, "errors": problems}
+
+
+POST_ROUTES = {"/api/settings": post_settings, "/api/service": post_service, "/api/prompt": post_prompt,
+               "/api/notify-test": post_notify_test, "/api/projects": project_action,
+               "/api/browse": lambda body: (200, choose_folder()), "/api/run": lambda body: run_now(),
+               "/api/submit": submit}
+
+
 def report(query: dict) -> str | None:
     root = settings.home()
     if not root:
@@ -394,6 +517,14 @@ class Handler(BaseHTTPRequestHandler):
             self.json(200, settings_payload())
         elif url.path == "/api/projects":
             self.json(200, projects_view())
+        elif url.path == "/api/service":
+            self.json(200, service_view(fresh=True))
+        elif url.path == "/api/prompt":
+            view = prompt_view(parse_qs(url.query).get("agent", [""])[0])
+            if view is None:
+                self.send(404, b"not found", "text/plain")
+            else:
+                self.json(200, view)
         elif url.path == "/api/report":
             text = report(parse_qs(url.query))
             if text is None:
@@ -409,31 +540,16 @@ class Handler(BaseHTTPRequestHandler):
         if not self.local_host() or self.headers.get("X-Cortana") != "1" \
                 or not (self.headers.get("Content-Type") or "").startswith("application/json"):
             return self.send(403, b"forbidden", "text/plain")
-        path = urlparse(self.path).path
-        if path not in ("/api/settings", "/api/projects", "/api/browse", "/api/run", "/api/submit"):
+        handler = POST_ROUTES.get(urlparse(self.path).path)
+        if not handler:
             return self.send(404, b"not found", "text/plain")
         try:
             body = json.loads(self.rfile.read(min(int(self.headers.get("Content-Length") or 0), 500_000)) or b"{}")
         except (ValueError, json.JSONDecodeError):
             return self.json(400, {"ok": False, "errors": ["The request was not valid JSON."]})
         if not isinstance(body, dict):
-            return self.json(400, {"ok": False, "errors": ["The request was not valid JSON."]})
-        if path == "/api/projects":
-            return self.json(*project_action(body))
-        if path == "/api/browse":
-            return self.json(200, choose_folder())
-        if path == "/api/run":
-            return self.json(*run_now())
-        if path == "/api/submit":
-            return self.json(*submit(body))
-        root = settings.home()
-        if not root:
-            return self.json(409, {"ok": False, "errors": ["Pick a project first."]})
-        clean, errors = settings.validate(body)
-        if errors:
-            return self.json(400, {"ok": False, "errors": errors})
-        settings.save(clean, root)
-        self.json(200, dict(settings_payload(), ok=True, note=sync_service()))
+            return self.json(400, {"ok": False, "errors": ["The request must be a JSON object."]})
+        self.json(*handler(body))
 
     def log_message(self, *args) -> None:
         pass  # keep the terminal quiet; the page polls every 5 seconds

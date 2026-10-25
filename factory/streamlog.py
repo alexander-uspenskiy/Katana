@@ -29,7 +29,7 @@ def summarize(path: Path, max_events: int = 15) -> dict:
     tools, seen = Counter(), set()
     events = deque(maxlen=max_events)
     summary = {"model": None, "messages": 0, "tokens": tokens, "tools": tools,
-               "events": events, "result": None}
+               "events": events, "result": None, "rate_limit": None}
     try:
         lines = path.read_text(errors="replace").splitlines()
     except OSError:
@@ -62,6 +62,8 @@ def summarize(path: Path, max_events: int = 15) -> dict:
                 if isinstance(block, dict) and block.get("type") == "tool_result" \
                         and block.get("is_error"):
                     events.append({"kind": "error", "detail": str(block.get("content"))[:240]})
+        elif kind == "rate_limit_event":
+            summary["rate_limit"] = event.get("rate_limit_info") or {}
         elif kind == "result":
             summary["result"] = event
     result = summary["result"]

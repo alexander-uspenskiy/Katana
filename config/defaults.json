@@ -14,6 +14,13 @@
     "security_source": "auto",
     "timeout_min": 10
   },
+  "setup_completed": "",
+  "budgets": {"run_tokens": 0, "daily_tokens": 0, "pause_near_limit": false},
+  "notify": {
+    "macos": true,
+    "teams_webhook": "",
+    "events": {"done": true, "failed": true, "blocked": true, "paused": true}
+  },
   "agents": {
     "orchestrator": {"model": "sonnet", "effort": "low"},
     "ba": {"model": "opus", "effort": "high"},
