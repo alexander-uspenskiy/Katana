@@ -4,9 +4,29 @@
    flat, isGate, gated, post, ...) are used at call time. The editor works on ui.pg.draft and saves the whole plan
    (pipeline, artifacts, custom agents) with one POST to /api/settings; /api/validate checks every change. */
 
-const PG = { W: 216, H: 118, GH: 128, GX: 88, GY: 18, PAD: 18, TOP: 16, SW: 118, SH: 52, EW: 92, ADD: 26, STEP: 28 };
+const PG = { W: 216, H: 142, GH: 142, GX: 88, GY: 18, PAD: 18, TOP: 16, SW: 118, SH: 52, EW: 92, ADD: 26, STEP: 28 };
 const VERDICT_HINT = { reviewer: "APPROVE", security: "APPROVE", tester: "PASS", architect: "READY", ba: "READY", developer: "DONE" };
 const pgTab = { step: "Step", artifacts: "Artifacts", agents: "Agents" };
+/* ---------- role icons, and the model + effort every step shows ---------- */
+const PG_ROLES = {  // agent → [icon paths (16×16, stroked), colour]
+  ba: ['<path d="M5.5 3H4a1 1 0 0 0-1 1v9a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1V4a1 1 0 0 0-1-1h-1.5"/><rect x="5.5" y="1.8" width="5" height="2.6" rx=".8"/><path d="M5.5 8h5M5.5 10.8h3"/>', "#8a5cd6"],
+  architect: ['<path d="M8 2l6 3-6 3-6-3z"/><path d="M2 8l6 3 6-3M2 11l6 3 6-3"/>', "#14a3a0"],
+  security: ['<path d="M8 1.8l5 1.8v4c0 3-2.2 5-5 6.4C5.2 12.6 3 10.6 3 7.6v-4z"/><path d="M5.8 8l1.6 1.6 3-3.2"/>', "#d03b3b"],
+  developer: ['<path d="M5.5 4.5L2 8l3.5 3.5M10.5 4.5L14 8l-3.5 3.5M9 3l-2 10"/>', "#2a78d6"],
+  tester: ['<path d="M6 2h4M6.8 2v4.2L3 12.6a1 1 0 0 0 .9 1.4h8.2a1 1 0 0 0 .9-1.4L9.2 6.2V2"/><path d="M4.8 10h6.4"/>', "#1baf7a"],
+  reviewer: ['<circle cx="7" cy="7" r="4.2"/><path d="M10.2 10.2L14 14M5.2 7l1.4 1.4L9 5.8"/>', "#d98a00"],
+  orchestrator: ['<circle cx="8" cy="8" r="1.8"/><circle cx="3" cy="3.5" r="1.3"/><circle cx="13" cy="3.5" r="1.3"/><circle cx="8" cy="13.2" r="1.3"/><path d="M6.7 6.9L4 4.6M9.3 6.9L12 4.6M8 9.8v2.1"/>', "#8a5cd6"],
+  custom: ['<path d="M8 2l1.4 4.6L14 8l-4.6 1.4L8 14l-1.4-4.6L2 8l4.6-1.4z"/>', "#e0568a"],
+  gate: ['<rect x="2.5" y="2.5" width="11" height="11" rx="2"/><path d="M5.5 8.2l1.7 1.7 3.3-3.6"/>', "var(--ink-2)"],
+};
+const pgRole = (agent) => (!agent ? "gate" : PG_ROLES[agent] ? agent : "custom");
+function pgBadge(agent, size = 28, style = "") {  // the coloured icon tile that tells step kinds apart at a glance
+  const k = pgRole(agent), [paths, colour] = PG_ROLES[k], i = Math.round(size * 0.62);
+  return `<span class="mono-badge rb" style="--rc:${colour};width:${size}px;height:${size}px;border-radius:${size > 24 ? 8 : 6}px;${style}" aria-hidden="true"><svg width="${i}" height="${i}" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">${paths}</svg></span>`;
+}
+const PG_MODELS = { fable: "Fable 5.1", opus: "Opus 5.5", sonnet: "Sonnet 5.5", haiku: "Haiku 5.5" };  // alias → the current model it points at
+const pgModel = (m) => (/^claude-/.test(m || "") ? modelName(m) : PG_MODELS[m] || modelName(m));
+const pgRunWith = (a) => `<span class="chip" title="Model">${esc(pgModel(a.model))}</span>${effortMeter(a.effort)}`;
 const pgSlug = (s) => String(s || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 30);
 
 /* ---------- data the graph draws from ---------- */
@@ -34,6 +54,20 @@ const pgProduces = (s, table, agents) => [...new Set([].concat(s.outputs || [],
   Object.values(table).filter((a) => a.path && a.path === s.output).map((a) => a.id),
   !isGate(s) && agents[s.agent] && agents[s.agent].writes_code ? ["code"] : []))];
 const pgReads = (s) => s.inputs || [];
+function pgReadable(phases, s) {  // what a step can read: the artifacts of earlier phases (`before`), plus (`loop`) what the phases
+  // from a feedback loop's target up to its gateway wrote on a previous pass, when that loop covers the step's phase
+  const table = pgTable(), agents = pgAgents(), stages = flat(phases);
+  const at = (id) => phases.findIndex((ph) => ph.some((o) => o.id === id));
+  const made = (ph) => ph.filter((o) => !(isGate(s) && o === s)).flatMap((o) => pgProduces(o, table, agents));
+  const i = at(s.id), before = new Set(["requirements"]), loop = new Set();
+  phases.slice(0, i).forEach((ph) => made(ph).forEach((a) => before.add(a)));
+  phases.forEach((ph, g) => ph.filter(gated).forEach((gate) => {
+    const t = at(pgBackOf(stages, gate));
+    if (t < 0 || t > i || g < i) return;
+    phases.slice(t, g + 1).forEach((p) => made(p).forEach((a) => { if (!before.has(a)) loop.add(a); }));
+  }));
+  return { before, loop };
+}
 function pgBackOf(stages, s) {  // where a failed gateway sends the work: its 'on fail', else the nearest earlier build stage
   if (s.on_fail) return s.on_fail;
   const i = stages.indexOf(s), build = stages.slice(0, i).reverse().find((o) => o.agent === "developer");
@@ -138,16 +172,19 @@ function pgGraph(o) {
     const tip = `${posn[s.id]}. ${s.title}\n${isGate(s) ? "Gateway measured by Katana, no LLM call" : s.task}\n${approval === s.id ? "Waiting for you" : (x.state === "pending" ? "" : STATE_LABEL[x.state] || x.state) + (x.runs ? " · " + x.runs + " runs" : "")}`.trim();
     if (isGate(s)) {
       const mode = pgGateway(s), n = (s.conditions || []).length;
-      nodes.push(`<div class="gn gn-gate ${klass(s)}" data-pg-node="${esc(s.id)}" role="button" tabindex="0" style="${box}" ${tipAttr(tip)}>
-        <svg class="gn-shape" viewBox="0 0 ${p.w} ${p.h}" preserveAspectRatio="none" aria-hidden="true"><polygon points="${p.w / 2},3 ${p.w - 3},${p.h / 2} ${p.w / 2},${p.h - 3} 3,${p.h / 2}"/></svg>
-        <div class="gn-gb"><b>${esc(s.title)}</b><span>${n} criteri${n === 1 ? "on" : "a"} · ${mode === "manual" ? "manual" : "auto"}</span>${s.required ? `<span>required</span>` : ""}</div>${flag(s)}</div>`);
+      nodes.push(`<div class="gn gn-stage gn-gate ${klass(s)}" data-pg-node="${esc(s.id)}" role="button" tabindex="0" style="${box}" ${tipAttr(tip)}>
+        <div class="gn-top">${pgBadge(null)}<div class="gn-t"><b>${esc(s.title)}</b><span class="muted">Gateway</span></div><span class="gn-pos">${esc(posn[s.id])}</span></div>
+        <div class="gn-model"><span class="chip" title="Katana measures gateways itself">Katana</span><span class="chip" title="No LLM call, so no model or effort">no model</span></div>
+        <div class="gn-io"><div class="io-row" title="Reads"><i>↓</i>${pgChips(pgReads(s), table, o.flow)}</div><div class="io-row" title="Writes"><i>↑</i>${pgChips(pgProduces(s, table, agents), table, o.flow)}</div></div>
+        <div class="gn-meta"><span class="chip">${n} criteri${n === 1 ? "on" : "a"}</span><span class="chip ${mode === "manual" ? "accent" : ""}">${icon("gate", 11)}${mode === "manual" ? "manual" : "auto"}</span>${s.required ? `<span class="chip">required</span>` : ""}</div>${flag(s)}</div>`);
       return;
     }
     const mode = pgGateway(s);
     nodes.push(`<div class="gn gn-stage ${klass(s)}" data-pg-node="${esc(s.id)}" role="button" tabindex="0" style="${box}" ${tipAttr(tip)}>
-      <div class="gn-top"><span class="mono-badge" aria-hidden="true">${mono(s.agent)}</span><div class="gn-t"><b>${esc(s.title)}</b><span class="muted">${esc(a.title)} · ${esc(modelName(a.model))}</span></div><span class="gn-pos">${esc(posn[s.id])}</span></div>
+      <div class="gn-top">${pgBadge(s.agent)}<div class="gn-t"><b>${esc(s.title)}</b><span class="muted">${esc(a.title)}</span></div><span class="gn-pos">${esc(posn[s.id])}</span></div>
+      <div class="gn-model">${pgRunWith(a)}</div>
       <div class="gn-io"><div class="io-row" title="Reads"><i>↓</i>${pgChips(pgReads(s), table, o.flow)}</div><div class="io-row" title="Writes"><i>↑</i>${pgChips(pgProduces(s, table, agents), table, o.flow)}</div></div>
-      <div class="gn-meta"><span class="chip">${a.writes_code ? "changes code" : "report only"}</span>${mode ? `<span class="chip ${mode === "manual" ? "accent" : ""}">${icon("gate", 11)}${esc(s.pass.join("/"))} · ${mode}</span>` : ""}${a.custom ? `<span class="chip">custom</span>` : ""}</div>${flag(s)}</div>`);
+      <div class="gn-meta"><span class="chip">${a.writes_code ? "changes code" : "report only"}</span>${mode ? `<span class="chip ${mode === "manual" ? "accent" : ""}">${icon("gate", 11)}${esc(s.pass.join("/"))} · ${mode === "manual" ? "manual" : "auto"}</span>` : ""}${a.custom ? `<span class="chip">custom</span>` : ""}</div>${flag(s)}</div>`);
   });
   const sel0 = o.sel === "$start";
   nodes.push(`<div class="gn-start ${sel0 ? "sel" : ""}" data-pg-node="$start" role="button" tabindex="0" style="left:${L.start.x}px;top:${L.start.y}px;width:${L.start.w}px;height:${L.start.h}px"><div style="display:grid;gap:3px;justify-items:center">Requirement<span class="ach ${o.flow === "requirements" ? "on" : ""}" data-pg-art="requirements" role="button" tabindex="0" title="The requirement Katana took from the trigger · docs/00-requirements.md">requirements</span></div></div>`);
@@ -176,7 +213,7 @@ function pgCanTarget(o, s) {  // while picking a loop target on the graph: is `s
 }
 function pgMenuItems(kind) {  // kind: step (agents), gateway, or both
   const agents = Object.values(pgAgents()).filter((a) => a.name !== ui.cfg.options.router), std = agents.filter((a) => !a.custom), mine = agents.filter((a) => a.custom);
-  const row = (a) => `<button data-pg-add="agent" data-agent="${esc(a.name)}"><span class="mono-badge" style="width:22px;height:22px;font-size:9.5px;border-radius:6px">${mono(a.name)}</span>${esc(a.title)}</button>`;
+  const row = (a) => `<button data-pg-add="agent" data-agent="${esc(a.name)}">${pgBadge(a.name, 22)}${esc(a.title)}<small class="muted" style="margin-left:auto">${esc(pgModel(a.model))} · ${esc(a.effort)}</small></button>`;
   const steps = `<div class="h">Standard agents</div>${std.map(row).join("")}${mine.length ? `<div class="h">Your agents</div>${mine.map(row).join("")}` : ""}
     <button data-pg-add="new-agent">＋ New agent…</button>`;
   const gateways = `<div class="h">Gateways</div>
@@ -307,8 +344,10 @@ function pgInspector() {
   const gate = isGate(s), mode = pgGateway(s), gatedNow = gated(s);
   const agentOpts = (list) => list.map((a) => `<option value="${esc(a.name)}" ${s.agent === a.name ? "selected" : ""}>${esc(a.title)}</option>`).join("");
   const real = Object.values(agents).filter((a) => a.name !== ui.cfg.options.router), std = real.filter((a) => !a.custom), mine = real.filter((a) => a.custom);
-  const picks = (key, ids) => `<div class="picks">${ids.map((a) => `<label title="${esc(table[a].title)}${table[a].path ? " · " + esc(table[a].path) : ""}"><input type="checkbox" data-pgf="${key}" value="${esc(a)}" ${(s[key] || []).includes(a) ? "checked" : ""} ${key === "outputs" && table[a].path && table[a].path === s.output ? "disabled" : ""}>${esc(a)}</label>`).join("")}</div>`;
-  const readIds = Object.keys(table), writeIds = Object.keys(table).filter((a) => a !== "requirements");
+  const avail = pgReadable(P, s);
+  const note = (key, a) => key !== "inputs" ? "" : avail.before.has(a) ? "" : avail.loop.has(a) ? "\nWritten later in the plan: available once a feedback loop sends work back." : "\nNothing before this step writes it.";
+  const picks = (key, ids) => `<div class="picks">${ids.map((a) => `<label class="${key === "inputs" && !avail.before.has(a) ? (avail.loop.has(a) ? "viaLoop" : "unwritten") : ""}" title="${esc(table[a].title)}${table[a].path ? " · " + esc(table[a].path) : ""}${esc(note(key, a))}"><input type="checkbox" data-pgf="${key}" value="${esc(a)}" ${(s[key] || []).includes(a) ? "checked" : ""} ${key === "outputs" && table[a].path && table[a].path === s.output ? "disabled" : ""}>${esc(a)}${key === "inputs" && avail.loop.has(a) && !avail.before.has(a) ? icon("loop", 11) : ""}</label>`).join("")}</div>`;
+  const readIds = Object.keys(table).filter((a) => avail.before.has(a) || avail.loop.has(a) || (s.inputs || []).includes(a)), writeIds = Object.keys(table).filter((a) => a !== "requirements");
   const targets = stages.filter((o) => pos[o.id] && parseInt(pos[o.id], 10) <= parseInt(pos[id], 10) && !(gate && o.id === id));
   const loop = gatedNow ? `<div class="sec loopsec"><h3>${icon("loop", 14)} Feedback loop</h3>
       <div class="seg2" role="radiogroup" aria-label="Gateway type">
@@ -334,13 +373,13 @@ function pgInspector() {
       <div class="acts"><button class="btn" data-pg="phase-up" ${i === 0 ? "disabled" : ""}>◀ Earlier</button><button class="btn" data-pg="phase-down" ${i === P.length - 1 ? "disabled" : ""}>Later ▶</button>
         <button class="btn" data-pg="up" ${k === 0 ? "disabled" : ""}>${icon("up", 13)}</button><button class="btn" data-pg="down" ${k === P[i].length - 1 ? "disabled" : ""}>${icon("down", 13)}</button>
         <button class="btn ghost" data-pg="delete" style="margin-left:auto">${icon("trash", 13)} Delete</button></div></div>`;
-  return `<div style="display:flex;gap:8px;align-items:center"><span class="mono-badge" style="width:28px;height:28px;font-size:11px">${gate ? "◆" : mono(s.agent)}</span><h3>${gate ? "Gateway" : "Step"} ${esc(pos[id])}</h3></div>
+  return `<div style="display:flex;gap:8px;align-items:center">${pgBadge(gate ? null : s.agent)}<h3>${gate ? "Gateway" : "Step"} ${esc(pos[id])}</h3></div>
     <div class="sec">${pgInput(s, "title", "Title", 'maxlength="60"')}
       <div class="row2">${pgInput(s, "id", "Id", 'class="mono" spellcheck="false"')}${pgInput(s, "output", gate ? "Report for the rework step" : "Report (output)", 'class="mono" spellcheck="false"')}</div>
       ${gate ? "" : `<label class="field"><span>Agent${agents[s.agent] && agents[s.agent].writes_code ? " · changes code" : ""}</span><select data-pgf="agent"><optgroup label="Standard">${agentOpts(std)}</optgroup>${mine.length ? `<optgroup label="Yours">${agentOpts(mine)}</optgroup>` : ""}<option value="__new">＋ New agent…</option></select></label>
       <label class="field"><span>Task</span><textarea data-pgf="task" rows="3">${esc(s.task)}</textarea></label>`}</div>
     ${loop}${conds}
-    <div class="sec"><h3>${icon("down", 13)} Reads (input artifacts)</h3>${picks("inputs", readIds)}${gate ? `<small class="muted">The reports and code this gateway measures.</small>` : ""}
+    <div class="sec"><h3>${icon("down", 13)} Reads (input artifacts)</h3>${picks("inputs", readIds)}<small class="muted">${gate ? "The reports and code this gateway measures. " : ""}Only what earlier steps write${[...avail.loop].some((a) => !avail.before.has(a)) ? `, and ${icon("loop", 11)} what a feedback loop brings back from later steps` : ""}.</small>
       <h3 style="margin-top:4px">${icon("up", 13)} Writes (output artifacts)</h3>${picks("outputs", writeIds)}<small class="muted">The report path above is always one of them. <button class="btn ghost" style="height:auto;padding:0" data-pg-tab="artifacts" data-new="artifact">New artifact…</button></small></div>
     ${placement}`;
 }
@@ -374,9 +413,9 @@ function pgAgentsPane() {
   const pg = ui.pg, agents = pgAgents(), stages = flat(pg.draft.pipeline), form = pg.form && pg.form.kind === "agent" ? pg.form : null;
   const row = (a) => {
     const used = stages.filter((s) => s.agent === a.name).map((s) => s.title);
-    return `<div class="pg-item"><div class="h"><span class="mono-badge" style="width:24px;height:24px;font-size:10px;border-radius:6px">${mono(a.name)}</span><b>${esc(a.title)}</b>${a.custom ? `<span class="chip accent">custom</span>` : ""}
+    return `<div class="pg-item"><div class="h">${pgBadge(a.name, 24)}<b>${esc(a.title)}</b>${a.custom ? `<span class="chip accent">custom</span>` : ""}
       ${a.custom ? `<button class="btn" data-pg="agent-edit" data-id="${esc(a.name)}">Edit</button><button class="btn" data-pg="agent-delete" data-id="${esc(a.name)}" ${used.length ? `disabled title="Used by ${esc(used.join(", "))}"` : ""}>Delete</button>` : ""}</div>
-      <span class="muted">${esc(a.role || "")}</span><span class="muted">${esc(modelName(a.model))} · ${esc(a.effort)} · ${a.writes_code ? "changes code" : "report only"}</span>
+      <span class="muted">${esc(a.role || "")}</span><span class="muted">${esc(pgModel(a.model))} · ${esc(a.effort)} · ${a.writes_code ? "changes code" : "report only"}</span>
       <span class="muted">${used.length ? "Used in " + esc(used.join(", ")) : "Not in the plan"}</span></div>`;
   };
   return `<div class="acts"><h3 style="margin-right:auto;align-self:center">Agents</h3>${form ? "" : `<button class="btn" data-pg="agent-new">+ New agent</button>`}</div>

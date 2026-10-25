@@ -510,17 +510,29 @@ def _validate_gateway(s: dict, label: str, errors: list) -> str:
 
 def plan_issues(clean: dict, catalog: dict) -> list:
     """Problems with how the plan fits together, as [{level: error|warning, stage, message}]: feedback loops that
-    don't go back, and artifacts a stage reads that nothing before it writes."""
+    don't go back, and artifacts a stage reads that nothing before it writes. A feedback loop makes what its phases
+    write readable by those same phases on the next pass, so that is not a problem."""
     plan, table = phases(clean.get("pipeline")), artifact_table(clean)
     where = {s["id"]: i for i, ph in enumerate(plan) for s in ph}
     by_id = {s["id"]: s for ph in plan for s in ph}
+    flat_ids = [s["id"] for ph in plan for s in ph]
     out = []
 
     def add(level, stage, message):
         out.append({"level": level, "stage": stage["id"], "message": f"{stage['title']}: {message}"})
 
+    def back_of(s):  # where a failed gateway sends the work: its 'on fail', else the nearest earlier build stage
+        if s.get("on_fail"):
+            return s["on_fail"]
+        earlier = flat_ids[:flat_ids.index(s["id"])]
+        return next((x for x in reversed(earlier) if by_id[x].get("agent") == "developer"), earlier[-1] if earlier else None)
+
+    loops = [(where[t], g) for g, ph in enumerate(plan) for s in ph if gateway(s)
+             for t in [back_of(s)] if t in where and where[t] <= g]  # (target phase, gateway phase)
+
     for i, phase in enumerate(plan):
         earlier = {a for ph in plan[:i] for s in ph for a in produced(s, catalog, table)}
+        again = [(t, g) for t, g in loops if t <= i <= g]  # loops over this phase
         for s in phase:
             target = s.get("on_fail")
             if gateway(s) and target in where:
@@ -532,8 +544,10 @@ def plan_issues(clean: dict, catalog: dict) -> list:
             elif gateway(s) and is_gate(s) and i == 0:
                 add("warning", s, "it is the first step, so there is nothing to measure or go back to.")
             beside = {a for o in phase if o is not s for a in produced(o, catalog, table)}
+            back = {a for t, g in again for ph in plan[t:g + 1] for o in ph if not (is_gate(s) and o is s)
+                    for a in produced(o, catalog, table)}  # what those phases wrote on the previous pass
             for a in s.get("inputs") or []:
-                if a == "requirements" or a in earlier:
+                if a == "requirements" or a in earlier or a in back:
                     continue
                 name = table.get(a, {}).get("title", a)
                 if a in beside:
