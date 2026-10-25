@@ -1,0 +1,9 @@
+.env
+*.log
+runs/
+worktrees/
+.DS_Store
+node_modules/
+__pycache__/
+.venv/
+logs/
