@@ -128,7 +128,7 @@ main { max-width: 1560px; margin: 0 auto; padding: 20px 24px 48px; display: grid
 .field { display: grid; gap: 4px; min-width: 0; }
 .field > span { font-size: 12px; color: var(--ink-2); font-weight: 500; }
 .field small { font-size: 11.5px; color: var(--muted); }
-input[type="text"], input[type="number"], select, textarea {
+input[type="text"], input[type="number"], input[type="url"], select, textarea {
   height: 32px; padding: 0 10px; border-radius: 8px; border: 1px solid var(--axis); background: var(--surface); min-width: 0; width: 100%;
 }
 textarea { height: auto; min-height: 56px; padding: 7px 10px; resize: vertical; line-height: 1.45; }
@@ -376,6 +376,104 @@ tr.open .chev { transform: rotate(90deg); }
 .savebar-in .msg { margin-right: auto; font-size: 13px; display: flex; gap: 8px; align-items: center; }
 .errors { margin: 8px 0 0; padding-left: 18px; color: var(--critical); font-size: 12.5px; }
 
+/* ---------- settings layout + navigation ---------- */
+.settings-layout { display: grid; grid-template-columns: 196px minmax(0, 1fr); gap: 24px; align-items: start; }
+.set-nav { position: sticky; top: calc(var(--top-h, 140px) + 20px); display: grid; gap: 14px; align-content: start; }
+.set-nav .grp { display: grid; gap: 1px; }
+.set-nav .grp > span { font-size: 11px; text-transform: uppercase; letter-spacing: .05em; color: var(--muted); padding: 0 10px 3px; font-weight: 600; }
+.set-nav button { text-align: left; border: 0; background: none; padding: 6px 10px; border-radius: 8px; cursor: pointer; color: var(--ink-2); font-size: 13px; }
+.set-nav button:hover { background: var(--wash); color: var(--ink); }
+.set-nav button[aria-current="true"] { background: var(--accent-wash); color: var(--ink); font-weight: 600; }
+.set-nav .setup-link { justify-content: flex-start; text-decoration: none; }
+#settingsBody > section.card { scroll-margin-top: calc(var(--top-h, 140px) + 20px); }
+.warnings { margin: 8px 0 0; padding-left: 18px; font-size: 12.5px; color: var(--ink); }
+.warnings li::marker { color: var(--serious); }
+@media (max-width: 900px) {
+  .settings-layout { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+  .set-nav { position: static; display: flex; gap: 4px; overflow-x: auto; scrollbar-width: none; padding-bottom: 2px; }
+  .set-nav .grp { display: contents; }
+  .set-nav .grp > span { display: none; }
+  .set-nav button, .set-nav .setup-link { white-space: nowrap; flex: none; border: 1px solid var(--border); background: var(--surface); }
+  #settingsBody > section.card { scroll-margin-top: 16px; }
+}
+
+/* ---------- presets + agent editor ---------- */
+.presets { display: grid; gap: 10px; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); }
+.preset { display: grid; gap: 4px; text-align: left; padding: 12px 14px; border-radius: 12px; border: 1.5px solid var(--border); background: var(--surface); cursor: pointer; align-content: start; }
+.preset:hover { background: var(--surface-2); }
+.preset.on { border-color: var(--accent); background: var(--accent-wash); }
+.preset b { font-size: 14px; display: flex; align-items: center; gap: 6px; }
+.preset .desc { color: var(--ink-2); font-size: 12.5px; }
+.preset .mix { color: var(--muted); font-size: 11.5px; }
+.agent-eds { display: grid; gap: 10px; margin-top: 16px; }
+.agent-ed { border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; background: var(--surface); display: grid; gap: 12px; }
+.agent-ed.off { background: var(--surface-2); }
+.agent-ed.off .ae-main, .agent-ed.off .ae-foot { opacity: .55; }
+.ae-h { display: flex; gap: 10px; align-items: center; }
+.ae-h .t { min-width: 0; margin-right: auto; }
+.ae-h .t .muted { font-size: 12px; }
+.ae-main { display: flex; gap: 12px 18px; flex-wrap: wrap; align-items: end; }
+.ae-main .field { width: auto; }
+.ae-main select { width: 130px; }
+.ae-main .used { font-size: 12.5px; color: var(--ink-2); min-height: 32px; display: flex; align-items: center; }
+.ae-foot { display: flex; gap: 8px 12px; flex-wrap: wrap; align-items: flex-start; }
+.ae-foot details { flex: 1 1 320px; min-width: 0; }
+.ae-foot summary { cursor: pointer; font-size: 12.5px; color: var(--ink-2); height: 28px; display: flex; align-items: center; gap: 6px; }
+.ae-foot details[open] summary { margin-bottom: 6px; }
+.ae-foot textarea { font-family: var(--mono); font-size: 12px; }
+.tool-bad { color: var(--critical); font-size: 12px; margin-top: 4px; }
+.switch { display: inline-flex; align-items: center; gap: 8px; cursor: pointer; font-size: 12.5px; color: var(--ink-2); flex: none; }
+.switch input { appearance: none; -webkit-appearance: none; width: 34px; height: 20px; border-radius: 999px; background: var(--axis); position: relative; margin: 0; cursor: pointer; transition: background .15s; flex: none; }
+.switch input::after { content: ""; position: absolute; top: 2px; left: 2px; width: 16px; height: 16px; border-radius: 50%; background: #fff; box-shadow: 0 1px 2px rgba(0,0,0,.25); transition: left .15s; }
+.switch input:checked { background: var(--accent); }
+.switch input:checked::after { left: 16px; }
+.switch input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+.checks { display: flex; gap: 4px 18px; flex-wrap: wrap; }
+.budget-now { display: grid; gap: 6px; margin-top: 14px; padding: 10px 12px; border-radius: 10px; background: var(--surface-2); font-size: 12.5px; color: var(--ink-2); }
+.meter.warn > i { background: var(--warning); }
+.meter.crit > i { background: var(--critical); }
+.role.off { opacity: .6; }
+
+/* ---------- service ---------- */
+.svc-status { display: flex; gap: 8px 10px; align-items: center; flex-wrap: wrap; }
+.svc-status b { font-size: 15px; }
+.svc-btns { display: flex; gap: 8px; flex-wrap: wrap; margin: 12px 0 14px; }
+.svc-btns .btn { height: 32px; padding: 0 14px; }
+
+/* ---------- setup wizard ---------- */
+#view-setup { max-width: 820px; }
+.wiz-h { display: flex; gap: 12px; align-items: flex-start; padding: 18px 20px 0; }
+.wiz-h h2 { margin: 2px 0 0; font-size: 20px; letter-spacing: -.01em; }
+.wiz-h .kicker { color: var(--muted); font-size: 12.5px; }
+.wiz-h .btn { margin-left: auto; }
+.wiz-steps { list-style: none; margin: 16px 20px 0; padding: 0; display: flex; gap: 6px; flex-wrap: wrap; }
+.wiz-steps li { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--muted); padding: 3px 10px 3px 4px; border-radius: 999px; border: 1px solid var(--border); background: var(--surface); }
+.wiz-steps .n { width: 20px; height: 20px; border-radius: 50%; display: grid; place-items: center; font-size: 11px; font-weight: 700; background: var(--surface-2); }
+.wiz-steps li.cur { color: var(--ink); border-color: var(--accent); background: var(--accent-wash); font-weight: 600; }
+.wiz-steps li.cur .n { background: var(--accent); color: var(--on-accent); }
+.wiz-steps li.done { color: var(--ink-2); }
+.wiz-steps li.done .n { background: color-mix(in srgb, var(--good) 18%, var(--surface)); color: var(--good-ink); }
+.wiz-b { padding: 18px 20px; display: grid; gap: 14px; }
+.wiz-b > p { margin: 0; color: var(--ink-2); }
+.wiz-f { display: flex; gap: 8px; padding: 14px 20px; border-top: 1px solid var(--grid); align-items: center; flex-wrap: wrap; }
+.wiz-f .btn { height: 34px; padding: 0 16px; }
+.wiz-f .grow { margin-right: auto; }
+.summary-list { margin: 0; display: grid; grid-template-columns: max-content minmax(0, 1fr); gap: 8px 18px; font-size: 13.5px; }
+.summary-list dt { color: var(--muted); }
+.summary-list dd { margin: 0; }
+#promptDlg { width: min(980px, calc(100vw - 32px)); }
+#promptDlg .pd-b { padding: 12px 16px; display: grid; gap: 6px; }
+#promptDlg textarea { min-height: min(60vh, 560px); font: 12.5px/1.6 var(--mono); }
+#promptDlg .pd-f { display: flex; gap: 8px; padding: 0 16px 14px; flex-wrap: wrap; align-items: center; }
+@media (max-width: 640px) {
+  .wiz-h, .wiz-b, .wiz-f { padding-left: 14px; padding-right: 14px; }
+  .wiz-steps { margin-left: 14px; margin-right: 14px; }
+  .wiz-steps li span:last-child { display: none; }
+  .wiz-steps li.cur span:last-child { display: inline; }
+  .summary-list { grid-template-columns: minmax(0, 1fr); gap: 2px; }
+  .summary-list dd { margin-bottom: 8px; }
+}
+
 /* ---------- log + queue ---------- */
 .log { max-height: 340px; overflow: auto; background: var(--surface-2); border-radius: 8px; padding: 10px 12px; margin: 0; white-space: pre-wrap; word-break: break-word; font: 12px/1.55 var(--mono); }
 .log .err { color: var(--critical); font-weight: 600; }
@@ -543,7 +641,15 @@ footer { max-width: 1560px; margin: 0 auto; padding: 0 24px 32px; color: var(--m
 
 <!-- ================= SETTINGS ================= -->
 <main id="view-settings" hidden>
-  <div id="settingsBody" class="settings-grid"><div class="empty">Loading settings…</div></div>
+  <div class="settings-layout">
+    <nav class="set-nav" id="setNav" aria-label="Settings sections"></nav>
+    <div id="settingsBody" class="settings-grid"><div class="empty">Loading settings…</div></div>
+  </div>
+</main>
+
+<!-- ================= SETUP WIZARD ================= -->
+<main id="view-setup" hidden>
+  <section class="card" id="wizard" aria-live="polite"><div class="empty">Loading setup…</div></section>
 </main>
 
 <footer id="foot"></footer>
@@ -552,6 +658,14 @@ footer { max-width: 1560px; margin: 0 auto; padding: 0 24px 32px; color: var(--m
 <dialog id="dlg" aria-labelledby="dlgTitle">
   <div class="dh"><b id="dlgTitle"></b><span class="muted" id="dlgSub"></span><button class="btn" style="margin-left:auto" id="dlgClose">Close</button></div>
   <pre id="dlgBody"></pre>
+</dialog>
+<dialog id="promptDlg" aria-labelledby="pdTitle">
+  <div class="dh"><b id="pdTitle"></b><span class="muted" id="pdSub"></span><button class="btn" style="margin-left:auto" data-pd="close">Close</button></div>
+  <div class="pd-b">
+    <label class="field"><span>Role prompt</span><textarea id="pdText" spellcheck="false" aria-describedby="pdNote"></textarea></label>
+    <small class="muted" id="pdNote"></small>
+  </div>
+  <div class="pd-f"><button class="btn" data-pd="reset" id="pdReset">Reset to default</button><span style="margin-left:auto"></span><button class="btn" data-pd="close">Cancel</button><button class="btn primary" data-pd="save" id="pdSave">Save prompt</button></div>
 </dialog>
 
 <script>
@@ -697,6 +811,7 @@ function stageStates(run) {
     else if (def.pass && !def.pass.includes(h.verdict)) r.state = "rework";
     else r.state = "done";
   }
+  (run.skipped || []).forEach((id) => { if (res[id] && res[id].state === "pending") res[id].state = "skipped"; });
   const c = run.current;
   if (c && c.stage && res[c.stage]) res[c.stage].state = "active";
   else if (run.status === "paused" && run.stage && res[run.stage]) res[run.stage].state = "paused";
@@ -758,10 +873,13 @@ function renderBanners(d) {
   if (ui.failing) out.push(["err", "<b>The dashboard can’t reach its server.</b> Showing data from " + ago(new Date(ui.lastOk).toISOString()) + ". Is <span class='mono'>factory/dashboard.py</span> still running?"]);
   const f = d.factory || {};
   if (f.error) out.push(["err", `<b>Last scan stopped:</b> ${esc(f.error)}`]);
-  const paused = d.runs.filter((r) => r.status === "paused");
+  const bud = d.budget || {};
+  if (bud.paused_until) out.push(["warn", `<b>Daily token cap reached.</b> The factory is paused until ${dateTime(bud.paused_until)}: ${compact(bud.today)} of ${compact(bud.daily_cap)} tokens used today. Raise the cap in <a href="#settings">Settings → Budgets</a> to continue on the next scan.`]);
+  if (bud.near_limit_until) out.push(["warn", `<b>Usage is near your subscription limit.</b> Runs are paused until ${dateTime(bud.near_limit_until)}.`]);
+  const paused = d.runs.filter((r) => r.status === "paused" && !r.reason);  // a reason means a budget pause
   if (paused.length) out.push(["warn", `<b>Usage limit reached${f.limit_hit ? " at " + time(f.limit_hit) : ""}.</b> ${paused.length} run${paused.length > 1 ? "s" : ""} paused; ${paused.length > 1 ? "they resume" : "it resumes"} on the next scan after your subscription window resets.`]);
   const svc = d.service || {};
-  if (!svc.loaded && !f.alive && ui.tab === "overview") out.push(["info", `The 10-minute service isn’t running. Start it with <span class="mono">scripts/install-service.sh</span> or run <span class="mono">python3 factory/orchestrator.py watch</span>.`]);
+  if (!svc.loaded && !f.alive && ui.tab === "overview") out.push(["info", `The 10-minute service isn’t running. Install it in <a href="#settings">Settings → Service</a> or run <span class="mono">python3 factory/orchestrator.py watch</span>.`]);
   $("banners").innerHTML = out.map(([k, html]) => `<div class="banner"><span class="ico">${icon(k === "err" ? "err" : k === "warn" ? "pause" : "info", 16)}</span><div>${html}</div></div>`).join("");
 }
 
@@ -813,7 +931,8 @@ function renderKpis(d) {
   <div class="card tile"><div class="label">Tool calls</div><div class="value">${full(sum(toolMap))}</div>
     <div class="foot">${topTools.length ? topTools.map(([k, v]) => esc(k) + " " + v).join(" · ") : "none yet"}</div></div>
   <div class="card tile"><div class="label">Agent time</div><div class="value">${dur(seconds)}</div>
-    <div class="foot">avg ${dur(stages.length ? stages.reduce((a, e) => a + (e.seconds || 0), 0) / stages.length : 0)} per stage run</div></div>`;
+    <div class="foot">avg ${dur(stages.length ? stages.reduce((a, e) => a + (e.seconds || 0), 0) / stages.length : 0)} per stage run</div></div>
+  ${budgetTile(d)}`;
 }
 function sparkCols(d) {
   const items = d.events.slice(-40);
@@ -950,10 +1069,10 @@ function renderRoster(d) {
     const tok = TOKEN_TYPES.reduce((x, t) => x + (s[t.key] || 0), 0);
     const verdicts = Object.entries(s.verdicts || {}).map(([v, n]) => `${n}× ${v.toLowerCase().replace("_", " ")}`).join(", ");
     const note = a.name === "orchestrator" ? (d.settings.mode === "auto" ? "decides each next stage" : "used in full-auto mode only") : used.has(a.name) ? `${d.settings.pipeline.filter((p) => p.agent === a.name).length} stage${d.settings.pipeline.filter((p) => p.agent === a.name).length > 1 ? "s" : ""} in plan` : "not in plan";
-    return `<div class="role ${busy.has(a.name) ? "busy" : ""}">
+    return `<div class="role ${busy.has(a.name) ? "busy" : ""} ${a.enabled === false ? "off" : ""}">
       <div class="mono-badge" aria-hidden="true">${mono(a.name)}</div>
       <div style="min-width:0">
-        <div class="top-line"><b>${esc(a.title)}</b>${busy.has(a.name) ? `<span class="chip"><span class="dot live"></span>working</span>` : ""}<span class="chip">${esc(modelName(a.model))}</span>${effortMeter(a.effort)}</div>
+        <div class="top-line"><b>${esc(a.title)}</b>${a.enabled === false ? `<span class="chip">disabled</span>` : ""}${a.prompt_override ? `<span class="chip accent">custom prompt</span>` : ""}${busy.has(a.name) ? `<span class="chip"><span class="dot live"></span>working</span>` : ""}<span class="chip">${esc(modelName(a.model))}</span>${effortMeter(a.effort)}</div>
         <div class="meta"><span>${esc(note)}</span><span>${s.stations} call${s.stations === 1 ? "" : "s"}</span><span>avg ${dur(s.stations ? s.seconds / s.stations : 0)}</span><span>${compact(tok)} tokens</span>${verdicts ? `<span>${esc(verdicts)}</span>` : ""}</div>
         <details><summary>${esc(a.role || "")} · ${a.tools.length} tools</summary><div class="tools">${a.tools.map((t) => `<span class="chip mono">${esc(t)}</span>`).join("") || '<span class="muted">no tools</span>'}</div></details>
       </div>
@@ -962,7 +1081,7 @@ function renderRoster(d) {
 }
 
 /* ---------- runs ---------- */
-const STATE_LABEL = { pending: "not started", done: "passed", rework: "sent back", active: "working now", paused: "paused (usage limit)", limit: "hit usage limit", error: "errored", failed: "failed", blocked: "blocked", skipped: "skipped by orchestrator" };
+const STATE_LABEL = { pending: "not started", done: "passed", rework: "sent back", active: "working now", paused: "paused (usage limit)", limit: "hit usage limit", error: "errored", failed: "failed", blocked: "blocked", skipped: "skipped" };
 function track(run) {
   const st = stageStates(run);
   return `<div class="trackN">${run.pipeline.map((s, i) => {
@@ -1059,6 +1178,7 @@ function runDetail(r) {
       <div><dt>Retry attempts</dt><dd>${r.attempts || 0}</dd></div>
       <div><dt>Tokens</dt><dd ${tipAttr(TOKEN_TYPES.map((x) => x.label + ": " + full(tok[x.key])).join("\n"))}>${full(sum(tok))}</dd></div>
       <div><dt>API-equivalent</dt><dd>${usd(r.totals.cost_usd)}</dd></div>
+      ${ui.data && ui.data.budget && ui.data.budget.run_cap ? `<div><dt>Token budget</dt><dd>${compact(sum(tok))} of ${compact(ui.data.budget.run_cap)}</dd></div>` : ""}
       <div><dt>Tool calls</dt><dd>${sum(toolTotals)}</dd></div>
       <div><dt>Created</dt><dd>${dateTime(r.created)}</dd></div>
     </dl>
@@ -1242,6 +1362,8 @@ async function loadSettings() {
     ui.draft = clone(ui.cfg.settings);
     ui.errors = [];
     renderSettings();
+    if (ui.tab === "setup" && !ui.wiz) startWizard();
+    maybeFirstRun();
   } catch (e) { $("settingsBody").innerHTML = `<div class="empty">Couldn’t load settings.</div>`; }
 }
 const dirty = () => ui.cfg && JSON.stringify(ui.draft) !== JSON.stringify(ui.cfg.settings);
@@ -1254,6 +1376,7 @@ function updateSaveBar() {
   $("saveBtn").disabled = !isDirty || ui.saving;
   $("discardBtn").disabled = !isDirty;
   $("errList").innerHTML = ui.errors.map((e) => `<li>${esc(e)}</li>`).join("");
+  $("warnList").innerHTML = draftWarnings(ui.draft).map((w) => `<li>${esc(w)}</li>`).join("");
 }
 function renderSettings() {
   const c = ui.cfg, s = ui.draft;
@@ -1287,19 +1410,7 @@ function renderSettings() {
     </div>
   </div></section>
 
-  <section class="card"><div class="card-h"><h2>Agents</h2><span class="sub">model and effort for each agent</span>
-    <div class="right"><button class="btn" data-act="reset-agents">Reset to defaults</button></div></div><div class="card-b">
-    <div class="tbl-wrap"><table class="agents-tbl"><thead><tr><th>Agent</th><th>Model</th><th>Effort</th><th>Used in</th></tr></thead><tbody>
-    ${agentNames.map((n) => {
-      const a = c.catalog[n], v = s.agents[n] || { model: a.model, effort: a.effort };
-      const used = n === c.options.router ? "Full-auto mode" : s.pipeline.filter((p) => p.agent === n).map((p) => p.title).join(", ") || "—";
-      return `<tr><td><div style="display:flex;gap:10px;align-items:center"><span class="mono-badge" aria-hidden="true">${mono(n)}</span><div><b>${esc(a.title)}</b><div class="muted" style="font-size:12px;max-width:320px">${esc(a.role || "")}</div></div></div></td>
-        <td><select data-agent="${n}" data-f="model" aria-label="${esc(a.title)} model">${opt(c.options.models, v.model, cap)}</select></td>
-        <td><div class="effort-pick" role="group" aria-label="${esc(a.title)} effort">${c.options.efforts.map((e) => `<button type="button" data-agent="${n}" data-f="effort" data-v="${e}" aria-pressed="${v.effort === e}">${e}</button>`).join("")}</div></td>
-        <td class="ink2" style="font-size:12.5px">${esc(used)}</td></tr>`;
-    }).join("")}</tbody></table></div>
-    <p class="sec-desc">Model names are aliases for the latest model of each family. Higher effort thinks longer: better results, more of your usage.</p>
-  </div></section>
+  ${agentsSection(c, s)}
 
   <section class="card"><div class="card-h"><h2>Plan</h2><span class="sub">the stages each run goes through${s.mode === "auto" ? ", used as the Orchestrator’s catalogue" : ""}</span>
     <div class="right"><a class="btn" href="#plan">View diagram</a><button class="btn" data-act="reset-plan">Reset to default</button></div></div><div class="card-b">
@@ -1327,11 +1438,16 @@ function renderSettings() {
     </div>
   </div></section>
 
+  ${budgetsSection(c, s)}
+  ${notifySection(c, s)}
+  ${serviceSection()}
+
   <div class="savebar"><div class="savebar-in">
-    <div style="margin-right:auto"><div class="msg" id="saveMsg"></div><ul class="errors" id="errList"></ul></div>
+    <div style="margin-right:auto"><div class="msg" id="saveMsg"></div><ul class="errors" id="errList"></ul><ul class="warnings" id="warnList"></ul></div>
     <button class="btn" id="discardBtn" data-act="discard">Discard</button>
     <button class="btn primary" id="saveBtn" data-act="save">Save settings</button>
   </div></div>`;
+  afterSettingsRender();
   updateSaveBar();
 }
 function onSettingsInput(e) {
@@ -1343,6 +1459,9 @@ function onSettingsInput(e) {
     if (k === "mode") { renderSettings(); return; }
   } else if (t.dataset.agent && t.dataset.f === "model") {
     s.agents[t.dataset.agent] = Object.assign({}, s.agents[t.dataset.agent], { model: t.value });
+    markPresets();
+  } else if (t.dataset.agent || t.dataset.budget || t.dataset.notify || t.dataset.notifyEvent) {
+    if (onControlInput(e, s)) { renderSettings(); return; }
   } else if (t.dataset.stage) {
     const p = s.pipeline[Number(t.dataset.stage)], f = t.dataset.f;
     if (f === "pass") {
@@ -1366,8 +1485,9 @@ async function onSettingsClick(t) {
   if (t.dataset.agent && t.dataset.f === "effort") {
     s.agents[t.dataset.agent] = Object.assign({}, s.agents[t.dataset.agent], { effort: t.dataset.v });
     t.parentElement.querySelectorAll("button").forEach((b) => b.setAttribute("aria-pressed", String(b === t)));
-    updateSaveBar(); return true;
+    markPresets(); updateSaveBar(); return true;
   }
+  if (await onControlClick(t, s, c)) return true;
   if (!act) return false;
   const i = Number(t.dataset.i);
   if (act === "up" || act === "down") { const j = act === "up" ? i - 1 : i + 1; [s.pipeline[i], s.pipeline[j]] = [s.pipeline[j], s.pipeline[i]]; }
@@ -1400,11 +1520,426 @@ async function saveSettings() {
   ui.saving = false; updateSaveBar();
 }
 
+/* ---------- settings: agents, budgets, notifications, service ---------- */
+// Settings sections are found by their <h2>; a section can set data-group to choose its group in the side nav.
+const NAV_GROUPS = { "Project": "Project", "How the SDLC runs": "Project", "Agents": "Agents & plan", "Plan": "Agents & plan" };
+const EVENT_TEXT = { done: "Done", failed: "Failed", blocked: "Blocked", paused: "Paused (usage limit or budget)" };
+const SVC_BUSY = { install: "Installing…", start: "Starting…", stop: "Stopping…", uninstall: "Uninstalling…" };
+const M = 1e6;
+const cap1 = (x) => x[0].toUpperCase() + x.slice(1);
+const postJson = (url, body) => fetch(url, { method: "POST", headers: { "Content-Type": "application/json", "X-Cortana": "1" }, body: JSON.stringify(body) }).then((r) => r.json());
+Object.assign(ui, { toolsOpen: new Set(), svc: null, svcBusy: null, wiz: null, prompt: null, firstRunShown: false });
+
+function agentConf(s, c, n) { const a = c.catalog[n]; return Object.assign({ model: a.model, effort: a.effort }, s.agents[n]); }
+function agentTools(s, c, n) { const v = s.agents[n] || {}; return Array.isArray(v.tools) ? v.tools : c.catalog[n].tools; }
+function applyPreset(s, c, key) { Object.entries(c.options.presets[key].agents).forEach(([n, v]) => (s.agents[n] = Object.assign({}, s.agents[n], v))); }
+function matchingPreset(s, c) {
+  return Object.keys(c.options.presets).find((k) => Object.entries(c.options.presets[k].agents).every(([n, v]) => {
+    const a = agentConf(s, c, n); return a.model === v.model && a.effort === v.effort;
+  })) || null;
+}
+function presetCards(c, current, attr) {
+  return `<div class="presets" role="group" aria-label="Agent presets">${Object.entries(c.options.presets).map(([k, p]) => {
+    const counts = {}; Object.values(p.agents).forEach((v) => (counts[v.model] = (counts[v.model] || 0) + 1));
+    const efforts = EFFORTS.filter((e) => Object.values(p.agents).some((v) => v.effort === e));
+    return `<button type="button" class="preset ${current === k ? "on" : ""}" ${attr}="${k}" aria-pressed="${current === k}">
+      <b>${current === k ? icon("check", 14) : ""}${esc(p.title)}</b><span class="desc">${esc(p.desc)}</span>
+      <span class="mix">${Object.entries(counts).map(([m, n]) => `${cap1(m)} ×${n}`).join(" · ")} · ${efforts.join("/")} effort</span></button>`;
+  }).join("")}</div>`;
+}
+function markPresets() { const box = $("presetBox"); if (box) box.innerHTML = presetCards(ui.cfg, matchingPreset(ui.draft, ui.cfg), "data-preset"); }
+function toolProblems(tools) {
+  const o = ui.cfg.options, re = new RegExp(o.tool_pattern), banned = new Set(o.unsafe_commands);
+  return tools.flatMap((t) => {
+    if (!re.test(t)) return [`“${t}” is not an allowed tool.`];
+    const m = /^Bash\(([^ )]+)/.exec(t);
+    return m && banned.has(m[1].split("/").pop()) ? [`“${t}” runs ${m[1]}, which agents may not use.`] : [];
+  });
+}
+function draftWarnings(s) {
+  if (!s) return [];
+  const off = new Set(Object.entries(s.agents || {}).filter(([, v]) => v && v.enabled === false).map(([n]) => n));
+  const out = [];
+  s.pipeline.forEach((p, i) => {
+    if (off.has(p.agent) && p.pass && p.pass.length) out.push(`Stage ${i + 1} (${p.title}) is ${p.required ? "a required gate" : "a gate"}, but its agent is disabled: it will be skipped${p.required ? ", so full-auto runs can finish without it" : ""}.`);
+    else if (p.on_fail) {
+      const t = s.pipeline.find((o) => o.id === p.on_fail);
+      if (t && off.has(t.agent)) out.push(`Stage ${i + 1} (${p.title}) sends failures back to ${t.title}, whose agent is disabled: rework continues at the next enabled stage.`);
+    }
+  });
+  return out;
+}
+
+function agentsSection(c, s) {
+  return `<section class="card"><div class="card-h"><h2>Agents</h2><span class="sub">a preset, then fine-tune each agent</span>
+    <div class="right"><button class="btn" data-act="reset-agents">Reset to defaults</button></div></div><div class="card-b">
+    <div id="presetBox">${presetCards(c, matchingPreset(s, c), "data-preset")}</div>
+    <p class="sec-desc">A preset sets every agent’s model and effort in one click. Adjust any agent below afterwards; nothing is saved until you press Save.</p>
+    <div class="agent-eds">${Object.keys(c.catalog).map((n) => agentEditor(c, s, n)).join("")}</div>
+    <p class="sec-desc">Model names are aliases for the latest model of each family. Higher effort thinks longer: better results, more of your usage.</p>
+  </div></section>`;
+}
+function agentEditor(c, s, n) {
+  const a = c.catalog[n], v = agentConf(s, c, n), router = n === c.options.router, on = v.enabled !== false;
+  const tools = agentTools(s, c, n), custom = Array.isArray((s.agents[n] || {}).tools), bad = router ? [] : toolProblems(tools);
+  const used = router ? (s.mode === "auto" ? "Chooses every next stage" : "Full-auto mode only")
+    : s.pipeline.filter((p) => p.agent === n).map((p) => p.title).join(", ") || "Not in the plan";
+  return `<div class="agent-ed ${on ? "" : "off"}">
+    <div class="ae-h"><span class="mono-badge" aria-hidden="true">${mono(n)}</span>
+      <div class="t"><b>${esc(a.title)}</b>${on ? "" : ` <span class="chip">disabled</span>`}<div class="muted">${esc(a.role || "")}</div></div>
+      <label class="switch"><input type="checkbox" data-agent="${n}" data-f="enabled" ${on ? "checked" : ""} aria-label="${esc(a.title)} enabled"><span>${on ? "Enabled" : "Disabled"}</span></label></div>
+    <div class="ae-main">
+      <label class="field"><span>Model</span><select data-agent="${n}" data-f="model" aria-label="${esc(a.title)} model">${c.options.models.map((m) => `<option value="${m}" ${m === v.model ? "selected" : ""}>${cap1(m)}</option>`).join("")}</select></label>
+      <div class="field"><span>Effort</span><div class="effort-pick" role="group" aria-label="${esc(a.title)} effort">${c.options.efforts.map((e) => `<button type="button" data-agent="${n}" data-f="effort" data-v="${e}" aria-pressed="${v.effort === e}">${e}</button>`).join("")}</div></div>
+      <div class="field"><span>Used in</span><div class="used">${esc(used)}</div></div>
+    </div>
+    <div class="ae-foot">
+      ${router ? `<span class="muted" style="font-size:12.5px;line-height:28px;flex:1 1 320px">No tools: it only decides which stage runs next.</span>`
+      : `<details data-tools="${n}" ${ui.toolsOpen.has(n) || bad.length ? "open" : ""}><summary>${icon("tool", 13)}<span data-tools-sum="${n}">Tool allowlist · ${tools.length} allowed</span>${custom ? ` <span class="chip accent">custom</span>` : ""}</summary>
+        <textarea data-agent="${n}" data-f="tools" rows="3" spellcheck="false" aria-label="${esc(a.title)} tool allowlist">${esc(tools.join(", "))}</textarea>
+        <small class="muted">Comma-separated: built-in tools such as <span class="mono">Read</span>, <span class="mono">Edit</span> or <span class="mono">Grep</span>, or <span class="mono">Bash(command *)</span> for one command. Shells, network and system commands are refused.</small>
+        <div class="tool-bad" data-tool-bad="${n}">${bad.map(esc).join("<br>")}</div>
+        ${custom ? `<button class="btn" style="margin-top:6px" data-act="reset-tools" data-agent="${n}">Reset to default tools</button>` : ""}</details>`}
+      <button class="btn" data-act="prompt" data-agent="${n}">${icon("text", 13)} Prompt${a.prompt_override ? ` <span class="chip accent">custom</span>` : ""}</button>
+    </div>
+  </div>`;
+}
+
+const capHint = (v) => (v ? `${full(v)} tokens` : "No cap");
+const millions = (v) => +((v || 0) / M).toFixed(3);
+function budgetsSection(c, s) {
+  const b = s.budgets || {}, now = (ui.data && ui.data.budget) || c.budget || {}, d = ui.data;
+  const day = now.today || 0, pct = b.daily_tokens ? Math.min(100, (day / b.daily_tokens) * 100) : 0;
+  const finished = d ? d.runs.filter((r) => ["done", "failed", "blocked"].includes(r.status) && r.history.length) : [];
+  const avg = finished.length ? finished.reduce((a, r) => a + sum(r.totals.tokens), 0) / finished.length : 0;
+  const capInput = (key, label, help) => `<label class="field"><span>${label}</span><input type="number" min="0" step="0.5" inputmode="decimal" data-budget="${key}" value="${millions(b[key])}"><small><b data-budget-hint="${key}">${capHint(b[key])}</b> · ${help}</small></label>`;
+  return `<section class="card" data-group="Limits & alerts"><div class="card-h"><h2>Budgets</h2><span class="sub">token caps the orchestrator enforces</span></div><div class="card-b">
+    <div class="row-fields">
+      ${capInput("run_tokens", "Token cap per run (million tokens)", "a run that reaches it fails, with the reason in its details. 0 = no cap.")}
+      ${capInput("daily_tokens", "Daily token cap (million tokens)", "when all runs together reach it, the factory pauses until midnight. 0 = no cap.")}
+    </div>
+    <div class="budget-now"><div>Today so far: <b class="num">${compact(day)}</b> tokens${b.daily_tokens ? ` of ${compact(b.daily_tokens)} (${Math.round(pct)}%)` : ""}${avg ? ` · finished runs averaged <b class="num">${compact(avg)}</b>` : ""}</div>
+      ${b.daily_tokens ? `<div class="meter ${pct >= 100 ? "crit" : pct >= 80 ? "warn" : ""}"><i style="width:${pct}%"></i></div>` : ""}</div>
+    <label class="check" style="margin-top:10px"><input type="checkbox" data-budget="pause_near_limit" ${b.pause_near_limit ? "checked" : ""}> Pause when usage is near the subscription limit</label>
+    <p class="sec-desc">When the Claude CLI warns that your usage window is nearly used up, the run pauses after its current stage and resumes once the window resets. Without this, Cortana keeps going until the limit is hit, then pauses.</p>
+    <p class="sec-desc">Tokens count input, cache writes, cache reads and output, the same as Spent tokens on the Overview. A stage that crosses a cap is stopped within a few seconds.</p>
+  </div></section>`;
+}
+function notifySection(c, s) {
+  const n = s.notify || { events: {} };
+  return `<section class="card" data-group="Limits & alerts"><div class="card-h"><h2>Notifications</h2><span class="sub">when a run finishes or stops</span></div><div class="card-b">
+    <label class="switch"><input type="checkbox" data-notify="macos" ${n.macos ? "checked" : ""}><span>macOS notifications in Notification Center</span></label>
+    <div class="field" style="margin-top:14px"><span>Notify when a run is</span><div class="checks">${c.options.notify_events.map((e) => `<label class="check"><input type="checkbox" data-notify-event="${e}" ${(n.events || {})[e] ? "checked" : ""}> ${EVENT_TEXT[e] || e}</label>`).join("")}</div></div>
+    <label class="field" style="margin-top:10px"><span>Microsoft Teams incoming webhook (optional)</span><input type="url" data-notify="teams_webhook" value="${esc(n.teams_webhook || "")}" placeholder="https://….webhook.office.com/webhookb2/…" spellcheck="false" autocomplete="off">
+      <small>Only called when set. Cortana posts a short card with the run, its status and the reason. Use a channel’s Incoming Webhook URL, or a Workflows “post to a channel when a webhook request is received” URL.</small></label>
+    <div style="display:flex;gap:8px;align-items:center;margin-top:12px;flex-wrap:wrap"><button class="btn" data-act="notify-test">Send test notification</button><span class="muted" style="font-size:12px">Uses the values above, even before you save.</span></div>
+  </div></section>`;
+}
+function serviceSection() {
+  return `<section class="card" data-group="System"><div class="card-h"><h2>Service</h2><span class="sub">the launchd agent that scans on a schedule · buttons act immediately</span>
+    <div class="right"><button class="btn" data-act="svc-refresh">Refresh</button></div></div><div class="card-b" data-svc-box>${serviceBox(ui.svc)}</div></section>`;
+}
+function serviceBox(svc, compactView) {
+  if (!svc) return `<div class="empty">Checking the service…</div>`;
+  const busy = ui.svcBusy, mins = Math.round((svc.interval || 600) / 60);
+  const [dot, label, text] = svc.loaded ? ["good", "Running", `Scans the project folder every ${mins} minutes while you’re logged in.`]
+    : svc.installed ? ["serious", "Stopped", "Installed, but not loaded: no scheduled scans run until you start it."]
+    : ["", "Not installed", `Nothing scans in the background. Install it to scan every ${mins} minutes.`];
+  const btn = (a, l, off, primary) => `<button class="btn ${primary ? "primary" : ""}" data-svc="${a}" ${off || busy ? "disabled" : ""}>${busy === a ? SVC_BUSY[a] : l}</button>`;
+  return `<div class="svc-status"><span class="dot ${dot}"></span><b>${label}</b><span class="ink2" style="font-size:13px">${text}</span></div>
+    <div class="svc-btns">${btn("install", svc.installed ? "Reinstall" : "Install", false, !svc.installed)}${btn("start", "Start", !svc.installed || svc.loaded, svc.installed && !svc.loaded)}${btn("stop", "Stop", !svc.loaded)}${btn("uninstall", "Uninstall", !svc.installed)}</div>
+    ${compactView ? "" : `<dl class="facts" style="margin-bottom:14px"><div><dt>Label</dt><dd class="mono" style="word-break:break-all">${esc(svc.label)}</dd></div><div><dt>Interval</dt><dd>${mins} min</dd></div><div style="grid-column:1 / -1"><dt>Agent file</dt><dd class="mono" style="word-break:break-all">${esc(svc.plist)}</dd></div></dl>
+    <div class="muted" style="font-size:12px;margin-bottom:6px">launchd.log · last 20 lines · <span class="mono" style="word-break:break-all">${esc(svc.log_path)}</span></div>
+    ${svc.log.length ? `<pre class="log" style="max-height:260px">${svc.log.map(esc).join("\n")}</pre>` : `<div class="empty" style="padding:12px 0">No launchd output yet.</div>`}`}`;
+}
+function paintService() { document.querySelectorAll("[data-svc-box]").forEach((el) => (el.innerHTML = serviceBox(ui.svc, el.dataset.svcBox === "compact"))); }
+async function refreshService() {
+  try { const res = await fetch("/api/service", { cache: "no-store" }); if (res.ok) ui.svc = await res.json(); } catch (e) {}
+  paintService();
+}
+async function serviceAct(action) {
+  const ask = { stop: "Stop the service? Scheduled scans stop until you start it again. A scan in progress is stopped too; its run resumes from the last finished stage.",
+    uninstall: "Uninstall the service? Its launchd agent file is removed. Runs, input files and settings are kept." }[action];
+  if (ask && !confirm(ask)) return;
+  ui.svcBusy = action; paintService();
+  try {
+    const out = await postJson("/api/service", { action });
+    if (out.service) ui.svc = out.service;
+    toast(out.ok ? "Service: " + out.message : `Couldn’t ${action} the service: ${out.message || (out.errors || []).join(" ")}`);
+  } catch (e) { toast("Couldn’t reach the dashboard server."); }
+  ui.svcBusy = null; paintService(); fetchState();
+}
+async function notifyTest(n) {
+  try {
+    const out = await postJson("/api/notify-test", { notify: n });
+    toast(out.ok ? "Test notification sent." : (out.errors || ["Couldn’t send it."]).join(" "));
+  } catch (e) { toast("Couldn’t reach the dashboard server."); }
+}
+
+function afterSettingsRender() {
+  const groups = [];
+  document.querySelectorAll("#settingsBody > section.card").forEach((sec) => {
+    const h = sec.querySelector(".card-h h2"); if (!h) return;
+    const name = h.textContent.trim(), g = sec.dataset.group || NAV_GROUPS[name] || "More";
+    sec.id = "set-" + name.toLowerCase().replace(/[^a-z0-9]+/g, "-");
+    let grp = groups.find((x) => x.name === g); if (!grp) groups.push((grp = { name: g, items: [] }));
+    grp.items.push([sec.id, name]);
+  });
+  $("setNav").innerHTML = groups.map((g) => `<div class="grp"><span>${esc(g.name)}</span>${g.items.map(([id, name]) => `<button type="button" data-goto="${id}">${esc(name)}</button>`).join("")}</div>`).join("") +
+    `<div class="grp"><span>Setup</span><a class="btn setup-link" href="#setup">${icon("loop", 13)} Run setup again</a></div>`;
+  spySettings();
+  if (!ui.svc) refreshService();
+}
+function spySettings() {
+  if (ui.tab !== "settings") return;
+  const top = document.querySelector(".top"), edge = top.getBoundingClientRect().bottom + 40;
+  document.documentElement.style.setProperty("--top-h", top.offsetHeight + "px");  // sticky nav + jump offsets
+  const secs = [...document.querySelectorAll("#settingsBody > section.card[id]")];
+  let cur = secs[0];
+  for (const sec of secs) if (sec.getBoundingClientRect().top < edge) cur = sec;
+  if (secs.length && scrollY > 0 && innerHeight + scrollY >= document.documentElement.scrollHeight - 4) cur = secs[secs.length - 1];
+  const picked = ui.navTarget && $(ui.navTarget);  // a section picked in the nav stays current until the user scrolls
+  if (picked && picked.getBoundingClientRect().top < innerHeight) cur = picked;
+  document.querySelectorAll("#setNav [data-goto]").forEach((b) => b.setAttribute("aria-current", String(!!cur && b.dataset.goto === cur.id)));
+}
+window.addEventListener("scroll", spySettings, { passive: true });
+window.addEventListener("resize", spySettings);
+["wheel", "touchstart", "keydown"].forEach((k) => window.addEventListener(k, () => { ui.navTarget = null; }, { passive: true }));
+document.addEventListener("toggle", (e) => { const n = e.target.dataset && e.target.dataset.tools; if (n) e.target.open ? ui.toolsOpen.add(n) : ui.toolsOpen.delete(n); }, true);
+
+function onControlInput(e, s) {
+  // Returns true when the settings page needs a re-render.
+  const t = e.target, c = ui.cfg, n = t.dataset.agent;
+  if (n && t.dataset.f === "enabled") {
+    const v = Object.assign({}, s.agents[n]);
+    if (t.checked) delete v.enabled; else v.enabled = false;
+    s.agents[n] = v; return true;
+  }
+  if (n && t.dataset.f === "tools") {
+    const list = [...new Set(t.value.split(/[,\n]/).map((x) => x.trim()).filter(Boolean))], v = Object.assign({}, s.agents[n]);
+    if (JSON.stringify(list) === JSON.stringify(c.catalog[n].tools)) delete v.tools; else v.tools = list;
+    s.agents[n] = v;
+    const bad = document.querySelector(`[data-tool-bad="${n}"]`), label = document.querySelector(`[data-tools-sum="${n}"]`);
+    if (bad) bad.innerHTML = toolProblems(list).map(esc).join("<br>");
+    if (label) label.textContent = `Tool allowlist · ${list.length} allowed`;
+  } else if (t.dataset.budget) {
+    const b = (s.budgets = Object.assign({}, s.budgets)), k = t.dataset.budget;
+    b[k] = t.type === "checkbox" ? t.checked : t.value === "" ? 0 : Math.round(Number(t.value) * M);
+    const hint = document.querySelector(`[data-budget-hint="${k}"]`); if (hint) hint.textContent = capHint(b[k]);
+  } else if (t.dataset.notify) {
+    s.notify = Object.assign({}, s.notify, { [t.dataset.notify]: t.type === "checkbox" ? t.checked : t.value.trim() });
+  } else if (t.dataset.notifyEvent) {
+    s.notify = Object.assign({}, s.notify, { events: Object.assign({}, s.notify.events, { [t.dataset.notifyEvent]: t.checked }) });
+  }
+  return false;
+}
+async function onControlClick(t, s, c) {
+  if (t.dataset.goto) {
+    const el = $(t.dataset.goto);
+    ui.navTarget = t.dataset.goto;
+    if (el) el.scrollIntoView({ behavior: matchMedia("(prefers-reduced-motion: reduce)").matches ? "auto" : "smooth", block: "start" });
+    return true;
+  }
+  if (t.dataset.preset) { applyPreset(s, c, t.dataset.preset); renderSettings(); toast(`${c.options.presets[t.dataset.preset].title} preset applied. Adjust any agent, then save.`); return true; }
+  if (t.dataset.svc) { await serviceAct(t.dataset.svc); return true; }
+  const act = t.dataset.act;
+  if (act === "reset-tools") { const v = Object.assign({}, s.agents[t.dataset.agent]); delete v.tools; s.agents[t.dataset.agent] = v; renderSettings(); return true; }
+  if (act === "prompt") { openPrompt(t.dataset.agent); return true; }
+  if (act === "notify-test") { await notifyTest(s.notify); return true; }
+  if (act === "svc-refresh") { await refreshService(); return true; }
+  return false;
+}
+
+/* ---------- agent prompt editor ---------- */
+async function openPrompt(name) {
+  const dlg = $("promptDlg"), ta = $("pdText");
+  ui.prompt = null;
+  $("pdTitle").textContent = `${(ui.cfg.catalog[name] || {}).title || name} prompt`; $("pdSub").textContent = ""; $("pdNote").textContent = "";
+  ta.value = "Loading…"; ta.disabled = true; $("pdSave").disabled = $("pdReset").disabled = true;
+  if (!dlg.open) dlg.showModal();
+  try {
+    const res = await fetch(`/api/prompt?agent=${encodeURIComponent(name)}`, { cache: "no-store" });
+    if (!res.ok) throw new Error(res.status);
+    ui.prompt = await res.json();
+    ta.value = ui.prompt.prompt; ta.disabled = false; $("pdSave").disabled = false; $("pdReset").disabled = !ui.prompt.overridden;
+    $("pdSub").textContent = ui.prompt.overridden ? "· custom" : "· default";
+    $("pdNote").innerHTML = (ui.prompt.overridden ? `Your version is saved in <span class="mono">${esc(ui.prompt.path)}</span>; Reset to default deletes it.`
+      : `Saving writes your version to <span class="mono">${esc(ui.prompt.path)}</span> (not in git). The shipped prompt in <span class="mono">factory/agents/</span> stays as it is.`) +
+      " Prompt changes take effect immediately, without Save settings, from the next stage this agent runs.";
+  } catch (e) { ta.value = "Couldn’t load the prompt."; }
+}
+const promptEdited = () => ui.prompt && $("pdText").value !== ui.prompt.prompt;
+async function promptAction(kind) {
+  const p = ui.prompt, dlg = $("promptDlg");
+  if (kind === "close") { if (!promptEdited() || confirm("Discard your changes to this prompt?")) dlg.close(); return; }
+  if (!p || (kind === "reset" && !confirm("Reset to the default prompt? Your custom version is deleted."))) return;
+  try {
+    const out = await postJson("/api/prompt", kind === "reset" ? { agent: p.agent, reset: true } : { agent: p.agent, prompt: $("pdText").value });
+    if (!out.ok) { toast((out.errors || ["Couldn’t save the prompt."]).join(" ")); return; }
+    ui.cfg.catalog[p.agent].prompt_override = out.overridden;
+    toast(kind === "reset" ? "Prompt reset to the default." : out.overridden ? "Prompt saved. It applies from the next stage this agent runs." : "That’s the default prompt, so no custom version is kept.");
+    ui.prompt = null; dlg.close(); renderSettings(); fetchState();
+  } catch (e) { toast("Couldn’t reach the dashboard server."); }
+}
+$("promptDlg").addEventListener("click", (e) => { const b = e.target.closest("[data-pd]"); if (b) promptAction(b.dataset.pd); });
+$("promptDlg").addEventListener("cancel", (e) => { if (promptEdited() && !confirm("Discard your changes to this prompt?")) e.preventDefault(); });
+
+/* ---------- setup wizard ---------- */
+// A small step framework. A step is { id, title, heading?, render(w) → html, check?(w) → [errors],
+// input?(target, w) → re-render?, click?(target, w) → handled?, enter?(w), summary?(w) → text, when?(w) → shown? }.
+// `w` is ui.wiz: { at, draft, errors, busy }. Steps only edit w.draft; Finish saves it in one POST, so leaving
+// the wizard early changes nothing (service buttons are the exception: they act at once, as in Settings).
+const WIZARD_STEPS = [];
+function addWizardStep(step, where = {}) {
+  const ref = WIZARD_STEPS.findIndex((x) => x.id === (where.before || where.after));
+  const at = ref < 0 ? WIZARD_STEPS.length : where.before ? ref : ref + 1;
+  WIZARD_STEPS.splice(at, 0, step);
+}
+addWizardStep({
+  id: "mode", title: "Mode", heading: "How should runs move through the SDLC?",
+  render: (w) => `<p>Cortana turns requirement files into designed, built, tested and reviewed projects, with agents on your Claude subscription. A few choices and it’s ready; everything stays editable in Settings.</p>
+    <div class="modes" role="radiogroup" aria-label="SDLC mode">${ui.cfg.options.modes.map((m) => `<label class="mode-card"><input type="radio" name="wiz-mode" value="${m}" data-wiz-k="mode" ${w.draft.mode === m ? "checked" : ""}><div><b>${MODE_TEXT[m][0]}</b><p>${MODE_TEXT[m][1]}</p></div></label>`).join("")}</div>`,
+  summary: (w) => MODE_TEXT[w.draft.mode][0],
+});
+addWizardStep({
+  id: "agents", title: "Agents", heading: "Choose an agent preset",
+  render: (w) => {
+    const cur = matchingPreset(w.draft, ui.cfg);
+    return `<p>Pick how much model power the agents get. You can fine-tune each agent later in Settings → Agents.</p>${presetCards(ui.cfg, cur, "data-wiz-preset")}
+      ${cur ? "" : `<p class="muted" style="font-size:12.5px">Your agents are set up by hand now. Picking a preset replaces their models and effort.</p>`}`;
+  },
+  click: (t, w) => { if (!t.dataset.wizPreset) return false; applyPreset(w.draft, ui.cfg, t.dataset.wizPreset); return true; },
+  summary: (w) => { const p = matchingPreset(w.draft, ui.cfg); return p ? ui.cfg.options.presets[p].title + " preset" : "Custom models and effort"; },
+});
+addWizardStep({
+  id: "budgets", title: "Budgets", heading: "Set token budgets",
+  render: (w) => {
+    const b = w.draft.budgets;
+    return `<p>Optional caps. The orchestrator fails a run that reaches its cap, and pauses the whole factory until midnight at the daily cap. Leave 0 for no cap.</p>
+      <div class="row-fields">
+        <label class="field"><span>Token cap per run (million tokens)</span><input type="number" min="0" step="0.5" inputmode="decimal" data-wiz-budget="run_tokens" value="${millions(b.run_tokens)}"></label>
+        <label class="field"><span>Daily token cap (million tokens)</span><input type="number" min="0" step="0.5" inputmode="decimal" data-wiz-budget="daily_tokens" value="${millions(b.daily_tokens)}"></label>
+      </div>
+      <label class="check"><input type="checkbox" data-wiz-budget="pause_near_limit" ${b.pause_near_limit ? "checked" : ""}> Pause when usage is near the subscription limit</label>
+      <p class="muted" style="font-size:12.5px">Tokens include cache reads, so one run often uses tens of millions. The Overview shows how much each run used.</p>`;
+  },
+  input: (t, w) => {
+    const k = t.dataset.wizBudget; if (!k) return false;
+    w.draft.budgets = Object.assign({}, w.draft.budgets, { [k]: t.type === "checkbox" ? t.checked : t.value === "" ? 0 : Math.round(Number(t.value) * M) });
+    return false;
+  },
+  check: (w) => (["run_tokens", "daily_tokens"].some((k) => !(w.draft.budgets[k] >= 0)) ? ["Token caps must be 0 or a positive number."] : []),
+  summary: (w) => { const b = w.draft.budgets; return `${b.run_tokens ? compact(b.run_tokens) + " per run" : "No run cap"} · ${b.daily_tokens ? compact(b.daily_tokens) + " per day" : "no daily cap"}${b.pause_near_limit ? " · pauses near the usage limit" : ""}`; },
+});
+addWizardStep({
+  id: "service", title: "Service", heading: "Run the factory in the background",
+  render: () => `<p>The service is a launchd agent that scans <span class="mono">input/</span> every 10 minutes while you’re logged in. Install it now, or skip this step and run <span class="mono">python3 factory/orchestrator.py watch</span> yourself.</p><div data-svc-box="compact">${serviceBox(ui.svc, true)}</div>`,
+  enter: () => refreshService(),
+  summary: () => (ui.svc ? (ui.svc.loaded ? "Running" : ui.svc.installed ? "Installed, stopped" : "Not installed") : "—"),
+});
+// HOOK(project-step): the project-picker work adds its step first, e.g.
+//   addWizardStep({ id: "project", title: "Project", render, check, summary }, { before: "mode" });
+// HOOK(trigger-step): the triggers work adds its step before the service, e.g.
+//   addWizardStep({ id: "trigger", title: "Trigger", render, check, summary }, { before: "service" });
+addWizardStep({
+  id: "done", title: "Done", heading: "Ready to go",
+  render: (w) => `<p>Finish to save these settings. Then drop a requirements <span class="mono">.md</span> file into <span class="mono">input/</span> to start a run.</p>
+    <dl class="summary-list">${wizardSteps().filter((x) => x.summary).map((x) => `<dt>${esc(x.title)}</dt><dd>${esc(x.summary(w))}</dd>`).join("")}
+      <dt>Notifications</dt><dd>${w.draft.notify.macos ? "macOS" : "Off"}${w.draft.notify.teams_webhook ? " and Teams" : ""} · change them in Settings → Notifications</dd></dl>`,
+});
+const wizardSteps = () => WIZARD_STEPS.filter((x) => !x.when || x.when(ui.wiz));
+function startWizard() {
+  ui.wiz = { at: 0, draft: clone(dirty() ? ui.draft : ui.cfg.settings), errors: [], busy: false };
+  enterStep();
+}
+function enterStep() {
+  const st = wizardSteps()[ui.wiz.at];
+  if (st.enter) st.enter(ui.wiz);
+  renderWizard();
+  const h = $("wizard").querySelector("h2"); if (h) h.focus({ preventScroll: true });
+  window.scrollTo(0, 0);
+}
+function renderWizard() {
+  const w = ui.wiz, el = $("wizard");
+  if (!ui.cfg || !w) { el.innerHTML = `<div class="empty">Loading setup…</div>`; return; }
+  const steps = wizardSteps(), st = steps[w.at], last = w.at === steps.length - 1, again = !!ui.cfg.settings.setup_completed;
+  el.innerHTML = `<div class="wiz-h"><div><div class="kicker">${again ? "Setup" : "Welcome to Cortana"} · step ${w.at + 1} of ${steps.length}</div><h2 tabindex="-1">${esc(st.heading || st.title)}</h2></div>
+      <button class="btn ghost" data-wiz="skip">${again ? "Cancel" : "Skip setup"}</button></div>
+    <ol class="wiz-steps" aria-label="Setup steps">${steps.map((x, i) => `<li class="${i < w.at ? "done" : i === w.at ? "cur" : ""}" ${i === w.at ? 'aria-current="step"' : ""}><span class="n">${i < w.at ? "✓" : i + 1}</span><span>${esc(x.title)}</span></li>`).join("")}</ol>
+    <div class="wiz-b">${st.render(w)}${w.errors.length ? `<ul class="errors">${w.errors.map((e) => `<li>${esc(e)}</li>`).join("")}</ul>` : ""}</div>
+    <div class="wiz-f"><button class="btn grow" data-wiz="back" ${w.at === 0 ? "disabled" : ""}>Back</button><button class="btn primary" data-wiz="next" ${w.busy ? "disabled" : ""}>${last ? (w.busy ? "Saving…" : "Finish setup") : "Next"}</button></div>`;
+}
+function onWizardInput(e) {
+  const t = e.target, w = ui.wiz; if (!w) return;
+  if (t.dataset.wizK) { w.draft[t.dataset.wizK] = t.value; return; }
+  const st = wizardSteps()[w.at];
+  if (st.input && st.input(t, w)) renderWizard();
+}
+async function onWizardClick(t) {
+  const w = ui.wiz; if (!w) return false;
+  const st = wizardSteps()[w.at];
+  if (t.dataset.svc) { await serviceAct(t.dataset.svc); return true; }
+  if (st.click && st.click(t, w)) { renderWizard(); return true; }
+  const a = t.dataset.wiz; if (!a) return false;
+  if (a === "back") { w.errors = []; w.at = Math.max(0, w.at - 1); enterStep(); }
+  else if (a === "next") {
+    w.errors = st.check ? st.check(w) : [];
+    if (w.errors.length) renderWizard();
+    else if (w.at === wizardSteps().length - 1) await finishWizard();
+    else { w.at++; enterStep(); }
+  } else if (a === "skip") await leaveWizard();
+  return true;
+}
+async function postSettings(body) {
+  try {
+    const out = await postJson("/api/settings", body);
+    if (!out.ok) return { ok: false, errors: out.errors || ["Couldn’t save."] };
+    ui.cfg = out; ui.draft = clone(out.settings); ui.errors = []; fetchState();
+    return out;
+  } catch (e) { return { ok: false, errors: ["Couldn’t reach the dashboard server."] }; }
+}
+async function finishWizard() {
+  const w = ui.wiz; w.busy = true; renderWizard();
+  const out = await postSettings(Object.assign(clone(w.draft), { setup_completed: new Date().toISOString() }));
+  w.busy = false;
+  if (!out.ok) { w.errors = out.errors; renderWizard(); return; }
+  ui.wiz = null; renderSettings();
+  toast("Setup saved. Drop a requirements file into input/ to start a run.");
+  location.hash = "#overview";
+}
+async function leaveWizard() {
+  const first = !ui.cfg.settings.setup_completed;
+  if (first) {  // remember the skip, so the wizard doesn't come back on every visit
+    const out = await postSettings(Object.assign(clone(ui.cfg.settings), { setup_completed: "skipped " + new Date().toISOString() }));
+    if (!out.ok) { ui.wiz.errors = out.errors; renderWizard(); return; }
+    renderSettings();
+  }
+  ui.wiz = null;
+  location.hash = first ? "#overview" : "#settings";
+}
+function maybeFirstRun() {
+  if (ui.cfg && !ui.cfg.settings.setup_completed && !ui.firstRunShown && ui.tab !== "setup") { ui.firstRunShown = true; location.hash = "#setup"; }
+}
+
+/* ---------- overview: budget ---------- */
+function budgetTile(d) {
+  const b = d.budget || {}, live = d.runs.reduce((a, r) => a + (r.current ? sum(r.current.live.tokens) : 0), 0);
+  const today = (b.today || 0) + live;
+  const active = d.runs.filter((r) => r.status === "running" || r.status === "paused");
+  const biggest = active.reduce((m, r) => Math.max(m, sum(runTokens(r))), 0);
+  if (!b.daily_cap && !b.run_cap) return `<div class="card tile"><div class="label">Token budget</div><div class="value">${compact(today)}<small> today</small></div><div class="foot">No caps set · <a href="#settings">add a budget</a></div></div>`;
+  const pct = b.daily_cap ? Math.min(100, (today / b.daily_cap) * 100) : 0;
+  return `<div class="card tile"><div class="label">Token budget today${b.paused_until ? ` <span class="chip">${icon("pause", 11)}paused</span>` : ""}</div>
+    <div class="value">${compact(today)}<small>${b.daily_cap ? " / " + compact(b.daily_cap) : " used"}</small></div>
+    ${b.daily_cap ? `<div class="meter ${pct >= 100 ? "crit" : pct >= 80 ? "warn" : ""}" ${tipAttr(`${full(today)} of ${full(b.daily_cap)} tokens today (${Math.round(pct)}%)\nResets ${dateTime(b.resets)}`)}><i style="width:${pct}%"></i></div>` : ""}
+    <div class="foot">${b.paused_until ? `Paused until ${dateTime(b.paused_until)}` : b.daily_cap ? "Resets at midnight" : "No daily cap"} · ${b.run_cap ? `run cap ${compact(b.run_cap)}${active.length ? `, largest active run ${compact(biggest)}` : ""}` : "no run cap"}</div></div>`;
+}
+
 /* ---------- render + fetch ---------- */
 function render() {
   const d = ui.data;
   document.querySelectorAll(".nav a").forEach((a) => a.setAttribute("aria-current", a.dataset.nav === ui.tab ? "page" : "false"));
-  ["overview", "plan", "settings"].forEach((t) => ($("view-" + t).hidden = ui.tab !== t));
+  ["overview", "plan", "settings", "setup"].forEach((t) => ($("view-" + t).hidden = ui.tab !== t));
   if (!d) return;
   const y = window.scrollY;
   renderTop(d); renderBanners(d);
@@ -1449,8 +1984,10 @@ setInterval(() => {
 function route() {
   const t = (location.hash || "#overview").slice(1);
   if (ui.tab === "settings" && t !== "settings" && dirty()) toast("You have unsaved settings. They’re kept until you save or discard.");
-  ui.tab = ["overview", "plan", "settings"].includes(t) ? t : "overview";
-  if (ui.tab === "settings" && !ui.cfg) loadSettings(); else if (ui.tab === "settings") renderSettings();
+  ui.tab = ["overview", "plan", "settings", "setup"].includes(t) ? t : "overview";
+  if (ui.tab === "settings" && !ui.cfg) loadSettings(); else if (ui.tab === "settings") { renderSettings(); refreshService(); }
+  if (ui.tab !== "setup") ui.wiz = null;
+  else if (ui.cfg) startWizard(); else renderWizard();
   render();
   window.scrollTo(0, 0);
 }
@@ -1461,6 +1998,7 @@ document.addEventListener("click", async (e) => {
   const t = e.target.closest("button, tr.run");
   if (!t) return;
   if (t.closest("#view-settings") && (await onSettingsClick(t))) return;
+  if (t.closest("#view-setup") && (await onWizardClick(t))) return;
   if (t.dataset.filter) { ui.filter = t.dataset.filter; render(); return; }
   if (t.dataset.runTab) { ui.runTab[t.dataset.runTab] = t.dataset.tab; render(); return; }
   if (t.dataset.report) { openReport(t.dataset.report, t.dataset.name); return; }
@@ -1471,10 +2009,11 @@ document.addEventListener("click", async (e) => {
   if (seg && t.dataset.v) { ui.views[seg.dataset.view] = t.dataset.v; remember(); render(); return; }
   if (t.matches("tr.run")) toggleRun(t.dataset.run);
 });
-document.addEventListener("input", onSettingsInput);
+document.addEventListener("input", (e) => (e.target.closest("#view-setup") ? onWizardInput(e) : onSettingsInput(e)));
 document.addEventListener("change", (e) => {
   if (e.target.dataset.spend) { ui.spend[e.target.dataset.spend] = e.target.value; remember(); render(); return; }
   if (e.target.id === "planRun") { ui.planRun = e.target.value; render(); return; }
+  if (e.target.closest("#view-setup")) { onWizardInput(e); return; }
   onSettingsInput(e);
 });
 document.addEventListener("focusout", () => setTimeout(() => { if (pendingRender && !tipEl.classList.contains("show")) { pendingRender = false; render(); } }, 0));
@@ -1540,6 +2079,7 @@ document.addEventListener("scroll", () => tipEl.classList.contains("show") && hi
 
 route();
 fetchState();
+if (!["settings", "setup"].includes(ui.tab)) loadSettings();  // also tells whether the setup wizard is due
 </script>
 </body>
 </html>

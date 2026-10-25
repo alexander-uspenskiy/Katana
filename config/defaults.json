@@ -5,6 +5,13 @@
   "max_iterations": 3,
   "max_stations": 20,
   "station_timeout_min": 60,
+  "setup_completed": "",
+  "budgets": {"run_tokens": 0, "daily_tokens": 0, "pause_near_limit": false},
+  "notify": {
+    "macos": true,
+    "teams_webhook": "",
+    "events": {"done": true, "failed": true, "blocked": true, "paused": true}
+  },
   "agents": {
     "orchestrator": {"model": "sonnet", "effort": "low"},
     "ba": {"model": "opus", "effort": "high"},

@@ -6,6 +6,8 @@ config/settings.json, calling the Claude Code CLI headless on the user's subscri
 
 - deterministic mode: runs the plan's stages in order; a failed gate sends work back to its 'on fail' stage.
 - auto mode: the Orchestrator agent picks the next stage each time; required gates must pass before done.
+- disabled agents: their stages are skipped (deterministic) or never offered to the Orchestrator (auto).
+- budgets: a token cap per run fails the run; a daily token cap pauses the factory until midnight.
 
     python3 factory/orchestrator.py tick      # one scan (what launchd runs every 10 min)
     python3 factory/orchestrator.py watch     # scan in a loop in the foreground
@@ -22,9 +24,11 @@ import shutil
 import subprocess
 import sys
 import time
-from datetime import datetime
+from datetime import date, datetime
 from pathlib import Path
 
+import budget
+import notify
 import settings
 import streamlog
 
@@ -41,6 +45,12 @@ API_ENV_VARS = (
 )
 LIMIT_PATTERN = re.compile(
     r"usage limit|rate limit|limit reached|hit your limit|quota|overloaded|\b429\b", re.I)
+# Warnings that the subscription window is nearly used up (CLI stderr; rate_limit_event status in stream-json).
+NEAR_LIMIT_PATTERN = re.compile(
+    r"approaching (your |the )?(usage |rate )?limit|close to (your |the )?(usage )?limit|allowed_warning", re.I)
+NEAR_LIMIT_UTILIZATION = 0.9
+BUDGET_POLL = float(os.environ.get("CORTANA_BUDGET_POLL", "5"))  # seconds between token checks during a call
+BUDGET_CODE = -9  # exit code call_claude reports when it stopped a call at a token cap
 
 COMMON_RULES = """
 You are one stage in an unattended software pipeline. Nobody is watching and nobody will answer
@@ -104,13 +114,17 @@ def check_subscription(claude: str) -> dict:
     return {"subscription": status.get("subscriptionType"), "method": status.get("authMethod")}
 
 
+def read_beat() -> dict:
+    try:
+        return json.loads((RUNS_DIR / ".factory.json").read_text())
+    except (OSError, json.JSONDecodeError):
+        return {}
+
+
 def heartbeat(**fields) -> None:
     """Records what the factory is doing, for the dashboard."""
     path = RUNS_DIR / ".factory.json"
-    try:
-        beat = json.loads(path.read_text())
-    except (OSError, json.JSONDecodeError):
-        beat = {}
+    beat = read_beat()
     beat.update(fields, pid=os.getpid(), interval=WATCH_INTERVAL, mode=CONF.get("mode"),
                 updated=datetime.now().isoformat())
     tmp = path.with_suffix(".tmp")
@@ -118,23 +132,45 @@ def heartbeat(**fields) -> None:
     tmp.replace(path)
 
 
-def call_claude(cmd: list, prompt: str, cwd: Path, log_path: Path) -> tuple:
-    """Runs one CLI call, writing its stdout to log_path. Returns (exit code, stderr)."""
+def call_claude(cmd: list, prompt: str, cwd: Path, log_path: Path, watch=None) -> tuple:
+    """Runs one CLI call, writing its stdout to log_path. Returns (exit code, stderr).
+    `watch(log_path)` runs every few seconds while the call is in flight; if it returns a reason, the call is
+    stopped and the exit code is BUDGET_CODE."""
     timeout = int(CONF.get("station_timeout_min", 60)) * 60
-    with open(log_path, "w") as out:
-        proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=out, stderr=subprocess.PIPE,
+    err_path = log_path.with_name(log_path.name + ".err")
+    deadline, stop = time.time() + timeout, None
+    with open(log_path, "w") as out, open(err_path, "w+") as err:
+        proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=out, stderr=err,
                                 cwd=cwd, text=True, env=subscription_env())
         try:
-            _, stderr = proc.communicate(prompt, timeout=timeout)
-            return proc.returncode, stderr
-        except subprocess.TimeoutExpired:
-            proc.kill()
-            proc.communicate()
-            return -1, f"timeout after {timeout}s"
+            proc.stdin.write(prompt)
+            proc.stdin.close()
+        except BrokenPipeError:
+            pass
+        while True:
+            try:
+                proc.wait(timeout=BUDGET_POLL)
+                break
+            except subprocess.TimeoutExpired:
+                reason = watch(log_path) if watch else None
+                if time.time() > deadline:
+                    stop = (-1, f"timeout after {timeout}s")
+                elif reason:
+                    stop = (BUDGET_CODE, reason)
+                if stop:
+                    proc.kill()
+                    proc.wait()
+                    break
+        err.seek(0)
+        stderr = err.read()
+    err_path.unlink(missing_ok=True)
+    return stop if stop else (proc.returncode, stderr)
 
 
 def failure(code: int, result: dict, stderr: str) -> str | None:
-    """None if the call succeeded, else 'limit' or 'error'."""
+    """None if the call succeeded, else 'budget', 'limit' or 'error'."""
+    if code == BUDGET_CODE:
+        return "budget"
     if code == 0 and result and not result.get("is_error"):
         return None
     return "limit" if LIMIT_PATTERN.search(f"{result.get('result', '')} {stderr}") else "error"
@@ -218,14 +254,15 @@ def unmet_gates(run: dict) -> list:
     """Required gates that block 'done' in auto mode. A gate placed after a build stage in the plan must
     have passed after the latest build."""
     order = [s["id"] for s in run["pipeline"]]
-    builds = [s for s in run["pipeline"] if s["agent"] == "developer"]
+    pipeline = enabled_stages(run)  # gates of disabled agents are waived
+    builds = [s for s in pipeline if s["agent"] == "developer"]
     first_build = order.index(builds[0]["id"]) if builds else len(order)
     last_build = max((i for i, h in enumerate(run["history"])
                       if h["outcome"] == "ok" and h.get("agent") == "developer"), default=-1)
     unmet = []
     if builds and last_build < 0:
         unmet.append(builds[0])
-    for s in run["pipeline"]:
+    for s in pipeline:
         if not s.get("required"):
             continue
         idx = max((i for i, h in enumerate(run["history"]) if h["stage"] == s["id"] and h["outcome"] == "ok"),
@@ -234,6 +271,28 @@ def unmet_gates(run: dict) -> list:
         if idx < 0 or stale or not passed(s, run["history"][idx]):
             unmet.append(s)
     return unmet
+
+
+def enabled_stages(run: dict) -> list:
+    off = settings.disabled_agents(CONF)
+    return [s for s in run["pipeline"] if s["agent"] not in off]
+
+
+def skip_disabled(run: dict) -> bool:
+    """Deterministic mode: moves the run past stages whose agent is disabled in settings.
+    Returns False, and marks the run done, when no enabled stage is left."""
+    off = settings.disabled_agents(CONF)
+    order = [s["id"] for s in run["pipeline"]]
+    for sid in order[order.index(run["stage"]):]:
+        stage = stage_def(run, sid)
+        if stage["agent"] not in off:
+            run["stage"] = sid
+            return True
+        if sid not in run.setdefault("skipped", []):
+            run["skipped"].append(sid)
+            log(f"{run['id']}: skipped {stage['title']} ({stage['agent']} is disabled)")
+    run["status"] = "done"
+    return False
 
 
 def advance_deterministic(run: dict, verdict: str) -> None:
@@ -275,11 +334,12 @@ def decide(claude: str, run: dict) -> str:
     workspace = run_dir / "workspace"
     catalog = settings.agent_catalog()
     router = settings.effective_agent(CONF, catalog, settings.ROUTER)
-    ids = [s["id"] for s in run["pipeline"]]
+    stages = enabled_stages(run)  # the Orchestrator never sees stages of disabled agents
+    ids = [s["id"] for s in stages]
     unmet = unmet_gates(run)
 
     lines = [f"Requirement: {run['source']}", "", "Stage catalogue:"]
-    for s in run["pipeline"]:
+    for s in stages:
         gate = f" Gate: passes on {', '.join(s['pass'])}." if s.get("pass") else ""
         lines.append(f"- {s['id']}: {s['title']} by {catalog[s['agent']].get('title', s['agent'])}. "
                      f"{s['task']}{gate}{' Required.' if s.get('required') else ''}")
@@ -305,7 +365,7 @@ def decide(claude: str, run: dict) -> str:
                       "model": router["model"], "effort": router["effort"],
                       "started": datetime.now().isoformat(), "log": f"logs/{log_path.name}"}
     save(run)
-    code, stderr = call_claude(cmd, "\n".join(lines), workspace, log_path)
+    code, stderr = call_claude(cmd, "\n".join(lines), workspace, log_path, budget_watch(run))
     run.pop("current", None)
     try:
         result = json.loads(log_path.read_text().strip().splitlines()[-1])
@@ -373,7 +433,7 @@ def run_station(claude: str, run: dict) -> tuple:
                       "started": datetime.now().isoformat(), "log": f"logs/{log_path.name}"}
     save(run)
     log(f"{run['id']}: {stage['title']} ({stage['agent']}, {agent['model']}/{agent['effort']}, run {visit}) started")
-    code, stderr = call_claude(cmd, "\n".join(task), workspace, log_path)
+    code, stderr = call_claude(cmd, "\n".join(task), workspace, log_path, budget_watch(run))
     if stderr:
         (run_dir / "logs" / f"{stamp}.stderr").write_text(stderr)
     run.pop("current", None)
@@ -389,7 +449,8 @@ def run_station(claude: str, run: dict) -> tuple:
              "turns": result.get("num_turns"), "tokens": summary["tokens"],
              "cost_usd": result.get("total_cost_usd"), "tools": summary["tools"],
              "denials": len(result.get("permission_denials") or []),
-             "session_id": result.get("session_id"), "log": f"logs/{log_path.name}"}
+             "session_id": result.get("session_id"), "log": f"logs/{log_path.name}",
+             "near_limit": near_limit(summary, stderr)}
 
     problem = failure(code, result, stderr)
     if problem:
@@ -443,16 +504,134 @@ def handle_problem(run: dict, problem: str, what: str, error: str) -> None:
         run["reason"] = f"{what} failed {MAX_ATTEMPTS} times"
 
 
+# ---------------------------------------------------------------- budgets + notifications
+
+def usage(run: dict) -> tuple:
+    """(tokens this run has used, tokens all runs used today), counting the in-memory copy of this run."""
+    others = [r for r in load_runs() if r["id"] != run["id"]]
+    return budget.run_tokens(run), budget.day_tokens(others + [run])
+
+
+def budget_watch(run: dict):
+    """A check for call_claude: stops the call once the run cap or the daily cap is reached. None if no caps."""
+    if not any(budget.caps(CONF)):
+        return None
+    run_used, day_used = usage(run)
+
+    def check(log_path: Path) -> str | None:
+        live = budget.total(streamlog.summarize(log_path)["tokens"])
+        kind = budget.breach(CONF, run_used + live, day_used + live)
+        return {"run": "token cap per run reached", "day": "daily token cap reached"}.get(kind)
+    return check
+
+
+def stop_for_budget(run: dict, kind: str) -> bool:
+    """Fails the run at its token cap, or pauses it (and the factory) at the daily cap.
+    Returns False when the factory should stop for the day."""
+    (run_used, day_used), (run_cap, day_cap) = usage(run), budget.caps(CONF)
+    if kind == "run":
+        run["status"] = "failed"
+        run["reason"] = f"token cap per run reached: {run_used:,} of {run_cap:,} tokens"
+        log(f"{run['id']}: {run['reason']}")
+        return True
+    run["status"] = "paused"
+    run["reason"] = f"daily token cap reached: {day_used:,} of {day_cap:,} tokens today; resumes tomorrow"
+    heartbeat(budget_paused_until=budget.next_reset().isoformat(), budget_notified=date.today().isoformat())
+    log(f"{run['id']}: {run['reason']}")
+    return False
+
+
+def near_limit(summary: dict, stderr: str) -> dict | None:
+    """Whether the CLI warned that the subscription's usage window is nearly used up."""
+    info = summary.get("rate_limit") or {}
+    util = info.get("utilization")
+    util = util / 100 if isinstance(util, (int, float)) and util > 1 else util
+    warned = info.get("status") == "allowed_warning" or NEAR_LIMIT_PATTERN.search(stderr or "")
+    if not warned and not (isinstance(util, (int, float)) and util >= NEAR_LIMIT_UTILIZATION):
+        return None
+    resets = info.get("resetsAt")
+    return {"status": info.get("status") or "warning", "utilization": util,
+            "resets_at": datetime.fromtimestamp(resets).isoformat() if isinstance(resets, (int, float)) else None}
+
+
+def pause_near_limit(run: dict) -> bool:
+    """With 'pause when usage is near the limit' on, pauses the run after a stage that got a warning."""
+    warning = run["history"][-1].get("near_limit") if run["history"] else None
+    if not warning or not (CONF.get("budgets") or {}).get("pause_near_limit") or run["status"] != "running":
+        return False
+    run["status"] = "paused"
+    run["reason"] = "usage is near the subscription limit" + (
+        f"; resumes after {warning['resets_at'][11:16]}" if warning.get("resets_at") else "; resumes on a later scan")
+    heartbeat(near_limit_until=warning.get("resets_at"), limit_hit=datetime.now().isoformat())
+    log(f"{run['id']}: {run['reason']}")
+    return True
+
+
+def announce(run: dict) -> None:
+    """Sends a notification when a run reaches done, failed, blocked or paused (once per status)."""
+    status = run["status"]
+    if status not in settings.NOTIFY_EVENTS or run.get("notified") == status:
+        return
+    run["notified"] = status
+    text = run.get("reason") or {"done": "Every stage finished.",
+                                 "paused": "Usage limit reached; it resumes on a later scan."}.get(status, status)
+    for problem in notify.send(CONF, status, run["source"], text):
+        log(f"{run['id']}: {problem}")
+
+
+def factory_paused() -> bool:
+    """True while the daily token cap, or a near-limit warning, holds the factory until a later time."""
+    beat, (_, day_cap) = read_beat(), budget.caps(CONF)
+    used = budget.day_tokens(load_runs())
+    if day_cap and used >= day_cap:
+        until = budget.next_reset()
+        heartbeat(budget_paused_until=until.isoformat())
+        log(f"daily token cap reached ({used:,} of {day_cap:,} tokens); paused until {until:%Y-%m-%d %H:%M}")
+        if beat.get("budget_notified") != date.today().isoformat():
+            heartbeat(budget_notified=date.today().isoformat())
+            for problem in notify.send(CONF, "paused", "Daily token cap reached",
+                                       f"{used:,} of {day_cap:,} tokens used today. The factory resumes tomorrow."):
+                log(problem)
+        return True
+    if beat.get("budget_paused_until"):
+        heartbeat(budget_paused_until=None)
+    until = beat.get("near_limit_until")
+    if until and (CONF.get("budgets") or {}).get("pause_near_limit") and datetime.fromisoformat(until) > datetime.now():
+        log(f"usage is near the subscription limit; paused until {until[11:16]}")
+        return True
+    return False
+
+
 def process(claude: str, run: dict) -> bool:
+    """Drives a run, then sends any notification. Returns False if the tick should stop (usage limit or
+    daily token cap)."""
+    keep_going = drive(claude, run)
+    announce(run)
+    save(run)
+    return keep_going
+
+
+def drive(claude: str, run: dict) -> bool:
     """Drives a run until it finishes or pauses. Returns False if a usage limit was hit."""
     run["status"] = "running"
+    run.pop("reason", None)
     while run["status"] == "running":
         if len(run["history"]) >= int(CONF.get("max_stations", 20)):
             run["status"] = "failed"
             run["reason"] = f"stopped after {len(run['history'])} stages (limit {CONF.get('max_stations')})"
             break
+        kind = budget.breach(CONF, *usage(run)) if any(budget.caps(CONF)) else None
+        if kind:
+            if not stop_for_budget(run, kind):
+                save(run)
+                return False
+            break
+        if run["mode"] == "deterministic" and not skip_disabled(run):
+            break
         if run["mode"] == "auto" and not run["stage"]:
             choice = decide(claude, run)
+            if choice == "budget":
+                continue
             if choice in ("limit", "error"):
                 handle_problem(run, choice, "orchestrator", run["decisions"][-1].get("error", ""))
                 save(run)
@@ -467,6 +646,11 @@ def process(claude: str, run: dict) -> bool:
             save(run)
 
         outcome, verdict = run_station(claude, run)
+        if outcome == "budget":
+            if not stop_for_budget(run, budget.breach(CONF, *usage(run)) or "run"):
+                save(run)
+                return False
+            break
         if outcome != "ok":
             handle_problem(run, outcome, stage_def(run, run["stage"])["title"], run["history"][-1].get("error", ""))
             save(run)
@@ -474,6 +658,8 @@ def process(claude: str, run: dict) -> bool:
                 return run["status"] != "paused"
             break
         run["attempts"] = 0
+        if run.get("notified") == "paused":
+            run.pop("notified")  # it made progress since the last pause notification
         if run["mode"] == "auto":
             stage = stage_def(run, run["stage"])
             if verdict == "BLOCKED":
@@ -483,6 +669,9 @@ def process(claude: str, run: dict) -> bool:
             run["stage"] = None
         else:
             advance_deterministic(run, verdict)
+        if pause_near_limit(run):
+            save(run)
+            return False
         save(run)
     save(run)
     write_summary(run)
@@ -504,6 +693,8 @@ def tick() -> None:
         try:
             claude = find_claude()
             heartbeat(auth=check_subscription(claude), cli=claude)
+            if factory_paused():
+                return
             pending = [r for r in load_runs() if r["status"] in ("running", "paused")]
             for run in pending + claim_new_inputs():
                 heartbeat(state="working", run=run["id"])

@@ -9,3 +9,4 @@ __pycache__/
 logs/
 config/settings.json
 config/settings.tmp
+config/agents/
