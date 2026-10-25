@@ -1,18 +1,22 @@
 #!/usr/bin/env python3
 """Cortana orchestrator.
 
-Scans <project folder>/input/ for requirement .md files and drives each one through the plan in
-config/settings.json, calling the Claude Code CLI headless on the user's subscription.
+Takes requirements from each registered project's trigger (its input/ folder today; see factory/triggers/)
+and drives each one through the plan in that project's .cortana/settings.json, calling the Claude Code CLI
+headless on the user's subscription.
 
 - deterministic mode: runs the plan's stages in order; a failed gate sends work back to its 'on fail' stage.
 - auto mode: the Orchestrator agent picks the next stage each time; required gates must pass before done.
 
-    python3 factory/orchestrator.py tick      # one scan (what launchd runs every 10 min)
-    python3 factory/orchestrator.py watch     # scan in a loop in the foreground
-    python3 factory/orchestrator.py status    # list runs
+    python3 factory/orchestrator.py run [--project PATH]   # process the current input now, then exit
+    python3 factory/orchestrator.py tick      # scan every folder-interval and folder-watch project now
+    python3 factory/orchestrator.py watch     # scan those projects when due, in the foreground
+    python3 factory/orchestrator.py dispatch  # what launchd runs: a background worker per due project
+    python3 factory/orchestrator.py status [--project PATH]   # list runs
 """
 from __future__ import annotations
 
+import argparse
 import fcntl
 import glob
 import json
@@ -25,12 +29,15 @@ import time
 from datetime import datetime
 from pathlib import Path
 
+import dispatch
+import projects
 import settings
 import streamlog
+import triggers
 
 MAX_ATTEMPTS = int(os.environ.get("CORTANA_MAX_ATTEMPTS", "3"))
-WATCH_INTERVAL = int(os.environ.get("CORTANA_INTERVAL", "600"))
-SETTLE_SECONDS = 60  # ignore input files modified more recently (still being written)
+WATCH_SETTLE_SECONDS = 5  # folder-watch: a new file must be unchanged this long before it is claimed
+WATCH_WAIT_SECONDS = 30   # ...and a watch scan waits at most this long for it
 SETTING_SOURCES = os.environ.get("CORTANA_SETTING_SOURCES", "project")
 
 # Any of these would make the CLI bill an API account instead of the subscription.
@@ -49,18 +56,19 @@ Work only inside the current directory. Do the work yourself; do not delegate to
 Your output file must end with the VERDICT line your instructions define.
 """
 
-# Set by configure() at the start of every tick, from settings.
-ROOT = INPUT_DIR = RUNS_DIR = LOG_FILE = None
+# Set by configure() before each project is scanned, from that project's settings.
+ROOT = INPUT_DIR = RUNS_DIR = LOG_FILE = TRIGGER = None
 CONF: dict = {}
 
 
-def configure() -> None:
-    global ROOT, INPUT_DIR, RUNS_DIR, LOG_FILE, CONF
-    CONF = settings.load()
-    ROOT = settings.home(CONF)
+def configure(project: Path, settle: int = triggers.SETTLE_SECONDS) -> None:
+    global ROOT, INPUT_DIR, RUNS_DIR, LOG_FILE, CONF, TRIGGER
+    ROOT = Path(project).expanduser().resolve()
+    CONF = settings.load(ROOT)
     INPUT_DIR, RUNS_DIR, LOG_FILE = ROOT / "input", ROOT / "runs", ROOT / "logs" / "factory.log"
     for d in (INPUT_DIR, RUNS_DIR, LOG_FILE.parent):
         d.mkdir(parents=True, exist_ok=True)
+    TRIGGER = triggers.for_project(ROOT, CONF, log=log, settle=settle)
 
 
 def log(msg: str) -> None:
@@ -111,8 +119,9 @@ def heartbeat(**fields) -> None:
         beat = json.loads(path.read_text())
     except (OSError, json.JSONDecodeError):
         beat = {}
-    beat.update(fields, pid=os.getpid(), interval=WATCH_INTERVAL, mode=CONF.get("mode"),
-                updated=datetime.now().isoformat())
+    trig = settings.trigger(CONF)
+    beat.update(fields, pid=os.getpid(), interval=trig["interval_min"] * 60, trigger=trig["type"],
+                mode=CONF.get("mode"), updated=datetime.now().isoformat())
     tmp = path.with_suffix(".tmp")
     tmp.write_text(json.dumps(beat, indent=2))
     tmp.replace(path)
@@ -163,19 +172,19 @@ def git(workspace: Path, *args: str) -> None:
 
 def claim_new_inputs() -> list:
     runs = []
-    for src in sorted(INPUT_DIR.glob("*.md")):
-        if src.name.lower() == "readme.md" or src.name.startswith((".", "_")):
+    for item in TRIGGER.fetch():
+        if item.waiting:
+            log(f"skip {item.key}: modified less than {TRIGGER.settle}s ago")
             continue
-        if time.time() - src.stat().st_mtime < SETTLE_SECONDS:
-            log(f"skip {src.name}: modified less than {SETTLE_SECONDS}s ago")
-            continue
-        run_id = f"{datetime.now():%Y%m%d-%H%M%S}-{slugify(src.stem)}"
+        run_id = f"{datetime.now():%Y%m%d-%H%M%S}-{slugify(item.title)}"
         run_dir = RUNS_DIR / run_id
         workspace = run_dir / "workspace"
         (workspace / "docs").mkdir(parents=True)
         (run_dir / "logs").mkdir()
         (run_dir / "reports").mkdir()
-        shutil.move(str(src), run_dir / "requirements.md")
+        if not TRIGGER.claim(item, run_dir):
+            shutil.rmtree(run_dir)
+            continue
         shutil.copy(run_dir / "requirements.md", workspace / "docs/00-requirements.md")
         git(workspace, "init", "-q", "-b", "main")
         git(workspace, "config", "user.name", "Cortana")
@@ -184,12 +193,14 @@ def claim_new_inputs() -> list:
         git(workspace, "commit", "-q", "-m", "Add requirements")
         # The plan and mode are frozen per run, so editing settings never breaks a run in flight.
         pipeline = CONF["pipeline"]
-        run = {"id": run_id, "source": src.name, "status": "running", "mode": CONF["mode"],
+        run = {"id": run_id, "source": item.key, "status": "running", "mode": CONF["mode"],
+               "origin": {"trigger": TRIGGER.name, "key": item.key, "ref": item.ref},
                "pipeline": pipeline, "stage": pipeline[0]["id"] if CONF["mode"] == "deterministic" else None,
                "visits": {}, "loops": {}, "attempts": 0, "created": datetime.now().isoformat(),
                "history": [], "decisions": []}
         save(run)
-        log(f"claimed {src.name} as run {run_id} ({CONF['mode']} mode)")
+        TRIGGER.ack(item, run)
+        log(f"claimed {item.key} as run {run_id} ({CONF['mode']} mode)")
         runs.append(run)
     return runs
 
@@ -430,6 +441,14 @@ def write_summary(run: dict) -> None:
     (RUNS_DIR / run["id"] / "SUMMARY.md").write_text("\n".join(lines) + "\n")
 
 
+def report_back(run: dict) -> None:
+    """Sends a finished run's outcome to the source it came from (a no-op for the input folder)."""
+    try:
+        TRIGGER.report(run, (RUNS_DIR / run["id"] / "SUMMARY.md").read_text())
+    except Exception as e:  # a source being down must not lose the run's result
+        log(f"{run['id']}: could not report back to {TRIGGER.name}: {e}")
+
+
 def handle_problem(run: dict, problem: str, what: str, error: str) -> None:
     """Pauses the run on a usage limit; otherwise counts a retry and fails the run past the limit."""
     if problem == "limit":
@@ -487,13 +506,19 @@ def process(claude: str, run: dict) -> bool:
     save(run)
     write_summary(run)
     log(f"{run['id']}: {run['status']}")
+    if run["status"] in ("done", "failed", "blocked"):
+        report_back(run)
     return True
 
 
 # ---------------------------------------------------------------- commands
 
-def tick() -> None:
-    configure()
+def scan(project: Path, scheduled: bool = True) -> None:
+    """One scan of one project: resumes its unfinished runs, then claims and runs new requirements until
+    none are left. scheduled=False (Run now, `run`) claims files without waiting for them to settle."""
+    kind = settings.trigger(settings.load(Path(project)))["type"]
+    settle = (WATCH_SETTLE_SECONDS if kind == "folder-watch" else triggers.SETTLE_SECONDS) if scheduled else 0
+    configure(project, settle)
     with open(RUNS_DIR / ".lock", "w") as lock:
         try:
             fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
@@ -502,14 +527,21 @@ def tick() -> None:
             return
         heartbeat(state="scanning", error=None, tick_started=datetime.now().isoformat())
         try:
+            if kind == "folder-watch" and scheduled:  # launchd fired as the file appeared; let it finish
+                deadline = time.time() + WATCH_WAIT_SECONDS
+                while time.time() < deadline and any(i.waiting for i in TRIGGER.fetch()):
+                    time.sleep(1)
             claude = find_claude()
             heartbeat(auth=check_subscription(claude), cli=claude)
-            pending = [r for r in load_runs() if r["status"] in ("running", "paused")]
-            for run in pending + claim_new_inputs():
+            todo = [r for r in load_runs() if r["status"] in ("running", "paused")] + claim_new_inputs()
+            while todo:
+                run = todo.pop(0)
                 heartbeat(state="working", run=run["id"])
                 if not process(claude, run):
                     heartbeat(limit_hit=datetime.now().isoformat())
                     break
+                if not todo:  # requirements that arrived while this run was busy
+                    todo = claim_new_inputs()
         except SystemExit as e:
             heartbeat(error=str(e))
             raise
@@ -517,8 +549,38 @@ def tick() -> None:
             heartbeat(state="idle", run=None, tick_finished=datetime.now().isoformat())
 
 
-def status() -> None:
-    configure()
+def scan_all(only_due: bool) -> None:
+    """Scans every folder-interval and folder-watch project in this process, one after another."""
+    failed = []
+    for folder, conf in dispatch.service_projects():
+        if only_due and not dispatch.due(folder, conf):
+            continue
+        try:
+            scan(folder)
+        except SystemExit as e:
+            failed.append(f"{folder}: {e}")
+    if failed:
+        raise SystemExit("\n".join(failed))
+
+
+def dispatch_due() -> None:
+    """What launchd runs: starts a background worker for each project that is due and not already busy."""
+    for folder, conf in dispatch.service_projects():
+        if dispatch.due(folder, conf) and not dispatch.busy(folder):
+            dispatch.spawn_worker(folder, scheduled=True)
+
+
+def project_arg(value: str | None) -> Path:
+    folder = Path(value).expanduser().resolve() if value else settings.home()
+    if not folder:
+        raise SystemExit("No project selected. Pass --project PATH, or pick one in the dashboard.")
+    if not folder.is_dir():
+        raise SystemExit(f"Project folder not found: {folder}")
+    return folder
+
+
+def status(project: Path) -> None:
+    configure(project)
     runs = load_runs()
     if not runs:
         print(f"No runs yet. Drop a requirements .md file into {INPUT_DIR}.")
@@ -528,22 +590,42 @@ def status() -> None:
 
 
 def main() -> None:
-    command = sys.argv[1] if len(sys.argv) > 1 else "tick"
-    if command == "tick":
-        tick()
-    elif command == "watch":
-        configure()
-        log(f"watching {INPUT_DIR} every {WATCH_INTERVAL}s (Ctrl+C to stop)")
+    parser = argparse.ArgumentParser(description=__doc__.splitlines()[0],
+                                     formatter_class=argparse.RawDescriptionHelpFormatter, epilog=__doc__)
+    sub = parser.add_subparsers(dest="command")
+    for name in ("run", "status"):
+        p = sub.add_parser(name)
+        p.add_argument("--project", help="project folder (default: the active project)")
+        if name == "run":
+            p.add_argument("--scheduled", action="store_true", help=argparse.SUPPRESS)  # set by dispatch
+    for name in ("tick", "watch", "dispatch"):
+        sub.add_parser(name)
+    p = sub.add_parser("service-plist", help="print the launchd plist (used by scripts/install-service.sh)")
+    p.add_argument("--path", default=os.environ.get("PATH", ""), help="PATH for the agents")
+    args = parser.parse_args(sys.argv[1:] or ["tick"])
+
+    if args.command == "run":
+        folder = project_arg(args.project)
+        if not args.scheduled:
+            projects.open_project(folder, activate=False)  # a project run from the CLI shows up in the dashboard
+        scan(folder, scheduled=args.scheduled)
+    elif args.command == "tick":
+        scan_all(only_due=False)
+    elif args.command == "dispatch":
+        dispatch_due()
+    elif args.command == "watch":
+        print(f"watching {len(dispatch.service_projects())} project(s); checking every "
+              f"{dispatch.DISPATCH_SECONDS}s (Ctrl+C to stop)", flush=True)
         while True:
             try:
-                tick()
+                scan_all(only_due=True)
             except SystemExit as e:
-                log(f"tick aborted: {e}")
-            time.sleep(WATCH_INTERVAL)
-    elif command == "status":
-        status()
-    else:
-        raise SystemExit(__doc__)
+                print(f"scan aborted: {e}", flush=True)
+            time.sleep(dispatch.DISPATCH_SECONDS)
+    elif args.command == "status":
+        status(project_arg(args.project))
+    elif args.command == "service-plist":
+        sys.stdout.buffer.write(dispatch.plist(args.path))
 
 
 if __name__ == "__main__":

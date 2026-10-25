@@ -3,7 +3,8 @@
 
     python3 factory/dashboard.py [--port 8787] [--home DIR]
 
-Serves on 127.0.0.1 only. The page polls /api/state every 5 seconds.
+Serves on 127.0.0.1 only. The page polls /api/state every 5 seconds and shows the active project from
+config/projects.json; with no project selected it opens on the start screen.
 """
 from __future__ import annotations
 
@@ -19,12 +20,16 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
+import dispatch
+import projects
 import settings
 import streamlog
+import triggers
 
 HERE = Path(__file__).resolve().parent
 PAGE = HERE / "dashboard" / "index.html"
-LABEL = "com.cortana.orchestrator"
+INSTALL_SCRIPT = HERE.parent / "scripts" / "install-service.sh"
+LABEL = dispatch.LABEL
 TASK_LINE = re.compile(r"^\s*[-*]\s+\[([ xX])\]\s+(?:(T\d+)[:.)]?\s*)?(.+)$", re.M)
 AC_ROW = re.compile(r"^\|\s*\**(AC-\d+(?:\.\d+)?)\**\s*\|(.+)$", re.M)
 TOKEN_KEYS = ("input", "cache_write", "cache_read", "output")
@@ -48,11 +53,22 @@ def pid_alive(pid) -> bool:
 
 def service_status() -> dict:
     if time.time() - _service_cache["at"] > 30:  # launchctl is slow-ish; check twice a minute
-        plist = Path.home() / "Library/LaunchAgents" / f"{LABEL}.plist"
         loaded = subprocess.run(["launchctl", "print", f"gui/{os.getuid()}/{LABEL}"],
                                 capture_output=True).returncode == 0
-        _service_cache.update(at=time.time(), value={"installed": plist.exists(), "loaded": loaded})
+        _service_cache.update(at=time.time(), value={"installed": dispatch.PLIST_PATH.exists(), "loaded": loaded,
+                                                     "watching": dispatch.installed_watch_paths() or []})
     return _service_cache["value"]
+
+
+def sync_service() -> str | None:
+    """Rewrites the launchd plist if the folders it should watch changed. Returns a note for the page."""
+    installed = dispatch.installed_watch_paths()
+    if installed is None or os.environ.get("CORTANA_HOME") or installed == dispatch.watch_paths():
+        return None
+    out = subprocess.run([str(INSTALL_SCRIPT)], capture_output=True, text=True, timeout=60)
+    _service_cache["at"] = 0
+    return "Service updated to watch the new input folders." if out.returncode == 0 \
+        else f"Couldn't update the service: {(out.stderr or out.stdout).strip()[:300]}"
 
 
 def agents_view(conf: dict) -> list:
@@ -195,9 +211,26 @@ def home_status(root: Path) -> dict:
             if root.is_dir() else 0}
 
 
+def projects_view() -> dict:
+    reg = projects.load()
+    root = settings.home()
+    items = []
+    for entry in reg["projects"]:
+        path = Path(entry["path"])
+        conf = settings.load(path) if path.is_dir() else {}
+        items.append(dict(home_status(path), name=conf.get("project") or path.name, opened=entry.get("opened"),
+                          trigger=settings.trigger(conf) if conf else None,
+                          busy=path.is_dir() and dispatch.busy(path)))
+    return {"active": str(root) if root else None, "override": bool(os.environ.get("CORTANA_HOME")),
+            "projects": items}
+
+
 def state() -> dict:
-    conf = settings.load()
-    root = settings.home(conf)
+    root = settings.home()
+    base = {"generated": datetime.now().isoformat(), "projects": projects_view()}
+    if not root or not root.is_dir():
+        return dict(base, project=None, home=str(root) if root else None)
+    conf = settings.load(root)
     runs_dir = root / "runs"
     runs = []
     for path in sorted(runs_dir.glob("*/state.json"), reverse=True):
@@ -212,27 +245,106 @@ def state() -> dict:
         log_tail = (root / "logs" / "factory.log").read_text(errors="replace").splitlines()[-150:]
     except OSError:
         log_tail = []
-    return {"generated": datetime.now().isoformat(), "project": conf.get("project", "Cortana"), "home": str(root),
-            "factory": beat, "service": service_status(), "agents": agents_view(conf),
+    trig = settings.trigger(conf)
+    svc = dict(service_status())
+    svc["watched"] = str(root / "input") in svc.pop("watching")
+    return {**base, "project": conf.get("project", "Cortana"), "home": str(root),
+            "factory": beat, "service": svc, "agents": agents_view(conf), "trigger": trig,
+            "busy": dispatch.busy(root),
             "settings": {k: conf[k] for k in ("mode", "pipeline", "max_iterations", "max_stations",
                                               "station_timeout_min")},
             "queue": queue_view(root), "runs": runs, "events": events, "stats": aggregate(events), "log": log_tail}
 
 
 def settings_payload() -> dict:
-    conf = settings.load()
+    root = settings.home()
+    conf = settings.load(root)
     catalog = settings.agent_catalog()
+    conf["trigger"] = settings.trigger(conf)
     return {"settings": conf, "defaults": settings.defaults(),
             "options": {"models": settings.MODELS, "efforts": settings.EFFORTS, "modes": settings.MODES,
-                        "router": settings.ROUTER},
+                        "router": settings.ROUTER, "triggers": settings.TRIGGERS},
             "catalog": {n: {k: a.get(k) for k in ("title", "role", "model", "effort", "tools")}
                         for n, a in catalog.items()},
-            "home": home_status(settings.home(conf)),
+            "home": home_status(root) if root else None, "service": service_status(),
             "env_override": bool(os.environ.get("CORTANA_HOME"))}
 
 
+def choose_folder() -> dict:
+    """Shows the native macOS folder dialog on this Mac. Waits until the user picks a folder or cancels."""
+    script = 'POSIX path of (choose folder with prompt "Choose a Cortana project folder")'
+    try:
+        out = subprocess.run(["osascript", "-e", script], capture_output=True, text=True, timeout=600)
+    except (OSError, subprocess.TimeoutExpired) as e:
+        return {"ok": False, "errors": [f"Couldn't open the folder dialog: {e}"]}
+    if out.returncode != 0:
+        if "-128" in out.stderr:  # User canceled.
+            return {"ok": False, "cancelled": True}
+        return {"ok": False, "errors": [out.stderr.strip() or "Couldn't open the folder dialog."]}
+    path = out.stdout.strip()
+    return {"ok": True, "path": path.rstrip("/") or "/"}
+
+
+def project_action(body: dict) -> tuple:
+    """open | create | forget a project. Returns (HTTP code, response)."""
+    action, path = body.get("action"), str(body.get("path") or "").strip()
+    if action == "forget":
+        projects.forget(path)
+        return 200, {"ok": True, "projects": projects_view(), "note": sync_service()}
+    if action not in ("open", "create"):
+        return 400, {"ok": False, "errors": ["Unknown action."]}
+    error = projects.check_folder(path, must_exist=action == "open")
+    if error:
+        return 400, {"ok": False, "errors": [error]}
+    if os.environ.get("CORTANA_HOME"):
+        return 409, {"ok": False, "errors": ["CORTANA_HOME is set, so the dashboard can't switch projects."]}
+    folder = projects.open_project(path)
+    return 200, {"ok": True, "path": str(folder), "projects": projects_view(), "note": sync_service()}
+
+
+def run_now() -> tuple:
+    root = settings.home()
+    if not root or not root.is_dir():
+        return 409, {"ok": False, "errors": ["Pick a project first."]}
+    if dispatch.busy(root):
+        return 200, {"ok": True, "started": False, "note": "A scan of this project is already running."}
+    dispatch.spawn_worker(root, scheduled=False)
+    return 200, {"ok": True, "started": True}
+
+
+def submit(body: dict) -> tuple:
+    """Writes a pasted requirement into input/ as <title>.md. A once project starts on it right away."""
+    root = settings.home()
+    if not root or not root.is_dir():
+        return 409, {"ok": False, "errors": ["Pick a project first."]}
+    title, text = str(body.get("title") or "").strip(), str(body.get("markdown") or "").strip()
+    errors = [m for bad, m in ((not title, "Give the requirement a title."), (len(title) > 120, "Keep the title under 120 characters."),
+                               (not text, "Paste the requirement text.")) if bad]
+    if errors:
+        return 400, {"ok": False, "errors": errors}
+    slug = re.sub(r"[^a-z0-9]+", "-", title.lower()).strip("-")[:60] or "requirement"
+    folder = root / "input"
+    folder.mkdir(parents=True, exist_ok=True)
+    name, n = f"{slug}.md", 2
+    while (folder / name).exists():
+        name, n = f"{slug}-{n}.md", n + 1
+    body_text = text if text.lstrip().startswith("# ") else f"# {title}\n\n{text}"
+    tmp = folder / f".{name}.tmp"  # a leading dot keeps scans away until the rename
+    tmp.write_text(body_text + "\n")
+    past = time.time() - triggers.SETTLE_SECONDS - 1  # written in one go, so there's nothing to settle
+    os.utime(tmp, (past, past))
+    tmp.replace(folder / name)
+    kind = settings.trigger(settings.load(root))["type"]
+    started = kind == "once" and not dispatch.busy(root)
+    if started:
+        dispatch.spawn_worker(root, scheduled=False)
+    return 200, {"ok": True, "name": name, "trigger": kind, "started": started}
+
+
 def report(query: dict) -> str | None:
-    root = settings.home(settings.load())
+    root = settings.home()
+    if not root:
+        return None
     run_id, name = query.get("run", [""])[0], query.get("name", [""])[0]
     if not re.fullmatch(r"[\w.-]+", run_id) or not re.fullmatch(r"[\w-]+(/[\w-]+)*\.md", name):
         return None
@@ -271,6 +383,8 @@ class Handler(BaseHTTPRequestHandler):
             self.json(200, state())
         elif url.path == "/api/settings":
             self.json(200, settings_payload())
+        elif url.path == "/api/projects":
+            self.json(200, projects_view())
         elif url.path == "/api/report":
             text = report(parse_qs(url.query))
             if text is None:
@@ -286,17 +400,31 @@ class Handler(BaseHTTPRequestHandler):
         if not self.local_host() or self.headers.get("X-Cortana") != "1" \
                 or not (self.headers.get("Content-Type") or "").startswith("application/json"):
             return self.send(403, b"forbidden", "text/plain")
-        if urlparse(self.path).path != "/api/settings":
+        path = urlparse(self.path).path
+        if path not in ("/api/settings", "/api/projects", "/api/browse", "/api/run", "/api/submit"):
             return self.send(404, b"not found", "text/plain")
         try:
-            body = json.loads(self.rfile.read(min(int(self.headers.get("Content-Length") or 0), 200_000)))
+            body = json.loads(self.rfile.read(min(int(self.headers.get("Content-Length") or 0), 500_000)) or b"{}")
         except (ValueError, json.JSONDecodeError):
             return self.json(400, {"ok": False, "errors": ["The request was not valid JSON."]})
+        if not isinstance(body, dict):
+            return self.json(400, {"ok": False, "errors": ["The request was not valid JSON."]})
+        if path == "/api/projects":
+            return self.json(*project_action(body))
+        if path == "/api/browse":
+            return self.json(200, choose_folder())
+        if path == "/api/run":
+            return self.json(*run_now())
+        if path == "/api/submit":
+            return self.json(*submit(body))
+        root = settings.home()
+        if not root:
+            return self.json(409, {"ok": False, "errors": ["Pick a project first."]})
         clean, errors = settings.validate(body)
         if errors:
             return self.json(400, {"ok": False, "errors": errors})
-        settings.save(clean)
-        self.json(200, dict(settings_payload(), ok=True))
+        settings.save(clean, root)
+        self.json(200, dict(settings_payload(), ok=True, note=sync_service()))
 
     def log_message(self, *args) -> None:
         pass  # keep the terminal quiet; the page polls every 5 seconds
@@ -305,12 +433,12 @@ class Handler(BaseHTTPRequestHandler):
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     parser.add_argument("--port", type=int, default=int(os.environ.get("CORTANA_DASHBOARD_PORT", 8787)))
-    parser.add_argument("--home", help="project folder to show, overriding settings (for testing)")
+    parser.add_argument("--home", help="open this project folder (registers it and makes it active)")
     args = parser.parse_args()
     if args.home:
-        os.environ["CORTANA_HOME"] = str(Path(args.home).resolve())
+        projects.open_project(Path(args.home).resolve())
     server = ThreadingHTTPServer(("127.0.0.1", args.port), Handler)
-    print(f"Cortana dashboard: http://127.0.0.1:{args.port}  (project folder {settings.home(settings.load())})",
+    print(f"Cortana dashboard: http://127.0.0.1:{args.port}  (project {settings.home() or 'not chosen yet'})",
           flush=True)
     server.serve_forever()
 
