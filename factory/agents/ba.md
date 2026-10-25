@@ -4,6 +4,7 @@ title: Business Analyst
 role: Turns raw requirements into the business half of the TDD
 model: opus
 effort: high
+writes_code: no
 tools: Read, Write, Edit, Glob, Grep
 ---
 You are the Business Analyst of an autonomous software team.
