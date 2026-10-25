@@ -370,7 +370,7 @@ tr.open .chev { transform: rotate(90deg); }
 .gatebox { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 12.5px; padding: 6px 10px; border-radius: 8px; background: var(--surface-2); border: 1px dashed var(--axis); }
 .loopback { color: var(--ink-2); display: inline-flex; align-items: center; gap: 4px; }
 .swim { display: flex; align-items: flex-start; gap: 0; overflow-x: auto; padding: 4px 2px 12px; }
-.ph { flex: none; width: 212px; display: flex; flex-direction: column; gap: 8px; padding: 10px; border-radius: 12px; background: var(--wash); border: 1px solid var(--border); }
+.ph { flex: 1 1 0; min-width: 176px; max-width: 260px; display: flex; flex-direction: column; gap: 8px; padding: 10px; border-radius: 12px; background: var(--wash); border: 1px solid var(--border); }
 .ph.now { border-color: color-mix(in srgb, var(--accent) 45%, var(--border)); background: var(--accent-wash); }
 .ph-h { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
 .ph-h b { color: var(--ink); font-size: 12.5px; }
@@ -1111,6 +1111,8 @@ function renderKpis(d) {
   const calls = d.events.filter((e) => e.kind !== "live");
   const stages = calls.filter((e) => e.kind === "stage");
   const okRuns = stages.filter((e) => e.outcome === "ok").length;
+  const gateRuns = d.runs.flatMap((r) => (r.history || []).filter((h) => h.kind === "gate"));
+  const gateFails = gateRuns.filter((h) => h.verdict && h.verdict !== "PASS").length;
   const seconds = calls.reduce((a, e) => a + (e.seconds || 0), 0) + liveAgents.reduce((a, x) => a + (x.current.live.elapsed || 0), 0);
   const cost = calls.reduce((a, e) => a + (e.cost_usd || 0), 0);
   const rework = d.runs.reduce((a, r) => a + loops(r), 0);
@@ -1142,7 +1144,7 @@ function renderKpis(d) {
     <div class="meter good" ${tipAttr(pct(ac.pass, ac.total) + "% of acceptance criteria have a passing test")}><i style="width:${pct(ac.pass, ac.total)}%"></i></div>
     <div class="foot">${pct(ac.pass, ac.total)}% · from the latest test reports</div></div>
   <div class="card tile"><div class="label">Stage runs</div><div class="value">${stages.length + liveAgents.filter((x) => x.current.stage).length}</div>
-    <div class="foot">${pct(okRuns, stages.length)}% finished cleanly · ${rework} rework loop${rework === 1 ? "" : "s"} · ${calls.length - stages.length} orchestrator decisions</div></div>
+    <div class="foot">agent stages: ${pct(okRuns, stages.length)}% finished cleanly · ${gateRuns.length} gate check${gateRuns.length === 1 ? "" : "s"}${gateFails ? ` (${gateFails} sent back)` : ""} · ${rework} rework loop${rework === 1 ? "" : "s"} · ${calls.filter((e) => e.kind === "decision").length} orchestrator decisions</div></div>
   <div class="card tile"><div class="label">Tool calls</div><div class="value">${full(sum(toolMap))}</div>
     <div class="foot">${topTools.length ? topTools.map(([k, v]) => esc(k) + " " + v).join(" · ") : "none yet"}</div></div>
   <div class="card tile"><div class="label">Agent time</div><div class="value">${dur(seconds)}</div>
@@ -1982,6 +1984,8 @@ async function post(url, body) {
     return await res.json();
   } catch (e) { return { ok: false, errors: ["Couldn’t reach the dashboard server."] }; }
 }
+// Long paths keep their end, where projects differ: ~/…/parent/folder. The full path is in the tooltip.
+const shortPath = (path) => { const p = String(path || ""), parts = p.split("/"); return parts.length > 5 ? "…/" + parts.slice(-3).join("/") : p; };
 const initials = (name) => (String(name || "?").match(/[A-Za-z0-9]+/g) || ["?"]).slice(0, 2).map((w) => w[0]).join("").toUpperCase();
 function projectChips(p) {
   if (!p.exists) return `<span class="chip">${icon("warn", 12)}folder missing</span>`;
@@ -1997,7 +2001,7 @@ function renderStart(d) {
   $("recent").innerHTML = reg.projects.length ? `<ul class="plist">${reg.projects.map((p) => `<li class="${p.path === reg.active ? "cur" : ""}">
       <button class="prow" data-open="${esc(p.path)}" ${p.exists ? "" : "disabled"} aria-label="Open ${esc(p.name)}">
         <span class="mono-badge" aria-hidden="true">${esc(initials(p.name))}</span>
-        <span class="pt"><b>${esc(p.name)}${p.path === reg.active ? ` <span class="muted" style="font-weight:400">· open now</span>` : ""}</b><span class="mono muted" title="${esc(p.path)}">${esc(p.path)}</span></span>
+        <span class="pt"><b>${esc(p.name)}${p.path === reg.active ? ` <span class="muted" style="font-weight:400">· open now</span>` : ""}</b><span class="mono muted" title="${esc(p.path)}">${esc(shortPath(p.path))}</span></span>
         <span class="pm">${projectChips(p)}</span>
       </button>
       <button class="btn icon ghost" data-forget="${esc(p.path)}" title="Remove from the list (the folder stays)" aria-label="Remove ${esc(p.name)} from the list">${icon("x")}</button>
@@ -2006,7 +2010,7 @@ function renderStart(d) {
 function renderMenu() {
   const reg = (ui.data && ui.data.projects) || { projects: [] };
   $("projMenu").innerHTML = reg.projects.filter((p) => p.exists).slice(0, 8).map((p) =>
-    `<button class="item" role="menuitem" data-open="${esc(p.path)}" aria-current="${p.path === reg.active}"><b>${esc(p.name)}</b><span class="chip">${esc(triggerShort(p.trigger))}</span><span class="p" title="${esc(p.path)}">${esc(p.path)}</span></button>`).join("") +
+    `<button class="item" role="menuitem" data-open="${esc(p.path)}" aria-current="${p.path === reg.active}"><b>${esc(p.name)}</b><span class="chip">${esc(triggerShort(p.trigger))}</span><span class="p" title="${esc(p.path)}">${esc(shortPath(p.path))}</span></button>`).join("") +
     `<hr><a class="item" role="menuitem" href="#projects"><b>Open or create a project…</b></a>`;
 }
 function toggleMenu(open) {
@@ -2200,14 +2204,14 @@ function serviceSection() {
 }
 function serviceBox(svc, compactView) {
   if (!svc) return `<div class="empty">Checking the service…</div>`;
-  const busy = ui.svcBusy, mins = Math.round((svc.interval || 600) / 60);
-  const [dot, label, text] = svc.loaded ? ["good", "Running", `Scans the project folder every ${mins} minutes while you’re logged in.`]
+  const busy = ui.svcBusy, mins = Math.max(1, Math.round((svc.interval || 600) / 60)), every = mins === 1 ? "minute" : `${mins} minutes`;
+  const [dot, label, text] = svc.loaded ? ["good", "Running", `Checks every ${every} while you’re logged in, and scans each project when its own trigger is due.`]
     : svc.installed ? ["serious", "Stopped", "Installed, but not loaded: no scheduled scans run until you start it."]
-    : ["", "Not installed", `Nothing scans in the background. Install it to scan every ${mins} minutes.`];
+    : ["", "Not installed", `Nothing scans in the background. Once installed it checks every ${every} and scans each project when its trigger is due.`];
   const btn = (a, l, off, primary) => `<button class="btn ${primary ? "primary" : ""}" data-svc="${a}" ${off || busy ? "disabled" : ""}>${busy === a ? SVC_BUSY[a] : l}</button>`;
   return `<div class="svc-status"><span class="dot ${dot}"></span><b>${label}</b><span class="ink2" style="font-size:13px">${text}</span></div>
     <div class="svc-btns">${btn("install", svc.installed ? "Reinstall" : "Install", false, !svc.installed)}${btn("start", "Start", !svc.installed || svc.loaded, svc.installed && !svc.loaded)}${btn("stop", "Stop", !svc.loaded)}${btn("uninstall", "Uninstall", !svc.installed)}</div>
-    ${compactView ? "" : `<dl class="facts" style="margin-bottom:14px"><div><dt>Label</dt><dd class="mono" style="word-break:break-all">${esc(svc.label)}</dd></div><div><dt>Interval</dt><dd>${mins} min</dd></div><div style="grid-column:1 / -1"><dt>Agent file</dt><dd class="mono" style="word-break:break-all">${esc(svc.plist)}</dd></div></dl>
+    ${compactView ? "" : `<dl class="facts" style="margin-bottom:14px"><div><dt>Label</dt><dd class="mono" style="word-break:break-all">${esc(svc.label)}</dd></div><div><dt>Checks every</dt><dd>${every}</dd></div><div style="grid-column:1 / -1"><dt>Agent file</dt><dd class="mono" style="word-break:break-all">${esc(svc.plist)}</dd></div></dl>
     <div class="muted" style="font-size:12px;margin-bottom:6px">launchd.log · last 20 lines · <span class="mono" style="word-break:break-all">${esc(svc.log_path)}</span></div>
     ${svc.log.length ? `<pre class="log" style="max-height:260px">${svc.log.map(esc).join("\n")}</pre>` : `<div class="empty" style="padding:12px 0">No launchd output yet.</div>`}`}`;
 }
