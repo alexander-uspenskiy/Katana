@@ -41,4 +41,4 @@ class FolderTrigger(Trigger):
         return True
 
     def report(self, run: dict, summary: str) -> None:
-        pass  # the outcome is in runs/<id>/SUMMARY.md, next to the requirements it came from
+        pass  # the outcome is in .katana/runs/<id>/SUMMARY.md, next to the requirements it came from

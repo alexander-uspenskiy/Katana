@@ -1,10 +1,16 @@
-"""Katana settings: defaults in config/defaults.json, each project's changes in <project>/.katana/settings.json.
+"""Katana settings: defaults in config/defaults.json, each project's changes in <project>/katana.config.json.
 
 Shared by the orchestrator (reads them before every station) and the dashboard (edits them).
 
 The plan (`pipeline`) is a list of phases; each phase is a list of stages that run at the same time.
 A stage is an agent stage, or a gate step (`"kind": "gate"`) that Katana measures itself (see gates.py).
 Old flat plans, a list of stages, load as one stage per phase.
+
+A stage names the artifacts it reads (`inputs`) and writes (`outputs`): ids from the `artifacts` list, plus
+two built in: `requirements` (the requirement Katana took from the trigger) and `code` (the workspace).
+A gate step, or an agent stage with `pass` verdicts, is a gateway: `"gateway": "autonomous"` sends failed
+work back by itself, `"manual"` stops the run and waits for a person to approve, send back or reject.
+`custom_agents` holds agents defined in a project, next to the standard ones in factory/agents/.
 """
 from __future__ import annotations
 
@@ -21,7 +27,7 @@ import projects
 REPO = Path(__file__).resolve().parent.parent
 AGENTS_DIR = REPO / "factory" / "agents"
 DEFAULTS_PATH = REPO / "config" / "defaults.json"
-PROMPTS_DIR = REPO / "config" / "agents"  # prompt overrides edited in the dashboard (not in git)
+PROMPTS_DIR = projects.USER_DIR / "agents"  # prompt overrides edited in the dashboard, shared by all projects
 
 MODELS = ["fable", "opus", "sonnet", "haiku"]
 EFFORTS = ["low", "medium", "high", "xhigh", "max"]
@@ -59,7 +65,17 @@ UNSAFE_COMMANDS = {"sudo", "su", "rm", "curl", "wget", "ssh", "scp", "sftp", "rs
                    "dd", "mkfs", "diskutil", "chown", "kill", "killall", "pkill", "crontab", "defaults", "claude"}
 MAX_TOKENS_CAP = 10 ** 11
 TEAMS_HOSTS = (".webhook.office.com", ".logic.azure.com", ".powerplatform.com", ".powerautomate.com")
-NOTIFY_EVENTS = ("done", "failed", "blocked", "paused")
+NOTIFY_EVENTS = ("done", "failed", "blocked", "paused", "approval")
+GATEWAYS = ["autonomous", "manual"]
+AGENT_NAME = re.compile(r"^[a-z][a-z0-9-]{1,29}$")
+DEFAULT_TOOLS = ["Read", "Write", "Edit", "Glob", "Grep"]
+# Artifacts every plan can use. `requirements` is written by Katana; `code` is the run's workspace.
+BUILTIN_ARTIFACTS = [
+    {"id": "requirements", "title": "Requirements", "path": "docs/00-requirements.md", "builtin": True,
+     "description": "The requirement Katana took from the trigger"},
+    {"id": "code", "title": "Project code", "path": None, "builtin": True, "kind": "code",
+     "description": "The generated project in the run's workspace"},
+]
 
 
 def defaults() -> dict:
@@ -67,12 +83,14 @@ def defaults() -> dict:
 
 
 def settings_path(project: Path) -> Path:
-    return Path(project) / ".katana" / "settings.json"
+    return projects.config_path(project)
 
 
 def load(project: Path | None = None) -> dict:
     """Defaults merged with the settings of `project` (the active project if omitted)."""
     project = project or home()
+    if project:
+        projects.upgrade_layout(project)
     merged = defaults()
     try:
         user = json.loads(settings_path(project).read_text()) if project else {}
@@ -120,7 +138,7 @@ def writes_code(catalog: dict, stage: dict) -> bool:
 
 
 def home(conf: dict | None = None) -> Path | None:
-    """The active project folder (holds input/, runs/, logs/ and .katana/), or None before one is chosen.
+    """The active project folder (holds input/, katana.config.json and .katana/), or None before one is chosen.
     KATANA_HOME overrides it, for testing. `conf` is accepted for older callers and ignored."""
     override = os.environ.get("KATANA_HOME")
     return Path(override).expanduser().resolve() if override else projects.active()
@@ -150,8 +168,66 @@ def load_agent(name: str) -> dict:
     return agent
 
 
-def agent_catalog() -> dict:
-    return {p.stem: load_agent(p.stem) for p in sorted(AGENTS_DIR.glob("*.md"))}
+def custom_agent(name: str, spec: dict) -> dict:
+    """An agent defined in a project's settings. Its model and effort live in `agents`, like any agent's."""
+    prompt = str(spec.get("prompt") or "").strip()
+    tools = spec.get("tools")
+    return {"name": name, "title": str(spec.get("title") or name), "role": str(spec.get("role") or ""),
+            "model": "sonnet", "effort": "medium", "prompt": prompt, "default_prompt": prompt, "prompt_override": False,
+            "writes_code": "yes" if spec.get("writes_code") else "no", "custom": True,
+            "tools": list(tools) if isinstance(tools, list) else list(DEFAULT_TOOLS)}
+
+
+def agent_catalog(conf: dict | None = None) -> dict:
+    """Standard agents (factory/agents/) plus the custom agents of `conf` (the active project's if omitted)."""
+    out = {p.stem: load_agent(p.stem) for p in sorted(AGENTS_DIR.glob("*.md"))}
+    custom = (conf if conf is not None else load()).get("custom_agents")
+    for name, spec in (custom if isinstance(custom, dict) else {}).items():
+        if name not in out and isinstance(spec, dict):
+            out[name] = custom_agent(name, spec)
+    return out
+
+
+def set_custom_prompt(name: str, text: str, project: Path | None = None) -> bool:
+    """Saves the prompt of a custom agent in the project's settings. False if there is no such agent."""
+    project = project or home()
+    path = settings_path(project)
+    try:
+        user = json.loads(path.read_text())
+    except (OSError, json.JSONDecodeError):
+        return False
+    spec = (user.get("custom_agents") or {}).get(name)
+    if not isinstance(spec, dict):
+        return False
+    spec["prompt"] = text.strip()
+    save(user, project)
+    return True
+
+
+def artifact_table(conf: dict) -> dict:
+    """Artifact id → {id, title, path, description}: the built-in ones, then the project's."""
+    out = {a["id"]: dict(a) for a in BUILTIN_ARTIFACTS}
+    for a in conf.get("artifacts") or []:
+        if isinstance(a, dict) and a.get("id") and a["id"] not in out:
+            out[a["id"]] = {"id": a["id"], "title": a.get("title") or a["id"], "path": a.get("path"),
+                            "description": a.get("description") or ""}
+    return out
+
+
+def produced(stage: dict, catalog: dict, table: dict) -> list:
+    """Artifact ids a stage writes: its `outputs`, the artifact at its output path, and `code` for coders."""
+    ids = list(stage.get("outputs") or [])
+    ids += [a["id"] for a in table.values() if a.get("path") and a["path"] == stage.get("output")]
+    if writes_code(catalog, stage):
+        ids.append("code")
+    return list(dict.fromkeys(ids))
+
+
+def gateway(stage: dict) -> str | None:
+    """'autonomous' or 'manual' for a gateway (a gate step, or a stage with pass verdicts); None for other stages."""
+    if not (is_gate(stage) or stage.get("pass")):
+        return None
+    return stage.get("gateway") if stage.get("gateway") in GATEWAYS else "autonomous"
 
 
 def save_prompt(name: str, text: str) -> None:
@@ -192,7 +268,38 @@ def tool_problem(tool: str) -> str | None:
 
 def validate(new: dict) -> tuple:
     """Returns (clean settings, list of errors). Only known keys survive."""
-    errors, catalog = [], agent_catalog()
+    clean, errors, _ = _validate(new)
+    return clean, errors
+
+
+def diagnose(new: dict) -> dict:
+    """Everything wrong or doubtful with a settings draft, for the graph editor: {errors, warnings}, each a list
+    of {message, stage}, where `stage` is the id of the stage it is about (or None)."""
+    clean, errors, issues = _validate(new)
+    plan = [s for phase in phases(new.get("pipeline")) for s in phase]
+    by_label = {}
+    for p, phase in enumerate(phases(new.get("pipeline")), 1):
+        for k, s in enumerate(phase, 1):
+            by_label[(p, k if len(phase) > 1 else 0)] = s.get("id")
+    explicit = {i["message"]: i["stage"] for i in issues}
+    out = {"errors": [], "warnings": []}
+    for message in errors:
+        m = re.match(r"^Phase (\d+)(?:, stage (\d+))?", message)
+        stage = explicit.get(message) or (by_label.get((int(m.group(1)), int(m.group(2) or 0))) if m else None)
+        out["errors"].append({"message": message, "stage": stage if stage in {s.get("id") for s in plan} else None})
+    for i in issues:
+        if i["level"] == "warning":
+            out["warnings"].append({"message": i["message"], "stage": i.get("stage")})
+    out["warnings"] += [{"message": w, "stage": None} for w in warnings(clean) if w not in explicit]
+    return out
+
+
+def _validate(new: dict) -> tuple:
+    errors, issues = [], []
+    custom = _validate_custom_agents(new.get("custom_agents"), errors)
+    catalog = agent_catalog({"custom_agents": custom})
+    artifacts = _validate_artifacts(new.get("artifacts"), errors)
+    table = artifact_table({"artifacts": artifacts})
     clean = {"project": str(new.get("project") or "Katana")[:60]}
 
     t = new.get("trigger") or {}
@@ -266,7 +373,10 @@ def validate(new: dict) -> tuple:
             if on_fail and on_fail not in ids:
                 errors.append(f"{label}: 'on fail' must point to a stage in the plan.")
             if s.get("kind") == "gate":
-                out_phase.append(validate_gate(s, sid, label, on_fail, errors))
+                stage = validate_gate(s, sid, label, on_fail, errors)
+                stage.update(_validate_io(s, stage, label, catalog, artifacts, table, errors))
+                stage["gateway"] = _validate_gateway(s, label, errors)
+                out_phase.append(stage)
                 continue
             agent = s.get("agent")
             if agent not in catalog or agent == ROUTER:
@@ -282,9 +392,16 @@ def validate(new: dict) -> tuple:
             if verdicts:
                 stage.update({"pass": verdicts, "on_fail": on_fail, "required": bool(s.get("required"))})
                 stage.update(max_loops(s, label, errors))
+                stage["gateway"] = _validate_gateway(s, label, errors)
+            stage.update(_validate_io(s, stage, label, catalog, artifacts, table, errors))
             out_phase.append(stage)
         check_phase(catalog, out_phase, p, errors)
         clean["pipeline"].append(out_phase)
+    clean["artifacts"], clean["custom_agents"] = artifacts, custom
+    for issue in plan_issues(clean, catalog):
+        issues.append(issue)
+        if issue["level"] == "error":
+            errors.append(issue["message"])
     off = disabled_agents(clean)
     agent_stages = [st for st in stages(clean["pipeline"]) if not is_gate(st)]
     if agent_stages and all(st["agent"] in off for st in agent_stages):
@@ -294,7 +411,136 @@ def validate(new: dict) -> tuple:
     clean["budgets"] = _validate_budgets(new.get("budgets") or {}, errors)
     clean["notify"] = _validate_notify(new.get("notify") or {}, errors)
     clean["setup_completed"] = str(new.get("setup_completed") or "")[:40]
-    return clean, errors
+    return clean, errors, issues
+
+
+def _validate_custom_agents(raw, errors: list) -> dict:
+    """Agents defined in the project: name → {title, role, prompt, writes_code, tools}."""
+    standard, out = {p.stem for p in AGENTS_DIR.glob("*.md")}, {}
+    for name, spec in (raw if isinstance(raw, dict) else {}).items():
+        spec = spec if isinstance(spec, dict) else {}
+        title = str(spec.get("title") or "").strip()[:40]
+        label = f"Agent {title or name}"
+        if not AGENT_NAME.match(str(name)):
+            errors.append(f"{label}: the name must be lowercase letters, digits and dashes, starting with a letter.")
+            continue
+        if name in standard:
+            errors.append(f"{label}: {name} is the name of a standard agent.")
+            continue
+        if not title:
+            errors.append(f"{label}: give the agent a title.")
+        prompt = str(spec.get("prompt") or "").strip()
+        if not prompt:
+            errors.append(f"{label}: write the agent's prompt.")
+        elif len(prompt) > 50_000:
+            errors.append(f"{label}: the prompt must be at most 50,000 characters.")
+        tools = spec.get("tools")
+        tools = DEFAULT_TOOLS if tools is None else tools.split(",") if isinstance(tools, str) else tools
+        tools = list(dict.fromkeys(str(t).strip() for t in tools if str(t).strip()))
+        if len(tools) > 40:
+            errors.append(f"{label}: at most 40 tools.")
+        for tool in tools:
+            problem = tool_problem(tool[:120])
+            if problem:
+                errors.append(f"{label}: tool “{tool[:60]}” {problem}.")
+        out[name] = {"title": title or name, "role": str(spec.get("role") or "").strip()[:200], "prompt": prompt,
+                     "writes_code": bool(spec.get("writes_code")), "tools": tools}
+    return out
+
+
+def _validate_artifacts(raw, errors: list) -> list:
+    """The project's documents that stages read and write: [{id, title, path, description}]."""
+    out = []
+    ids = {a["id"] for a in BUILTIN_ARTIFACTS}
+    paths = {a["path"] for a in BUILTIN_ARTIFACTS if a["path"]}
+    for n, a in enumerate(raw if isinstance(raw, list) else [], 1):
+        a = a if isinstance(a, dict) else {}
+        aid, path, label = str(a.get("id") or ""), str(a.get("path") or ""), f"Artifact {n}"
+        if not STAGE_ID.match(aid):
+            errors.append(f"{label}: id must be lowercase letters, digits and dashes.")
+        elif aid in ids:
+            errors.append(f"{label}: id {aid} is already used.")
+        if not OUTPUT_PATH.match(path):
+            errors.append(f"{label}: path must be a relative .md path such as docs/spec.md.")
+        elif path in paths:
+            errors.append(f"{label}: {path} is already another artifact's path.")
+        ids.add(aid)
+        paths.add(path)
+        out.append({"id": aid, "title": str(a.get("title") or aid).strip()[:60], "path": path,
+                    "description": str(a.get("description") or "").strip()[:200]})
+    return out
+
+
+def _register_artifact(artifacts: list, table: dict, path: str, title: str) -> str:
+    """Adds the document at `path` to the project's artifacts under a new id."""
+    base = re.sub(r"[^a-z0-9]+", "-", Path(path).stem.lower()).strip("-")[:30] or "doc"
+    aid, n = base, 2
+    while aid in table:
+        aid, n = f"{base}-{n}", n + 1
+    artifacts.append({"id": aid, "title": title[:60], "path": path, "description": ""})
+    table[aid] = dict(artifacts[-1])
+    return aid
+
+
+def _validate_io(s: dict, stage: dict, label: str, catalog: dict, artifacts: list, table: dict, errors: list) -> dict:
+    """A stage's `inputs` and `outputs`. The document at its own output path is always one of its outputs."""
+    out = {}
+    for key, verb in (("inputs", "reads"), ("outputs", "writes")):
+        ids = list(dict.fromkeys(str(x).strip() for x in s.get(key) or [] if str(x).strip()))
+        for aid in ids:
+            if aid not in table:
+                errors.append(f"{label}: {verb} the artifact “{aid[:40]}”, which doesn't exist.")
+        out[key] = [aid for aid in ids if aid in table]
+    path = stage.get("output")
+    own = next((a["id"] for a in table.values() if a.get("path") == path), None)
+    if own is None and path and OUTPUT_PATH.match(path):
+        own = _register_artifact(artifacts, table, path, stage["title"])
+    if own and own not in out["outputs"]:
+        out["outputs"].append(own)
+    return out
+
+
+def _validate_gateway(s: dict, label: str, errors: list) -> str:
+    mode = s.get("gateway") or "autonomous"
+    if mode not in GATEWAYS:
+        errors.append(f"{label}: gateway type is autonomous or manual.")
+        return "autonomous"
+    return mode
+
+
+def plan_issues(clean: dict, catalog: dict) -> list:
+    """Problems with how the plan fits together, as [{level: error|warning, stage, message}]: feedback loops that
+    don't go back, and artifacts a stage reads that nothing before it writes."""
+    plan, table = phases(clean.get("pipeline")), artifact_table(clean)
+    where = {s["id"]: i for i, ph in enumerate(plan) for s in ph}
+    by_id = {s["id"]: s for ph in plan for s in ph}
+    out = []
+
+    def add(level, stage, message):
+        out.append({"level": level, "stage": stage["id"], "message": f"{stage['title']}: {message}"})
+
+    for i, phase in enumerate(plan):
+        earlier = {a for ph in plan[:i] for s in ph for a in produced(s, catalog, table)}
+        for s in phase:
+            target = s.get("on_fail")
+            if gateway(s) and target in where:
+                if where[target] > i:
+                    add("error", s, f"the feedback loop goes forward to {by_id[target]['title']}. It must go back to an "
+                                    "earlier phase.")
+                elif target == s["id"] and is_gate(s):
+                    add("error", s, "a gate can't send work back to itself.")
+            elif gateway(s) and is_gate(s) and i == 0:
+                add("warning", s, "it is the first step, so there is nothing to measure or go back to.")
+            beside = {a for o in phase if o is not s for a in produced(o, catalog, table)}
+            for a in s.get("inputs") or []:
+                if a == "requirements" or a in earlier:
+                    continue
+                name = table.get(a, {}).get("title", a)
+                if a in beside:
+                    add("warning", s, f"reads {name}, which a stage in the same phase writes at the same time.")
+                else:
+                    add("warning", s, f"reads {name}, but no earlier stage writes it.")
+    return out
 
 
 def _agent_controls(name: str, conf: dict, catalog: dict, errors: list) -> dict:
@@ -360,6 +606,7 @@ def warnings(clean: dict) -> list:
         elif s.get("on_fail") and next((t.get("agent") for t in plan if t["id"] == s["on_fail"]), None) in off:
             out.append(f"Stage {n} ({s['title']}) sends failures back to {titles[s['on_fail']]}, whose agent is "
                        "disabled: rework continues at the next enabled stage.")
+    out += [i["message"] for i in plan_issues(clean, agent_catalog(clean)) if i["level"] == "warning"]
     return out
 
 
@@ -425,12 +672,15 @@ def check_phase(catalog: dict, phase: list, p: int, errors: list) -> None:
     outputs = [s.get("output") for s in phase]
     if len(phase) > 1 and len(set(outputs)) < len(outputs):
         errors.append(f"Phase {p}: stages that run at the same time need different output documents.")
+    written = [a for s in phase for a in s.get("outputs") or [] if a != "code"]
+    if len(phase) > 1 and len(set(written)) < len(written):
+        errors.append(f"Phase {p}: stages that run at the same time can't write the same artifact.")
 
 
 def save(clean: dict, project: Path | None = None) -> None:
     path = settings_path(project or home())
     path.parent.mkdir(parents=True, exist_ok=True)
-    tmp = path.with_suffix(".tmp")
+    tmp = path.with_name(path.name + ".tmp")
     tmp.write_text(json.dumps(clean, indent=2) + "\n")
     tmp.replace(path)
 

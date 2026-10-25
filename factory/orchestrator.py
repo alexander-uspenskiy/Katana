@@ -2,7 +2,7 @@
 """Katana orchestrator.
 
 Takes requirements from each registered project's trigger (its input/ folder today; see factory/triggers/)
-and drives each one through the plan in that project's .katana/settings.json, calling the Claude Code CLI
+and drives each one through the plan in that project's katana.config.json, calling the Claude Code CLI
 headless on the user's subscription.
 
 - deterministic mode: runs the plan's phases in order. The stages of a phase run at the same time (up to
@@ -13,6 +13,10 @@ headless on the user's subscription.
 - budgets: a token cap per run fails the run; a daily token cap pauses the factory until midnight.
 
 Gate steps (`"kind": "gate"`) are measured by Katana itself, with no LLM call: see gates.py.
+
+A gate step or a stage with pass verdicts is a gateway. An autonomous gateway sends failed work back by
+itself; a manual one stops the run in the `approval` status and waits for a person to approve, send back or
+reject (the dashboard records the answer in the run's state, and the next scan carries on).
 
     python3 factory/orchestrator.py run [--project PATH]   # process the current input now, then exit
     python3 factory/orchestrator.py tick      # scan every folder-interval and folder-watch project now
@@ -59,6 +63,7 @@ NEAR_LIMIT_PATTERN = re.compile(
 NEAR_LIMIT_UTILIZATION = 0.9
 BUDGET_POLL = float(os.environ.get("KATANA_BUDGET_POLL", "5"))  # seconds between token checks during a call
 BUDGET_CODE = -9  # exit code call_claude reports when it stopped a call at a token cap
+HUMAN = {"approve": "approved", "rework": "rework", "reject": "rejected"}  # a person's answer at a manual gateway
 
 COMMON_RULES = """
 You are one stage in an unattended software pipeline. Nobody is watching and nobody will answer
@@ -77,7 +82,9 @@ def configure(project: Path, settle: int = triggers.SETTLE_SECONDS) -> None:
     global ROOT, INPUT_DIR, RUNS_DIR, LOG_FILE, CONF, TRIGGER
     ROOT = Path(project).expanduser().resolve()
     CONF = settings.load(ROOT)
-    INPUT_DIR, RUNS_DIR, LOG_FILE = ROOT / "input", ROOT / "runs", ROOT / "logs" / "factory.log"
+    projects.upgrade_layout(ROOT)
+    INPUT_DIR, RUNS_DIR = ROOT / "input", projects.runs_dir(ROOT)
+    LOG_FILE = projects.logs_dir(ROOT) / "factory.log"
     for d in (INPUT_DIR, RUNS_DIR, LOG_FILE.parent):
         d.mkdir(parents=True, exist_ok=True)
     TRIGGER = triggers.for_project(ROOT, CONF, log=log, settle=settle)
@@ -218,7 +225,9 @@ def claim_new_inputs() -> list:
         # The plan and mode are frozen per run, so editing settings never breaks a run in flight.
         run = {"id": run_id, "source": item.key, "status": "running", "mode": CONF["mode"],
                "origin": {"trigger": TRIGGER.name, "key": item.key, "ref": item.ref},
-               "pipeline": CONF["pipeline"], "phase": 0 if CONF["mode"] == "deterministic" else None,
+               "pipeline": CONF["pipeline"], "artifacts": CONF.get("artifacts") or [],
+               "custom_agents": CONF.get("custom_agents") or {},
+               "phase": 0 if CONF["mode"] == "deterministic" else None,
                "next": [], "finished": [], "current": [],
                "visits": {}, "loops": {}, "attempts": 0, "created": datetime.now().isoformat(),
                "history": [], "decisions": []}
@@ -247,6 +256,18 @@ def latest(run: dict, stage_id: str) -> dict | None:
     return next((h for h in reversed(run["history"]) if h["stage"] == stage_id and h["outcome"] == "ok"), None)
 
 
+def catalog_for(run: dict) -> dict:
+    """Standard agents plus the project's custom ones. A custom agent deleted since the run started still works."""
+    custom = dict(run.get("custom_agents") or {})
+    custom.update(CONF.get("custom_agents") or {})
+    return settings.agent_catalog({"custom_agents": custom})
+
+
+def table_for(run: dict) -> dict:
+    """The artifacts of a run, as they were when it started."""
+    return settings.artifact_table({"artifacts": run.get("artifacts", CONF.get("artifacts"))})
+
+
 def gated(stage: dict) -> bool:
     """A gate step, or an agent stage with pass verdicts."""
     return settings.is_gate(stage) or bool(stage.get("pass"))
@@ -255,6 +276,8 @@ def gated(stage: dict) -> bool:
 def passed(stage: dict, entry: dict | None) -> bool:
     if not entry:
         return False
+    if entry.get("human") == "approved":  # a person accepted the work although the criteria were not met
+        return True
     if settings.is_gate(stage):
         return entry.get("verdict") == "PASS"
     return entry.get("verdict") in stage.get("pass", [])
@@ -335,15 +358,68 @@ def count_loop(run: dict, stage: dict, verdict: str) -> bool:
     return True
 
 
+def needs_approval(run: dict, stage: dict) -> bool:
+    """A manual gateway whose latest run failed and that nobody has decided on yet."""
+    entry = latest(run, stage["id"])
+    return (settings.gateway(stage) == "manual" and entry is not None and entry.get("verdict") != "BLOCKED"
+            and not passed(stage, entry) and not entry.get("human"))
+
+
+def request_approval(run: dict, stage: dict) -> None:
+    """Stops the run at a manual gateway until a person decides (see apply_decision)."""
+    entry = latest(run, stage["id"])
+    target = stage_def(run, fail_target(run, stage))
+    if settings.is_gate(stage):
+        reasons = [f"{r['label']} {gates.fmt_value(r)} (needs {r['op']} {r['threshold']})"
+                   for r in entry.get("results") or [] if r["outcome"] == "block"]
+    else:
+        reasons = [f"verdict {entry.get('verdict') or 'missing'}; passes on {', '.join(stage['pass'])}"]
+    run["status"] = "approval"
+    run["reason"] = f"{stage['title']} didn't pass and waits for your decision"
+    run["approval"] = {"stage": stage["id"], "title": stage["title"], "verdict": entry.get("verdict"),
+                       "visit": entry["visit"], "report": stage["output"], "reasons": reasons,
+                       "target": target["id"], "target_title": target["title"],
+                       "loops_used": run["loops"].get(stage["id"], 0),
+                       "loops_max": int(stage.get("max_loops") or CONF.get("max_iterations", 3)),
+                       "since": datetime.now().isoformat()}
+    log(f"{run['id']}: {stage['title']} didn't pass; waiting for a person to approve, send back or reject")
+
+
+def apply_decision(run: dict) -> None:
+    """A run waiting at a manual gateway carries on once the dashboard has recorded a decision: the gateway's
+    latest entry gets `human` = approved | rework | rejected, which settle() then acts on."""
+    ap = run.get("approval") or {}
+    human = HUMAN.get(ap.get("decision"))
+    if not human:
+        return
+    entry = latest(run, ap["stage"])
+    if entry:
+        entry.update(human=human, human_at=datetime.now().isoformat(), human_note=ap.get("note") or "")
+    run.setdefault("approvals", []).append(dict(ap, human=human, resolved=datetime.now().isoformat()))
+    run.pop("approval", None)
+    run.pop("notified", None)  # the next approval request notifies again
+    log(f"{run['id']}: {ap.get('title')} {human} by a person" + (f": {ap['note']}" if ap.get("note") else ""))
+
+
 def settle(run: dict, batch: list) -> list | None:
-    """After a phase or batch has finished: blocks the run on BLOCKED and counts failed gates. Returns the
-    failed gates, or None if the run stopped."""
+    """After a phase or batch has finished: stops at a manual gateway that failed, blocks the run on BLOCKED
+    and counts failed gates. Returns the failed gates, or None if the run stopped."""
+    waiting = [s for s in batch if needs_approval(run, s)]
+    if waiting:  # `finished` stays, so the run carries on from here instead of repeating the phase
+        request_approval(run, waiting[0])
+        return None
     run["finished"], run["next"] = [], []
     for s in batch:
         if (latest(run, s["id"]) or {}).get("verdict") == "BLOCKED":
             run["status"], run["reason"] = "blocked", f"{s['title']} could not continue"
             return None
     failed = [s for s in batch if gated(s) and not passed(s, latest(run, s["id"]))]
+    for s in failed:
+        entry = latest(run, s["id"])
+        if entry.get("human") == "rejected":
+            run["status"] = "failed"
+            run["reason"] = f"{s['title']} was rejected by a person" + (f": {entry['human_note']}" if entry.get("human_note") else "")
+            return None
     for s in failed:
         if not count_loop(run, s, latest(run, s["id"]).get("verdict")):
             return None
@@ -364,14 +440,17 @@ def advance_phase(run: dict) -> None:
 
 
 def describe(run: dict, s: dict, catalog: dict) -> str:
+    io = "".join(f" {label}: {', '.join(s[key])}." for key, label in (("inputs", "Reads"), ("outputs", "Writes"))
+                 if s.get(key))
+    manual = " A person decides when it fails." if settings.gateway(s) == "manual" else ""
     if settings.is_gate(s):
         conds = "; ".join(gates.describe(c) for c in s.get("conditions") or [])
         return (f"{s['id']}: {s['title']}, a gate step Katana measures itself (no agent, no tokens): {conds}. "
-                f"On fail the Developer gets {s['output']}.{' Required.' if s.get('required') else ''}")
+                f"On fail the Developer gets {s['output']}.{manual}{io}{' Required.' if s.get('required') else ''}")
     gate = f" Gate: passes on {', '.join(s['pass'])}." if s.get("pass") else ""
     code = " Changes code." if settings.writes_code(catalog, s) else " Writes only its report."
     return (f"{s['id']}: {s['title']} by {catalog[s['agent']].get('title', s['agent'])}. "
-            f"{s['task']}{gate}{code}{' Required.' if s.get('required') else ''}")
+            f"{s['task']}{gate}{manual}{code}{io}{' Required.' if s.get('required') else ''}")
 
 
 def decide(claude: str, run: dict):
@@ -379,7 +458,7 @@ def decide(claude: str, run: dict):
     or an outcome ('limit' / 'error') if the call failed."""
     run_dir = RUNS_DIR / run["id"]
     workspace = run_dir / "workspace"
-    catalog = settings.agent_catalog()
+    catalog = catalog_for(run)
     router = settings.effective_agent(CONF, catalog, settings.ROUTER)
     plan = enabled_stages(run)  # the Orchestrator never sees stages of disabled agents
     allowed = {s["id"] for s in plan}
@@ -492,7 +571,7 @@ def drop_snapshot(workspace: Path, path: Path) -> None:
 def run_station(claude: str, run: dict, stage: dict, alongside: list, snapshot: Path | None = None) -> tuple:
     """Runs one agent stage (in its own thread when a phase has several). Returns (outcome, verdict) with
     outcome ok|limit|error."""
-    catalog = settings.agent_catalog()
+    catalog = catalog_for(run)
     agent = settings.effective_agent(CONF, catalog, stage["agent"])
     coder = settings.writes_code(catalog, stage)
     run_dir = RUNS_DIR / run["id"]
@@ -507,6 +586,17 @@ def run_station(claude: str, run: dict, stage: dict, alongside: list, snapshot: 
         task.append(f"Running at the same time in this workspace: {', '.join(alongside)}. "
                     + ("You are the only one of them that may change code." if coder
                        else "Do not change any file except your output."))
+    table = table_for(run)
+    reads = [table[a] for a in stage.get("inputs") or [] if a in table]
+    extra = [table[a] for a in stage.get("outputs") or [] if a in table and table[a].get("path")
+             and table[a]["path"] != stage["output"]]
+    absent = [a["path"] for a in reads if a.get("path") and not (cwd / a["path"]).exists()]
+    if reads:
+        task.append("Read first: " + "; ".join(f"{a['path']} ({a['title']})" if a.get("path") else
+                                               f"the project code ({a['title']})" for a in reads) + "."
+                    + (f" Not written yet: {', '.join(absent)}; say so in your output if you needed it." if absent else ""))
+    if extra:
+        task.append("Also write: " + "; ".join(f"{a['path']} ({a['title']})" for a in extra) + ".")
     feedback = [g["output"] for g in failed_gates(run) if g["id"] != stage["id"]
                 and (fail_target(run, g) == stage["id"] or (run["mode"] == "auto" and is_build(stage)))]
     if feedback:
@@ -551,6 +641,8 @@ def run_station(claude: str, run: dict, stage: dict, alongside: list, snapshot: 
              "near_limit": near_limit(summary, stderr)}
     if alongside:
         entry["alongside"] = alongside
+    if absent:
+        entry["missing_inputs"] = absent
 
     problem = failure(code, result, stderr)
     verdict = None
@@ -567,6 +659,18 @@ def run_station(claude: str, run: dict, stage: dict, alongside: list, snapshot: 
             shutil.copy(output, workspace / stage["output"])
         shutil.copy(output, run_dir / "reports" / f"{stage['id']}-run{visit}.md")
         entry.update(outcome="ok", verdict=verdict)
+        unwritten = []
+        for a in extra:  # the other artifacts the stage promised: noted, not fatal
+            made = cwd / a["path"]
+            if made.is_file() and made.stat().st_mtime >= started:
+                if snapshot:
+                    (workspace / a["path"]).parent.mkdir(parents=True, exist_ok=True)
+                    shutil.copy(made, workspace / a["path"])
+            else:
+                unwritten.append(a["path"])
+        if unwritten:
+            entry["missing_outputs"] = unwritten
+            log(f"{run['id']}: {stage['title']} did not write {', '.join(unwritten)}")
     with LOCK:
         run["current"] = [c for c in run["current"] if c is not cur]
         run["history"].append(entry)
@@ -644,7 +748,7 @@ def run_batch(claude: str, run: dict, batch: list) -> str | None:
     steps. Returns None, or the problem ('limit' / 'error') after recording it."""
     agents = [s for s in batch if not settings.is_gate(s)]
     if agents:
-        catalog = settings.agent_catalog()
+        catalog = catalog_for(run)
         workspace = RUNS_DIR / run["id"] / "workspace"
         snapshots = {}
         if CONF.get("worktrees") and len(agents) > 1:  # snapshot before the code-writing stage starts
@@ -696,6 +800,10 @@ def write_summary(run: dict) -> None:
         for h in gate_runs:
             lines.append(f"- **{h['title']}** run {h['visit']}: {h['verdict']} · " + "; ".join(
                 f"{gates.condition_text(r)} → {gates.fmt_value(r)} {r['status']}" for r in h["results"]))
+    if run.get("approvals"):
+        lines += ["", "## Manual gateways", ""]
+        lines += [f"- **{a['title']}** run {a.get('visit')}: {a['human']}" + (f" ({a['note']})" if a.get("note") else "")
+                  + (f"; {'; '.join(a['reasons'])}" if a.get("reasons") else "") for a in run["approvals"]]
     if run["decisions"]:
         lines += ["", "## Orchestrator decisions", ""]
         lines += [f"{n}. **{', '.join(d.get('chosen') or []) if isinstance(d.get('chosen'), list) else d.get('chosen') or d['outcome']}**: "
@@ -834,6 +942,8 @@ def process(claude: str, run: dict) -> bool:
 
 def drive(claude: str, run: dict) -> bool:
     """Drives a run until it finishes or pauses. Returns False if a usage limit was hit."""
+    if run["status"] == "approval":
+        apply_decision(run)
     run["status"] = "running"
     run["current"] = []  # anything listed here was cut off when the factory last stopped
     run.pop("reason", None)
@@ -922,7 +1032,8 @@ def scan(project: Path, scheduled: bool = True) -> None:
             heartbeat(auth=auth.check(claude), cli=claude)
             if factory_paused():
                 return
-            todo = [r for r in load_runs() if r["status"] in ("running", "paused")] + claim_new_inputs()
+            todo = [r for r in load_runs() if r["status"] in ("running", "paused")
+                    or (r["status"] == "approval" and (r.get("approval") or {}).get("decision"))] + claim_new_inputs()
             while todo:
                 run = todo.pop(0)
                 heartbeat(state="working", run=run["id"])

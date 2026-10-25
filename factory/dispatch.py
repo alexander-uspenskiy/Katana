@@ -2,11 +2,10 @@
 
 launchd runs `orchestrator.py dispatch` every minute and whenever a folder-watch project's input/ changes.
 dispatch starts one detached worker (`orchestrator.py run --project P --scheduled`) per project that is due,
-so a long run in one project never holds up another. Each worker takes its project's runs/.lock.
+so a long run in one project never holds up another. Each worker takes its project's .katana/runs/.lock.
 """
 from __future__ import annotations
 
-import fcntl
 import json
 import os
 import plistlib
@@ -23,6 +22,7 @@ HERE = Path(__file__).resolve().parent
 LABEL = "com.katana.orchestrator"
 PLIST_PATH = Path.home() / "Library/LaunchAgents" / f"{LABEL}.plist"
 DISPATCH_SECONDS = int(os.environ.get("KATANA_DISPATCH_INTERVAL", "60"))
+LAUNCHD_LOG = projects.USER_DIR / "logs" / "launchd.log"
 SLACK_SECONDS = 30  # launchd fires a little early or late; count a project as due this close to its time
 
 
@@ -42,7 +42,7 @@ def service_projects() -> list:
 
 def last_scan(folder: Path) -> float:
     try:
-        beat = json.loads((folder / "runs" / ".factory.json").read_text())
+        beat = json.loads((projects.runs_dir(folder) / ".factory.json").read_text())
         return time.mktime(time.strptime(beat["tick_started"][:19], "%Y-%m-%dT%H:%M:%S"))
     except (OSError, ValueError, KeyError, json.JSONDecodeError):
         return 0.0
@@ -59,25 +59,16 @@ def due(folder: Path, conf: dict) -> bool:
 
 def busy(folder: Path) -> bool:
     """True while a scan of this project holds its lock."""
-    lock_path = Path(folder) / "runs" / ".lock"
-    if not lock_path.exists():
-        return False
-    with open(lock_path, "a") as lock:
-        try:
-            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        except BlockingIOError:
-            return True
-        fcntl.flock(lock, fcntl.LOCK_UN)
-    return False
+    return projects.locked(projects.runs_dir(folder) / ".lock")
 
 
 def spawn_worker(folder: Path, scheduled: bool) -> None:
     """Starts `orchestrator.py run` for one project in the background, in its own session so it outlives
     the dispatcher or the dashboard request that started it."""
     folder = Path(folder)
-    (folder / "logs").mkdir(parents=True, exist_ok=True)
+    projects.logs_dir(folder).mkdir(parents=True, exist_ok=True)
     cmd = [sys.executable, str(HERE / "orchestrator.py"), "run", "--project", str(folder)]
-    with open(folder / "logs" / "worker.log", "a") as err:
+    with open(projects.logs_dir(folder) / "worker.log", "a") as err:
         subprocess.Popen(cmd + (["--scheduled"] if scheduled else []), stdin=subprocess.DEVNULL,
                          stdout=subprocess.DEVNULL, stderr=err, start_new_session=True, cwd=str(HERE.parent))
 
@@ -89,7 +80,7 @@ def watch_paths() -> list:
 
 
 def plist(path_value: str, interval: int = DISPATCH_SECONDS) -> bytes:
-    log = str(HERE.parent / "logs" / "launchd.log")
+    log = str(LAUNCHD_LOG)
     job = {"Label": LABEL,
            "ProgramArguments": ["/usr/bin/python3", str(HERE / "orchestrator.py"), "dispatch"],
            "WorkingDirectory": str(HERE.parent),

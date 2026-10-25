@@ -7,8 +7,9 @@ and security-audited project out. Phase 0 runs on your Mac with your Claude subs
 
 ## How it works
 
-Katana works on **projects**. A project is a folder holding `input/` (requirement files), `runs/`, `logs/`
-and `.katana/settings.json` (that project's settings). Each requirement `.md` file in `input/` becomes a
+Katana works on **projects**. A project is a folder holding `input/` (requirement files),
+`katana.config.json` (that project's settings, JSON, safe to commit) and `.katana/` (everything Katana
+generates: `runs/` and `logs/`; keep it out of git). Each requirement `.md` file in `input/` becomes a
 run that follows the project's **plan**: a list of **phases**, each holding one or more stages
 that run at the same time. What starts a run is the project's **trigger**:
 
@@ -61,6 +62,37 @@ its own phase.
 - If one stage hits a usage limit or errors, the others finish, and the next scan reruns only the stages of
   the phase that did not finish.
 
+### Gateways
+
+A **gateway** is a gate step or a stage with pass verdicts: the plan's decision points. Each has a type:
+
+| Type | When its criteria are not met |
+|---|---|
+| `autonomous` (default) | The work goes back to the gateway's `on fail` stage by itself, up to its rework limit. |
+| `manual` | The run stops with the status **needs approval** and waits. In the dashboard you **send it back** (as autonomous would), **approve it anyway** and carry on, or **reject** it, which fails the run, each with an optional note. A gateway that passes never stops. |
+
+The decision is saved in the run's state, and the dashboard starts a scan at once. If one is already running,
+the run resumes on the next scan (**Run now**, or the service). A scan never touches a run that is still
+waiting, and a notification, with its own toggle, says when one is. Set the type in the graph editor, or
+`"gateway": "manual"` on the stage.
+
+### Artifacts
+
+An **artifact** is a document that stages read and write: `{id, title, path, description}` in the project's
+`artifacts` list, plus two built in: `requirements` (what Katana took from the trigger) and `code` (the
+workspace). A stage lists the artifacts it reads in `inputs` and writes in `outputs`; the document at its own
+`output` path is always one of them. Katana tells the agent to read its inputs first and which other documents
+to write, and records any input that did not exist yet and any promised output that was not written. In full
+auto, the Orchestrator sees each stage's inputs and outputs. The editor warns when a stage reads an artifact
+that nothing earlier writes, and refuses stages in one phase that write the same artifact.
+
+### Custom agents
+
+Besides the standard agents in [factory/agents/](factory/agents/), a project can define its own, in
+`custom_agents` of its `katana.config.json`: `{title, role, prompt, writes_code, tools}`. Their model and
+effort are set like any agent's, and they can be used for any stage. The tool allowlist follows the same
+safety rules, and a custom agent's prompt is edited from Settings → Agents → Prompt.
+
 ### Quality gates
 
 A **gate step** (`"kind": "gate"`) is a plan step that Katana measures itself, with no LLM call and no
@@ -88,7 +120,7 @@ tokens. Each condition has a metric, an operator, a threshold and a severity (`b
 - On failure, the gate writes `docs/gate-report.md`, every finding merged (failing tests, least-covered
   files, security findings, must-fix items), and sends the work to its `on fail` stage (default: the nearest
   earlier build stage). That stage is told to fix every finding in the report.
-- Measurements are kept per gate run in `runs/<id>/gates/<gate>-run<n>/` (`gate.log`, `junit.xml`,
+- Measurements are kept per gate run in `.katana/runs/<id>/gates/<gate>-run<n>/` (`gate.log`, `junit.xml`,
   `coverage.json`). Test commands run the generated project's code outside the CLI sandbox, with the same
   stripped environment as the agents.
 
@@ -99,19 +131,27 @@ tokens. Each condition has a metric, an operator, a threshold and a severity (`b
 | [factory/agents/](factory/agents/) | One role prompt per agent: BA, Architect, Security, Developer, Tester, Reviewer, Orchestrator |
 | [factory/triggers/](factory/triggers/) | Requirement sources: the connector interface and `FolderTrigger` |
 | [factory/projects.py](factory/projects.py) | The project registry |
+| [factory/dashboard/](factory/dashboard/) | The dashboard page (`index.html`) and the plan graph and its editor (`graph.js`, `graph.css`) |
 | [factory/dispatch.py](factory/dispatch.py) | Which projects are due, the background workers that scan them, and the launchd plist |
 | [factory/budget.py](factory/budget.py) | Token counting for the per-run and daily caps |
 | [factory/notify.py](factory/notify.py) | macOS and Teams notifications |
 | [config/defaults.json](config/defaults.json) | Default trigger, mode, limits, parallelism, gate commands, agents, budgets, notifications and plan |
-| `config/projects.json` | The registered projects and the active one (not in git) |
-| `<project>/.katana/settings.json` | That project's changes to the defaults, written by the setup wizard and Settings tab |
-| `config/auth.json` | How agents sign in: `subscription` or `api_key` (not in git). The keys themselves are in the keychain |
-| `config/agents/<name>.md` | Your edited agent prompts, written by Settings → Agents → Prompt (not in git). Shared by all projects |
-| `<project>/runs/<id>/` | Per run: `workspace/` (the generated project, its own git repo), `reports/`, `logs/`, `gates/`, `state.json`, `SUMMARY.md` |
+| `~/.katana/projects.json` | The registered projects and the active one |
+| `<project>/katana.config.json` | That project's changes to the defaults, written by the setup wizard and Settings tab |
+| `~/.katana/auth.json` | How agents sign in: `subscription` or `api_key`. The keys themselves are in the keychain, not in any file |
+| `~/.katana/agents/<name>.md` | Your edited agent prompts, written by Settings → Agents → Prompt. Shared by all projects |
+| `<project>/.katana/runs/<id>/` | Per run: `workspace/` (the generated project, its own git repo), `reports/`, `logs/`, `gates/`, `state.json`, `SUMMARY.md` |
+
+**User-level state** lives in `~/.katana/` (set `KATANA_USER_DIR` to move it). The first time Katana starts, it
+moves `config/projects.json`, `config/auth.json` and `config/agents/` there from the repository.
 
 **Upgrading:** settings used to live in `config/settings.json`. On the first start, Katana moves that file
-to `<project>/.katana/settings.json` for the project folder it named (or this repository), registers that
+to `<project>/katana.config.json` for the project folder it named (or this repository), registers that
 project, and renames the old file to `settings.json.migrated`.
+
+Projects from before `katana.config.json` are upgraded the first time Katana opens them: `.katana/settings.json`
+becomes `katana.config.json`, and the `runs/` and `logs/` folders Katana wrote move into `.katana/`. A project's
+own `runs/` or `logs/` folder is left alone, and nothing moves while a scan holds the project's lock.
 
 **Authentication:** Settings → Authentication shows whether the agents can sign in, and how. By default they
 use your Claude subscription: before every scan the orchestrator checks `claude auth status` for a subscription
@@ -119,7 +159,7 @@ login, and it removes `ANTHROPIC_API_KEY` and other API or provider variables fr
 Switch to **Anthropic API key** there and the agents get the saved key instead, billed per token. API keys
 (Anthropic, OpenAI, Google Gemini) are saved in your macOS login keychain under the service `katana`, never in a
 file; the dashboard shows only their last four characters. Only the Anthropic key reaches agents, and only in
-API key mode. The choice is shared by all projects and saved in `config/auth.json`.
+API key mode. The choice is shared by all projects and saved in `~/.katana/auth.json`.
 
 **Recovery:**
 - If a usage limit is hit, the run pauses and resumes on the next scan.
@@ -150,7 +190,7 @@ command. Bare `Bash`, `Bash(*)`, shells, and network or system commands such as 
 - **Pause when usage is near the limit:** when the CLI warns that the subscription window is nearly used up,
   the run pauses after the current stage and resumes after the window resets.
 
-**Notifications:** a macOS notification when a run is done, failed, blocked or paused, with a toggle for
+**Notifications:** a macOS notification when a run is done, failed, blocked, paused or needs approval, with a toggle for
 each event. If you add a Teams incoming-webhook URL, which must be an https URL on `webhook.office.com`,
 `logic.azure.com` or `powerplatform.com`, Katana also posts a card there. Nothing is sent to Teams
 without one.
@@ -163,7 +203,7 @@ python3 factory/dashboard.py
 
 Then open http://127.0.0.1:8787. With no project selected it opens on the **start screen**: your recent
 projects, a path field with **Browse…** (the native macOS folder dialog), **Open project**, and
-**Create new project**, which makes the folder with `input/`, `runs/`, `logs/` and `.katana/` inside.
+**Create new project**, which makes the folder with `input/` and `.katana/` inside.
 `--home DIR` opens a folder directly.
 
 Once a project is open, the project name in the top bar switches between recent projects, and every tab
@@ -186,10 +226,20 @@ The project's tabs refresh every 5 seconds:
   - The activity timeline, with a sub-lane per concurrent stage, tokens by model and by agent, models and
     effort, the queue and the log.
   - Run details include a **Gates** tab: every gate run with each condition's measured value and result.
-- **Plan:** a swim lane, one column per phase with its stages stacked, and a diamond for each gate step
-  listing its conditions with the latest measured values. Pick a run to see its live progress, and in
-  full-auto mode the path the Orchestrator took. Below, every stage's agent, model, effort, task, output and
-  gate, grouped by phase.
+- **Plan:** the plan as a graph: one column per phase, stages stacked when they run together, gateways as
+  diamonds, and every **feedback loop** drawn as a line back to the stage it returns to, labelled with its type
+  and limit (`used/max` for a run). Each stage shows the artifacts it reads (↓) and writes (↑); click one to
+  highlight who writes and who reads it. Pick a run to see its live progress, and in full-auto mode the path
+  the Orchestrator took. A run waiting at a manual gateway shows a banner with **Review…** on every tab. Below,
+  every stage's agent, model, effort, task, output and gate, grouped by phase.
+  - **Edit plan** opens the graph editor on the current plan (a run's plan is frozen). The **+** in each gap
+    inserts a step or an autonomous or manual gateway there; **+ step in parallel** adds to a phase. Select a
+    node or click a loop label to edit it in the side panel: title, agent (standard or your own), task,
+    reads and writes, the gateway type, passing verdicts or criteria, **where failed work goes back to**
+    (a list, or **Pick on the graph**), max loops, phase and order. The **Artifacts** tab manages the documents and
+    the **Agents** tab creates agents. Every change is checked by the server as you edit, so a loop that goes
+    forward, an unknown artifact, or a stage reading something nothing earlier writes is flagged on its node and
+    in the problem list. Undo and redo are available, and **Save plan** applies it to new runs.
 - **Settings:** grouped sections with a side navigation (a scrolling row on phones), and one save bar for
   all of them:
   - **Project:** the project name and folder, **Switch project**, the **trigger** (with the scan interval
@@ -197,18 +247,18 @@ The project's tabs refresh every 5 seconds:
     rework loops, stages per run, stage time and stages at once.
   - **Agents & plan:**
     - Presets, and for each agent its model, effort, an on/off switch and its tool allowlist.
-    - Each agent's prompt can be viewed and edited. A saved prompt is written to `config/agents/<name>.md`
+    - Each agent's prompt can be viewed and edited. A saved prompt is written to `~/.katana/agents/<name>.md`
       and takes effect immediately; **Reset to default** deletes it.
     - Gate settings: test and coverage commands, what a missing tool means, where security findings come
       from, and per-stage worktrees.
-    - The plan editor: add phases, add a parallel stage to a phase, move a stage to another phase, reorder
+    - The plan editor (also as forms; the graph editor above is the richer one): add phases, add a parallel stage to a phase, move a stage to another phase, reorder
       phases and stages, change each stage's agent, task, output and verdict gate, and edit a quality gate's
       conditions.
   - **Limits & alerts:** budgets and notifications, with a test button.
   - **System:**
     - Whether the service is installed and running, with Install, Start, Stop and Uninstall buttons. These
       act immediately.
-    - The last 20 lines of `logs/launchd.log`.
+    - The last 20 lines of `~/.katana/logs/launchd.log`.
 
 The server listens on localhost only. Every change, including settings, prompts, service actions and test
 notifications, needs a JSON POST with a custom header, so other web pages can't make them. The dollar figures are the API-equivalent list price; your subscription is what
@@ -246,7 +296,7 @@ scripts/install-service.sh
 ```
 
 installs the background service, a launchd agent that runs while you are logged in. It generates the plist
-from `config/projects.json`:
+from `~/.katana/projects.json`:
 - Every minute, launchd runs `orchestrator.py dispatch`, which starts a background worker for each project
   that is due. A long run in one project never holds up another.
 - `WatchPaths` lists the `input/` folder of every `folder-watch` project, so a new file starts a scan

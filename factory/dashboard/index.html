@@ -254,6 +254,7 @@ tr.open .chev { transform: rotate(90deg); }
 .node.paused, .node.limit { border-color: var(--warning); border-style: dashed; color: var(--ink); }
 .node.error, .node.failed { border-color: var(--critical); background: color-mix(in srgb, var(--critical) 14%, var(--surface)); color: var(--ink); }
 .node.blocked { border-color: var(--serious); background: color-mix(in srgb, var(--serious) 16%, var(--surface)); color: var(--ink); }
+.node.approval { border-color: var(--warning); background: color-mix(in srgb, var(--warning) 28%, var(--surface)); color: var(--ink); animation: ping 1.6s infinite; }
 .node.skipped { border-style: dotted; }
 .node sup { position: absolute; top: -7px; right: -9px; font-size: 9.5px; background: var(--ink); color: var(--surface); border-radius: 6px; padding: 0 3px; line-height: 13px; }
 .link { width: 10px; height: 1.5px; background: var(--axis); flex: none; }
@@ -369,15 +370,6 @@ tr.open .chev { transform: rotate(90deg); }
 .step .io { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 12px; color: var(--muted); }
 .gatebox { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 12.5px; padding: 6px 10px; border-radius: 8px; background: var(--surface-2); border: 1px dashed var(--axis); }
 .loopback { color: var(--ink-2); display: inline-flex; align-items: center; gap: 4px; }
-.ph.loop-col { flex: none; width: 250px; max-width: none; align-items: stretch; }
-.loop-row { display: grid; gap: 4px; padding: 8px 10px; border: 1px dashed var(--axis); border-radius: 10px; background: var(--surface); font-size: 12px; min-width: 0; }
-.loop-row.rework { border-color: var(--warning); border-style: solid; }
-.loop-row .loop-h { display: flex; align-items: center; gap: 6px; min-width: 0; }
-.loop-row .loop-h b { font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.loop-row .loop-h .btn { margin-left: auto; height: 22px; padding: 0 7px; font-size: 11.5px; }
-.loop-ed { display: grid; gap: 8px; padding: 10px; border: 1px solid var(--accent); border-radius: 10px; background: var(--surface); min-width: 0; }
-.loop-ed .acts { display: flex; gap: 6px; flex-wrap: wrap; }
-.loop-ed .errors { margin: 0; }
 .swim { display: flex; align-items: flex-start; gap: 0; overflow-x: auto; padding: 4px 2px 12px; }
 .ph { flex: 1 1 0; min-width: 176px; max-width: 260px; display: flex; flex-direction: column; gap: 8px; padding: 10px; border-radius: 12px; background: var(--wash); border: 1px solid var(--border); }
 .ph.now { border-color: color-mix(in srgb, var(--accent) 45%, var(--border)); background: var(--accent-wash); }
@@ -636,6 +628,7 @@ footer { max-width: 1560px; margin: 0 auto; padding: 0 24px 32px; color: var(--m
 }
 @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
 </style>
+<link rel="stylesheet" href="/assets/graph.css">
 </head>
 <body>
 <header class="top">
@@ -695,7 +688,7 @@ footer { max-width: 1560px; margin: 0 auto; padding: 0 24px 32px; color: var(--m
         <div class="actions">
           <button class="btn primary" id="openBtn">Open project</button>
           <button class="btn" id="createBtn">Create new project</button>
-          <span class="muted" style="font-size:12.5px">Create makes the folder, with <span class="mono">input/</span>, <span class="mono">runs/</span>, <span class="mono">logs/</span> and <span class="mono">.katana/</span> inside.</span>
+          <span class="muted" style="font-size:12.5px">Create makes the folder, with <span class="mono">input/</span> and <span class="mono">.katana/</span> (runs and logs) inside, and its settings in <span class="mono">katana.config.json</span>.</span>
         </div>
         <ul class="errors" id="startErr"></ul>
       </div>
@@ -771,7 +764,7 @@ footer { max-width: 1560px; margin: 0 auto; padding: 0 24px 32px; color: var(--m
       <div class="card-b" id="queue"></div>
     </section>
     <section class="card" aria-labelledby="h-log">
-      <div class="card-h"><h2 id="h-log">Factory log</h2><span class="sub">logs/factory.log</span>
+      <div class="card-h"><h2 id="h-log">Factory log</h2><span class="sub">.katana/logs/factory.log</span>
         <div class="right"><div class="seg" data-view="log"><button aria-pressed="true" data-v="all">All</button><button aria-pressed="false" data-v="problems">Problems</button></div></div>
       </div>
       <div class="card-b" id="log"></div>
@@ -786,12 +779,12 @@ footer { max-width: 1560px; margin: 0 auto; padding: 0 24px 32px; color: var(--m
       <h2 id="h-plan">Plan</h2><span class="sub" id="planSub"></span>
       <div class="right">
         <label class="field" style="width:280px"><span class="sr" style="position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)">Show progress for</span><select id="planRun"></select></label>
-        <a class="btn" href="#settings">Edit plan</a>
+        <a class="btn" href="#settings" title="The same plan as forms">List editor</a>
       </div>
     </div>
     <div class="card-b" id="planHead"></div>
   </section>
-  <section class="card" aria-labelledby="h-steps">
+  <section class="card" id="stepsCard" aria-labelledby="h-steps">
     <div class="card-h"><h2 id="h-steps">Stages</h2><span class="sub" id="stepsSub"></span></div>
     <div class="card-b" id="planSteps"></div>
   </section>
@@ -824,6 +817,10 @@ footer { max-width: 1560px; margin: 0 auto; padding: 0 24px 32px; color: var(--m
     <div class="df"><span class="muted" id="subHint"></span><button type="submit" class="btn primary" id="subGo">Submit</button></div>
   </form>
 </dialog>
+<dialog id="apprDlg" aria-labelledby="apprTitle">
+  <div class="dh"><b id="apprTitle"></b><span class="muted" id="apprSub"></span><button class="btn" style="margin-left:auto" data-appr="close">Later</button></div>
+  <div class="appr-b" id="apprBody"></div>
+</dialog>
 <dialog id="dlg" aria-labelledby="dlgTitle">
   <div class="dh"><b id="dlgTitle"></b><span class="muted" id="dlgSub"></span><button class="btn" style="margin-left:auto" id="dlgClose">Close</button></div>
   <pre id="dlgBody"></pre>
@@ -837,6 +834,7 @@ footer { max-width: 1560px; margin: 0 auto; padding: 0 24px 32px; color: var(--m
   <div class="pd-f"><button class="btn" data-pd="reset" id="pdReset">Reset to default</button><span style="margin-left:auto"></span><button class="btn" data-pd="close">Cancel</button><button class="btn primary" data-pd="save" id="pdSave">Save prompt</button></div>
 </dialog>
 
+<script src="/assets/graph.js"></script>
 <script>
 "use strict";
 const REFRESH_MS = 5000;
@@ -857,6 +855,7 @@ const STATUS = {
   done:    { label: "Done",    icon: "check" },
   failed:  { label: "Failed",  icon: "x" },
   blocked: { label: "Blocked", icon: "warn" },
+  approval: { label: "Needs approval", icon: "warn" },
 };
 const MODE_TEXT = {
   deterministic: ["Deterministic", "Classic SDLC pipeline: stages run in plan order; a failed gate loops back to its ‘on fail’ stage."],
@@ -1005,7 +1004,7 @@ function stageStates(run) {
     if (h.outcome === "limit") r.state = "limit";
     else if (h.outcome !== "ok") r.state = "error";
     else if (h.verdict === "BLOCKED") r.state = "blocked";
-    else if (gated(def) && !passes(def, h.verdict)) r.state = "rework";
+    else if (gated(def) && !passes(def, h.verdict) && h.human !== "approved") r.state = "rework";
     else r.state = "done";
   }
   (run.skipped || []).forEach((id) => { if (res[id] && res[id].state === "pending") res[id].state = "skipped"; });
@@ -1013,6 +1012,7 @@ function stageStates(run) {
   if (run.status === "paused") waiting.forEach((id) => (res[id].state = "paused"));
   else if (run.status === "failed") waiting.forEach((id) => { if (res[id].state === "pending") res[id].state = "failed"; });
   cur(run).forEach((c) => { if (c.stage && res[c.stage]) res[c.stage].state = "active"; });
+  if (run.status === "approval" && run.approval && res[run.approval.stage]) res[run.approval.stage].state = "approval";
   if (["done", "failed", "blocked"].includes(run.status) && run.mode === "auto") for (const k in res) if (res[k].state === "pending") res[k].state = "skipped";
   return res;
 }
@@ -1105,6 +1105,7 @@ function renderBanners(d) {
   if (bud.near_limit_until) out.push(["warn", `<b>Usage is near your subscription limit.</b> Runs are paused until ${dateTime(bud.near_limit_until)}.`]);
   const paused = d.runs.filter((r) => r.status === "paused" && !r.reason);  // a reason means a budget pause
   if (paused.length) out.push(["warn", `<b>Usage limit reached${f.limit_hit ? " at " + time(f.limit_hit) : ""}.</b> ${paused.length} run${paused.length > 1 ? "s" : ""} paused; ${paused.length > 1 ? "they resume" : "it resumes"} on the next scan after your subscription window resets.`]);
+  d.runs.filter((r) => r.status === "approval" && r.approval).forEach((r) => out.push(["warn", `<b>${esc(r.source.replace(/\.md$/, ""))} needs your decision.</b> ${esc(r.approval.title)} didn’t pass${(r.approval.reasons || []).length ? ": " + esc(r.approval.reasons.join("; ")) : ""}. <button class="btn" data-approve="${esc(r.id)}" style="margin-left:6px">Review…</button>`]));
   const svc = d.service || {};
   const auto = SERVICE_TRIGGERS.includes(d.trigger.type);
   if (auto && !svc.loaded && !f.alive && ui.tab === "overview") out.push(["info", `The service isn’t running, so this project isn’t scanned automatically. Start it in <a href="#settings">Settings → Service</a>, run <span class="mono">python3 factory/orchestrator.py watch</span>, or press <b>Run now</b>.`]);
@@ -1325,7 +1326,7 @@ function renderRoster(d) {
 }
 
 /* ---------- runs ---------- */
-const STATE_LABEL = { pending: "not started", done: "passed", rework: "sent back", active: "working now", paused: "paused (usage limit)", limit: "hit usage limit", error: "errored", failed: "failed", blocked: "blocked", skipped: "skipped" };
+const STATE_LABEL = { pending: "not started", done: "passed", rework: "sent back", active: "working now", paused: "paused (usage limit)", limit: "hit usage limit", error: "errored", failed: "failed", blocked: "blocked", skipped: "skipped", approval: "waiting for you" };
 function track(run) {
   const st = stageStates(run), pos = stagePos(run.pipeline);
   const node = (s) => {
@@ -1343,7 +1344,7 @@ function track(run) {
 function renderRuns(d) {
   const counts = { all: d.runs.length };
   d.runs.forEach((r) => (counts[shown(r)] = (counts[shown(r)] || 0) + 1));
-  const opts = ["all", "running", "waiting", "paused", "done", "failed", "blocked"].filter((k) => k === "all" || counts[k]);
+  const opts = ["all", "running", "waiting", "approval", "paused", "done", "failed", "blocked"].filter((k) => k === "all" || counts[k]);
   if (!opts.includes(ui.filter)) ui.filter = "all";
   $("runFilter").innerHTML = opts.map((k) => `<button data-filter="${k}" aria-pressed="${ui.filter === k}">${k === "all" ? "All" : STATUS[k].label} <span class="muted num">${counts[k]}</span></button>`).join("");
   const runs = d.runs.filter((r) => ui.filter === "all" || shown(r) === ui.filter);
@@ -1598,6 +1599,8 @@ function gateConds(g, result) {  // a gate's conditions, with the measured value
   }).join("")}</ul>`;
 }
 function renderPlan(d) {
+  $("stepsCard").hidden = !!ui.pg;  // the stage list shows the saved plan, which the graph editor is changing
+  if (ui.pg) { if (!document.querySelector("#planHead .pg.editing")) pgPaint(); return; }
   const sel = $("planRun");
   const active = d.runs.find((r) => cur(r).length) || d.runs.find((r) => r.status === "running");
   if (ui.planRun && ui.planRun !== "none" && !d.runs.some((r) => r.id === ui.planRun)) ui.planRun = "";
@@ -1614,73 +1617,21 @@ function renderPlan(d) {
     const i = stages.indexOf(s), b = stages.slice(0, i).reverse().find((o) => o.agent === "developer");
     return b ? b.id : i > 0 ? stages[i - 1].id : null;
   })();
-  const nowPhase = chosen && chosen.mode === "deterministic" && ["running", "paused"].includes(chosen.status) ? chosen.phase : -1;
   const source = chosen ? [chosen] : d.runs;
   $("planSub").textContent = chosen ? `progress of ${chosen.source} · its plan was frozen when it started` : "what new runs will follow";
 
   const [mName, mDesc] = MODE_TEXT[mode] || [mode, ""];
   const router = conf.orchestrator;
-  const card = (s) => {
-    const a = conf[s.agent] || { title: s.agent }, x = st[s.id] || { state: "pending", runs: 0 };
-    return `<div class="lane-card ${x.state}" ${tipAttr(`${pos[s.id]}. ${s.title}\n${s.task}\n${STATE_LABEL[x.state]}${x.runs ? " · " + x.runs + " runs" : ""}`)}>
-      <div class="top"><span class="mono-badge" style="width:26px;height:26px;font-size:10.5px;border-radius:7px" aria-hidden="true">${mono(s.agent)}</span><div style="min-width:0"><b style="display:block">${esc(s.title)}</b><span class="muted" style="font-size:11.5px">${esc(a.title)} · ${esc(modelName(a.model))}</span></div></div>
-      <div class="meta">${a.writes_code ? `<span class="chip">changes code</span>` : `<span class="chip">report only</span>`}${s.pass ? `<span class="chip">${icon("gate", 11)}${esc(s.pass.join("/"))} → else ${esc(title(backOf(s)))}</span>` : ""}${chosen && x.state !== "pending" ? `<span class="chip">${esc(STATE_LABEL[x.state])}${x.runs > 1 ? ` ×${x.runs}` : ""}</span>` : ""}</div>
-    </div>`;
-  };
-  const gateCard = (g) => {
-    const x = st[g.id] || { state: "pending", runs: 0 }, m = latestGate(source, g.id);
-    return `<div class="diamond ${x.state}" aria-hidden="true"><span>${m ? (m.entry.verdict === "PASS" ? "✓" : "✗") : "◆"}</span></div>
-      <div style="text-align:center"><b style="font-size:13px">${esc(g.title)}</b><div class="muted" style="font-size:11.5px">measured by Katana · no LLM call</div></div>
-      ${gateConds(g, m)}
-      <div class="muted" style="font-size:11.5px;display:grid;gap:2px">${mode === "deterministic" || g.on_fail ? `<span class="loopback">${icon("loop", 12)} on fail → ${esc(title(backOf(g)))} with ${esc(g.output)}</span>` : ""}
-        ${g.required ? `<span>${icon("check", 11)} required before done</span>` : ""}
-        ${m ? `<span>measured ${ago(m.entry.finished)}${chosen ? ` · run ${m.entry.visit}` : ` in ${esc(m.run.source.replace(/\.md$/, ""))}`}</span>` : `<span>not measured yet</span>`}</div>`;
-  };
-  // Loops: every stage that can send work back. Editable on the current plan; a run's plan is frozen.
-  const limitOf = (s) => s.max_loops || d.settings.max_iterations;
-  const loopList = stages.filter(gated), free = stages.filter((s) => !gated(s));
-  const ed = !chosen && ui.loopEdit;
-  const loopForm = () => {
-    const src = stages.find((s) => s.id === ed.id) || {};
-    return `<div class="loop-ed" role="group" aria-label="${ed.isNew ? "New loop" : `Edit the ${esc(src.title)} loop`}">
-      <b style="font-size:12.5px">${ed.isNew ? "New loop" : esc(src.title)}</b>
-      ${ed.isNew ? `<label class="field"><span>After stage</span><select data-loop="id">${free.map((o) => `<option value="${esc(o.id)}" ${o.id === ed.id ? "selected" : ""}>${esc(pos[o.id])}. ${esc(o.title)}</option>`).join("")}</select></label>` : ""}
-      ${isGate(src) ? `<div class="muted" style="font-size:12px">Loops back when a blocking condition fails.</div>`
-        : `<label class="field"><span>Passes on</span><input type="text" class="mono" data-loop="pass" value="${esc(ed.pass)}" placeholder="APPROVE" spellcheck="false" autocomplete="off"><small>Any other verdict loops back.</small></label>`}
-      <label class="field"><span>Then go back to</span><select data-loop="on_fail"><option value="">Nearest build stage</option>${stages.filter((o) => o.id !== ed.id).map((o) => `<option value="${esc(o.id)}" ${ed.on_fail === o.id ? "selected" : ""}>${esc(pos[o.id])}. ${esc(o.title)}</option>`).join("")}</select></label>
-      <label class="field"><span>Max rework loops</span><input type="number" min="1" max="10" data-loop="max_loops" value="${esc(ed.max_loops)}" placeholder="${esc(d.settings.max_iterations)} (default)"></label>
-      ${ed.errors && ed.errors.length ? `<ul class="errors">${ed.errors.map((e) => `<li>${esc(e)}</li>`).join("")}</ul>` : ""}
-      <div class="acts"><button class="btn primary" data-loop-act="save" ${ed.saving ? "disabled" : ""}>Save loop</button><button class="btn" data-loop-act="cancel">Cancel</button>${!ed.isNew && !isGate(src) ? `<button class="btn ghost" data-loop-act="remove" ${ed.saving ? "disabled" : ""}>Remove</button>` : ""}</div>
-    </div>`;
-  };
-  const loopRow = (s) => {
-    if (ed && !ed.isNew && ed.id === s.id) return loopForm();
-    const used = chosen ? (chosen.loops || {})[s.id] || 0 : 0, to = backOf(s);
-    return `<div class="loop-row ${used ? "rework" : ""}">
-      <div class="loop-h">${icon("loop", 12)}<b>${esc(s.title)}</b>${chosen ? "" : `<button class="btn" data-loop-edit="${esc(s.id)}" aria-label="Edit the ${esc(s.title)} loop">Edit</button>`}</div>
-      <span class="muted">${isGate(s) ? "unless every blocking condition holds" : `unless ${s.pass.map(esc).join(" or ")}`}</span>
-      <span class="ink2">back to ${to ? `${esc(pos[to] || "")}. ${esc(title(to))}` : "—"}</span>
-      <span class="muted">${chosen ? `${used} of ${limitOf(s)} loops used` : `max ${limitOf(s)}×${s.max_loops ? "" : " (default)"}`}</span>
-    </div>`;
-  };
-  const loopCol = `<div class="ph loop-col"><div class="ph-h"><b>Loops</b><span class="chip">${loopList.length}</span></div>
-    ${loopList.map(loopRow).join("")}${ed && ed.isNew ? loopForm() : ""}
-    ${loopList.length || (ed && ed.isNew) ? "" : `<div class="muted" style="font-size:12px">No loops: every stage runs once.</div>`}
-    ${chosen ? `<div class="muted" style="font-size:11.5px">Frozen with this run. Choose <b>Current plan</b> to edit loops.</div>`
-      : ed && ed.isNew ? "" : `<button class="btn ghost" data-loop-edit="" ${free.length ? "" : `disabled title="Every stage already loops"`}>+ Add loop</button>`}</div>`;
-  const swim = `<div class="swim" aria-label="Plan phases">${phases.map((ph, i) => (i ? `<span class="ph-arrow" aria-hidden="true"></span>` : "") +
-    (ph.every(isGate) ? `<div class="ph gate-col ${i === nowPhase ? "now" : ""}"><div class="ph-h"><b>Phase ${i + 1}</b><span class="chip">gate</span></div>${ph.map(gateCard).join('<hr style="border:0;border-top:1px solid var(--grid);width:100%">')}</div>`
-      : `<div class="ph ${i === nowPhase ? "now" : ""}"><div class="ph-h"><b>Phase ${i + 1}</b>${ph.length > 1 ? `<span class="chip">${ph.length} in parallel</span>` : ""}</div>${ph.map(card).join("")}</div>`)).join("")}
-    <span class="ph-arrow" aria-hidden="true"></span>${loopCol}
-    ${mode === "deterministic" ? `<span class="ph-arrow" aria-hidden="true"></span><div class="end-col ${chosen ? ({ done: "done", failed: "failed", blocked: "failed" }[chosen.status] || "") : ""}">${chosen && ["failed", "blocked"].includes(chosen.status) ? icon(chosen.status === "blocked" ? "warn" : "x", 13) + STATUS[chosen.status].label : icon("check", 13) + "Done"}</div>` : ""}</div>`;
-  const keep = document.querySelector("#planHead .swim"), scrolled = keep ? keep.scrollLeft : 0;  // survive the 5 s refresh
+  const keep = $("pgViewCanvas"), scrolled = keep ? keep.scrollLeft : 0;  // survive the 5 s refresh
+  const asking = (chosen ? [chosen] : d.runs).filter((r) => r.status === "approval" && r.approval);
   $("planHead").innerHTML = `
+    ${asking.map((r) => `<div class="pg-appr"><div>${icon("warn", 16)} <b>${esc(r.source.replace(/\.md$/, ""))}</b> stopped at the manual gateway <b>${esc(r.approval.title)}</b> and waits for you: ${esc((r.approval.reasons || []).join("; ") || "it didn’t pass")}.</div><div class="acts"><button class="btn primary" data-approve="${esc(r.id)}">Review and decide…</button></div></div>`).join("")}
     <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px"><span class="badge">${icon(mode === "auto" ? "run" : "loop", 13)}${esc(mName)}</span><span class="ink2" style="font-size:13px">${esc(mDesc)}</span><span class="chip">up to ${d.settings.max_parallel || 1} stages at once</span></div>
     ${mode === "auto" ? `<div class="hub" style="margin-bottom:14px"><div class="mono-badge" aria-hidden="true">Or</div><div><b>Orchestrator agent</b> <span class="chip">${esc(modelName(router && router.model))}</span> ${effortMeter(router && router.effort)}
       <div class="ink2" style="font-size:13px;margin-top:4px">Before every step it reads the history and the documents, then picks the next stage or stages from the catalogue below (several at once, if at most one changes code), or <b>done</b>. Katana refuses <b>done</b> until every required gate has passed after the latest build, and stops a run after ${d.settings.max_stations} stages.</div></div></div>` : ""}
-    <div class="muted" style="font-size:12px;margin-bottom:4px">${mode === "auto" ? "Stage catalogue (the phases are a hint, not a rule)" : "Phases run left to right; the stages in a phase run at the same time"}</div>${swim}
+    ${pgView(d, chosen, st, mode, phases)}
     ${chosen ? `<div class="statusline" style="margin-top:8px">${statusBadge(shown(chosen))}<span>${chosen.history.length} steps run</span><span>${loops(chosen)} rework loops</span><span>${compact(sum(runTokens(chosen)))} tokens</span>${chosen.reason ? `<span>${esc(chosen.reason)}</span>` : ""}</div>` : ""}`;
-  if (scrolled) document.querySelector("#planHead .swim").scrollLeft = scrolled;
+  if (scrolled && $("pgViewCanvas")) $("pgViewCanvas").scrollLeft = scrolled;
 
   $("stepsSub").textContent = `${stages.length} stages in ${phases.length} phases · ${stages.filter(gated).length} gates`;
   const step = (s) => {
@@ -1694,8 +1645,9 @@ function renderPlan(d) {
         <div class="body"><div class="sc">
           <div class="sc-h"><span class="mono-badge" aria-hidden="true">◆</span><div style="min-width:0"><b>${esc(s.title)}</b><div class="muted" style="font-size:12px">Gate step · measured by Katana · <span class="mono">${esc(s.id)}</span></div></div>
             <div class="right"><span class="chip">no LLM call</span>${chosen ? `<span class="chip">${esc(STATE_LABEL[x.state])}</span>` : ""}</div></div>
+          ${(s.inputs || []).length ? `<div class="io"><span>Measures ${s.inputs.map((id) => `<button class="ach" data-pg-art="${esc(id)}">${esc(id)}</button>`).join(" ")}</span></div>` : ""}
           ${gateConds(s, m)}
-          <div class="gatebox">${icon("gate", 14)}<b>Gate</b> passes when every blocking condition holds
+          <div class="gatebox">${icon("gate", 14)}<b>Gate</b> passes when every blocking condition holds<span class="chip ${s.gateway === "manual" ? "accent" : ""}">${s.gateway === "manual" ? "manual: you decide" : "autonomous"}</span>
             <span class="loopback">${icon("loop", 13)} on fail → ${esc(pos[backOf(s)] || "")}. ${esc(title(backOf(s)))}, which gets <span class="mono">${esc(s.output)}</span> (max ${s.max_loops || d.settings.max_iterations}×)</span>
             ${s.required ? `<span class="chip accent">required before done</span>` : mode === "auto" ? `<span class="chip">optional</span>` : ""}</div>
           ${runLine}
@@ -1708,8 +1660,9 @@ function renderPlan(d) {
         <div class="sc-h"><span class="mono-badge" aria-hidden="true">${mono(s.agent)}</span><div style="min-width:0"><b>${esc(s.title)}</b><div class="muted" style="font-size:12px">${esc(a.title)} · <span class="mono">${esc(s.id)}</span></div></div>
           <div class="right"><span class="chip">${esc(modelName(a.model))}</span>${effortMeter(a.effort)}<span class="chip">${a.writes_code ? "changes code" : "report only"}</span>${chosen ? `<span class="chip">${esc(STATE_LABEL[x.state])}</span>` : ""}</div></div>
         <div class="task">${esc(s.task)}</div>
+        ${(s.inputs || []).length || (s.outputs || []).length ? `<div class="io">${(s.inputs || []).length ? `<span>Reads ${s.inputs.map((id) => `<button class="ach" data-pg-art="${esc(id)}">${esc(id)}</button>`).join(" ")}</span>` : ""}${(s.outputs || []).length ? `<span>Produces ${s.outputs.map((id) => `<button class="ach" data-pg-art="${esc(id)}">${esc(id)}</button>`).join(" ")}</span>` : ""}</div>` : ""}
         <div class="io"><span>Writes <button class="btn ghost mono" style="height:auto;padding:0;font-size:12px" ${chosen ? `data-report="${esc(chosen.id)}" data-name="${esc(s.output)}"` : "disabled"}>${esc(s.output)}</button></span>${a.role ? `<span>${esc(a.role)}</span>` : ""}</div>
-        ${s.pass ? `<div class="gatebox">${icon("gate", 14)}<b>Gate</b> passes on ${s.pass.map((v) => `<span class="chip">${esc(v)}</span>`).join(" ")}
+        ${s.pass ? `<div class="gatebox">${icon("gate", 14)}<b>Gate</b> passes on ${s.pass.map((v) => `<span class="chip">${esc(v)}</span>`).join(" ")}<span class="chip ${s.gateway === "manual" ? "accent" : ""}">${s.gateway === "manual" ? "manual: you decide" : "autonomous"}</span>
           ${mode === "deterministic" ? `<span class="loopback">${icon("loop", 13)} on fail → ${esc(pos[backOf(s)] || "")}. ${esc(title(backOf(s)))} (max ${s.max_loops || d.settings.max_iterations}×)</span>` : ""}
           ${s.required ? `<span class="chip accent">required before done</span>` : mode === "auto" ? `<span class="chip">optional</span>` : ""}</div>` : ""}
         ${runLine}
@@ -1721,69 +1674,6 @@ function renderPlan(d) {
       const picks = [].concat(x.chosen || []);
       return (i ? `<span class="arrow" aria-hidden="true"></span>` : "") + `<div class="fs" ${tipAttr((x.reason || "") + (x.override ? "\n" + x.override : ""))}><span class="n">${i + 1}</span><b style="font-size:13px">${picks[0] === "done" ? "Done" : picks.length ? picks.map((id) => esc(title(id))).join(" + ") : esc(x.outcome)}</b>${x.override ? icon("warn", 12) : ""}</div>`;
     }).join("")}</div></div>` : "");
-}
-
-/* ---------- loops (edited on the plan chart, saved straight to settings) ---------- */
-const VERDICT_HINT = { reviewer: "APPROVE", security: "APPROVE", tester: "PASS", architect: "READY", ba: "READY", developer: "DONE" };
-const loopDraft = (s, isNew) => ({ id: s.id, isNew, pass: (s.pass || [VERDICT_HINT[s.agent] || "APPROVE"]).join(", "),
-  on_fail: s.on_fail || "", max_loops: s.max_loops || "", errors: [], saving: false });
-const editingLoop = () => !!(document.activeElement && document.activeElement.closest && document.activeElement.closest(".loop-ed"));
-function openLoopEditor(focus) {
-  render();
-  const box = document.querySelector("#planHead .loop-ed");
-  if (!box) return;
-  box.scrollIntoView({ block: "nearest", inline: "nearest" });
-  const f = box.querySelector(focus || "select, input"); if (f) f.focus();
-}
-function onLoopInput(e) {
-  const ed = ui.loopEdit, f = e.target.dataset.loop;
-  if (!ed || !f) return;
-  if (f === "id") {
-    if (e.type !== "change") return;
-    const s = flat(ui.data.settings.pipeline).find((o) => o.id === e.target.value);
-    if (s) ui.loopEdit = loopDraft(s, true);
-    openLoopEditor('[data-loop="id"]');
-    return;
-  }
-  ed[f] = e.target.value;
-}
-async function onLoopClick(t) {
-  if (t.dataset.loopEdit !== undefined) {
-    const plan = flat(ui.data.settings.pipeline);
-    const s = t.dataset.loopEdit ? plan.find((o) => o.id === t.dataset.loopEdit) : plan.find((o) => !gated(o));
-    if (s) { ui.loopEdit = loopDraft(s, !t.dataset.loopEdit); openLoopEditor(); }
-    return;
-  }
-  if (t.dataset.loopAct === "cancel") { ui.loopEdit = null; render(); return; }
-  await saveLoop(t.dataset.loopAct === "remove");
-}
-async function saveLoop(remove) {
-  const ed = ui.loopEdit;
-  if (!ed) return;
-  const pass = ed.pass.split(",").map((v) => v.trim().toUpperCase()).filter(Boolean);
-  const apply = (conf) => {
-    const p = flat(conf.pipeline).find((o) => o.id === ed.id);
-    if (!p) return;
-    if (remove) { delete p.pass; delete p.on_fail; delete p.required; delete p.max_loops; return; }
-    if (!isGate(p)) { p.pass = pass; p.required = !!p.required; }
-    p.on_fail = ed.on_fail || null;
-    if (ed.max_loops === "") delete p.max_loops; else p.max_loops = Number(ed.max_loops);
-  };
-  const src = flat(ui.data.settings.pipeline).find((o) => o.id === ed.id);
-  ed.errors = !ui.cfg ? ["Settings are still loading. Try again in a moment."]
-    : !remove && src && !isGate(src) && !pass.length ? ["Add at least one passing verdict, such as APPROVE."] : [];
-  if (ed.errors.length) { render(); return; }
-  const body = clone(ui.cfg.settings), wasDirty = dirty();
-  apply(body);
-  ed.saving = true; render();
-  const out = await post("/api/settings", body);
-  ed.saving = false;
-  if (!out.ok) { ed.errors = out.errors || ["Couldn’t save."]; render(); return; }
-  ui.cfg = out; ui.cfg.settings.pipeline = phasesOf(out.settings.pipeline); ui.cfg.defaults.pipeline = phasesOf(out.defaults.pipeline);
-  if (wasDirty) apply(ui.draft); else ui.draft = clone(ui.cfg.settings);  // keep unsaved settings edits
-  ui.loopEdit = null; render();
-  toast(remove ? "Loop removed. It applies to new runs." : "Loop saved. It applies to new runs.");
-  fetchState();
 }
 
 /* ---------- settings ---------- */
@@ -1834,7 +1724,7 @@ function renderSettings() {
     <div class="row-fields">
       <label class="field"><span>Project name</span><input type="text" data-k="project" value="${esc(s.project)}" maxlength="60"></label>
       <div class="field" style="grid-column: span 2"><span>Project folder</span><div class="path-box mono">${esc(hs.path)}</div>
-        <small>Katana reads <span class="mono">input/</span> and writes <span class="mono">runs/</span> and <span class="mono">logs/</span> here. These settings are saved in <span class="mono">.katana/settings.json</span> inside it.</small></div>
+        <small>Katana reads <span class="mono">input/</span> and writes runs and logs to <span class="mono">.katana/</span> here. These settings are saved in <span class="mono">katana.config.json</span> in its root.</small></div>
     </div>
     <div class="folder-status">${icon("check", 13)} ${hs.runs} run${hs.runs === 1 ? "" : "s"} · ${hs.inputs} file${hs.inputs === 1 ? "" : "s"} in input/
       ${c.env_override ? `<span class="chip">${icon("warn", 12)} fixed by KATANA_HOME</span>` : ""}</div>
@@ -1880,7 +1770,7 @@ function renderSettings() {
   </div></section>
 
   <section class="card"><div class="card-h"><h2>Plan</h2><span class="sub">phases run in order; the stages in a phase run at the same time${s.mode === "auto" ? ". In full auto this is the Orchestrator’s catalogue" : ""}</span>
-    <div class="right"><a class="btn" href="#plan">View diagram</a><button class="btn" data-act="reset-plan">Reset to default</button></div></div><div class="card-b">
+    <div class="right"><button class="btn primary" data-pg="open-from-settings">Open graph editor</button><button class="btn" data-act="reset-plan">Reset to default</button></div></div><div class="card-b">
     ${s.pipeline.map((ph, i) => {
       const coders = ph.filter((p) => !isGate(p) && c.catalog[p.agent] && c.catalog[p.agent].writes_code);
       return `<div class="phase-ed">
@@ -1927,6 +1817,7 @@ function stageEditor(p, i, k) {
       <button class="btn icon" data-act="down" data-s="${key}" ${k === ph.length - 1 ? "disabled" : ""} title="Move down in phase" aria-label="Move ${esc(p.title)} down">${icon("down")}</button>
       <button class="btn icon" data-act="remove" data-s="${key}" ${flat(s.pipeline).length === 1 ? "disabled" : ""} title="Remove" aria-label="Remove ${esc(p.title)}">${icon("trash")}</button>
     </div>`;
+  const gateway = `<label class="field"><span>Gateway type</span><select data-stage="${key}" data-f="gateway" ${p.pass || isGate(p) ? "" : "disabled"}>${c.options.gateways.map((g) => `<option value="${g}" ${(p.gateway || "autonomous") === g ? "selected" : ""}>${g === "manual" ? "Manual: stop and ask me" : "Autonomous: loop back by itself"}</option>`).join("")}</select></label>`;
   if (isGate(p)) {
     const M = c.options.metrics;
     return `<div class="stage-ed">
@@ -1936,6 +1827,7 @@ function stageEditor(p, i, k) {
         <label class="field"><span>Stage id</span><input type="text" data-stage="${key}" data-f="id" value="${esc(p.id)}" spellcheck="false" class="mono"></label>
         <label class="field"><span>Report for the Developer</span><input type="text" data-stage="${key}" data-f="output" value="${esc(p.output)}" spellcheck="false" class="mono"></label>
         ${onFail(false)}
+        ${gateway}
         <label class="check"><input type="checkbox" data-stage="${key}" data-f="required" ${p.required ? "checked" : ""}> Required before done (full auto)</label>
         <div class="full"><div class="cond-head cond-ed"><span>Metric</span><span>Counts</span><span>Is</span><span>Threshold</span><span>On fail</span><span></span></div>
           ${(p.conditions || []).map((x, n) => `<div class="cond-ed">
@@ -1961,6 +1853,7 @@ function stageEditor(p, i, k) {
         <label class="field full"><span>Task</span><textarea data-stage="${key}" data-f="task" rows="2">${esc(p.task)}</textarea></label>
         <label class="field"><span>Gate: passes on</span><input type="text" data-stage="${key}" data-f="pass" value="${esc((p.pass || []).join(", "))}" placeholder="no gate" spellcheck="false"><small>Verdicts, e.g. APPROVE or PASS</small></label>
         ${onFail(!(p.pass && p.pass.length))}
+        ${gateway}
         ${move}
         <label class="check"><input type="checkbox" data-stage="${key}" data-f="required" ${p.required ? "checked" : ""} ${p.pass && p.pass.length ? "" : "disabled"}> Required before done (full auto)</label>
       </div>${ctrl}</div>`;
@@ -2012,7 +1905,7 @@ function onSettingsInput(e) {
     if (f === "pass") {
       const list = t.value.split(",").map((v) => v.trim().toUpperCase()).filter(Boolean);
       if (list.length) { p.pass = list; p.on_fail = p.on_fail || null; p.required = !!p.required; }
-      else { delete p.pass; delete p.on_fail; delete p.required; }
+      else { delete p.pass; delete p.on_fail; delete p.required; delete p.gateway; }
       if (e.type === "change") { renderSettings(); return; }
     } else if (f === "required") p.required = t.checked;
     else if (f === "on_fail") p.on_fail = t.value || null;
@@ -2200,7 +2093,7 @@ async function sendSubmit(e) {
 /* ---------- settings: agents, budgets, notifications, service ---------- */
 // Settings sections are found by their <h2>; a section can set data-group to choose its group in the side nav.
 const NAV_GROUPS = { "Project": "Project", "How the SDLC runs": "Project", "Agents": "Agents & plan", "Plan": "Agents & plan" };
-const EVENT_TEXT = { done: "Done", failed: "Failed", blocked: "Blocked", paused: "Paused (usage limit or budget)" };
+const EVENT_TEXT = { done: "Done", failed: "Failed", blocked: "Blocked", paused: "Paused (usage limit or budget)", approval: "Waiting for my decision at a manual gateway" };
 const SVC_BUSY = { install: "Installing…", start: "Starting…", stop: "Stopping…", uninstall: "Uninstalling…" };
 const M = 1e6;
 const cap1 = (x) => x[0].toUpperCase() + x.slice(1);
@@ -2263,7 +2156,7 @@ function agentEditor(c, s, n) {
     : flat(s.pipeline).filter((p) => p.agent === n).map((p) => p.title).join(", ") || "Not in the plan";
   return `<div class="agent-ed ${on ? "" : "off"}">
     <div class="ae-h"><span class="mono-badge" aria-hidden="true">${mono(n)}</span>
-      <div class="t"><b>${esc(a.title)}</b>${on ? "" : ` <span class="chip">disabled</span>`}<div class="muted">${esc(a.role || "")}</div></div>
+      <div class="t"><b>${esc(a.title)}</b>${a.custom ? ` <span class="chip accent">custom agent</span>` : ""}${on ? "" : ` <span class="chip">disabled</span>`}<div class="muted">${esc(a.role || "")}</div></div>
       <label class="switch"><input type="checkbox" data-agent="${n}" data-f="enabled" ${on ? "checked" : ""} aria-label="${esc(a.title)} enabled"><span>${on ? "Enabled" : "Disabled"}</span></label></div>
     <div class="ae-main">
       <label class="field"><span>Model</span><select data-agent="${n}" data-f="model" aria-label="${esc(a.title)} model">${c.options.models.map((m) => `<option value="${m}" ${m === v.model ? "selected" : ""}>${cap1(m)}</option>`).join("")}</select></label>
@@ -2277,7 +2170,7 @@ function agentEditor(c, s, n) {
         <small class="muted">Comma-separated: built-in tools such as <span class="mono">Read</span>, <span class="mono">Edit</span> or <span class="mono">Grep</span>, or <span class="mono">Bash(command *)</span> for one command. Shells, network and system commands are refused.</small>
         <div class="tool-bad" data-tool-bad="${n}">${bad.map(esc).join("<br>")}</div>
         ${custom ? `<button class="btn" style="margin-top:6px" data-act="reset-tools" data-agent="${n}">Reset to default tools</button>` : ""}</details>`}
-      <button class="btn" data-act="prompt" data-agent="${n}">${icon("text", 13)} Prompt${a.prompt_override ? ` <span class="chip accent">custom</span>` : ""}</button>
+      <button class="btn" data-act="prompt" data-agent="${n}">${icon("text", 13)} Prompt${a.prompt_override || a.custom ? ` <span class="chip accent">custom</span>` : ""}</button>
     </div>
   </div>`;
 }
@@ -2503,8 +2396,8 @@ async function openPrompt(name) {
     if (!res.ok) throw new Error(res.status);
     ui.prompt = await res.json();
     ta.value = ui.prompt.prompt; ta.disabled = false; $("pdSave").disabled = false; $("pdReset").disabled = !ui.prompt.overridden;
-    $("pdSub").textContent = ui.prompt.overridden ? "· custom" : "· default";
-    $("pdNote").innerHTML = (ui.prompt.overridden ? `Your version is saved in <span class="mono">${esc(ui.prompt.path)}</span>; Reset to default deletes it.`
+    $("pdSub").textContent = ui.prompt.custom ? "· your agent" : ui.prompt.overridden ? "· custom" : "· default";
+    $("pdNote").innerHTML = ui.prompt.custom ? `This agent belongs to the project; its prompt is saved in <span class="mono">${esc(ui.prompt.path)}</span>. Prompt changes take effect from the next stage this agent runs.` : (ui.prompt.overridden ? `Your version is saved in <span class="mono">${esc(ui.prompt.path)}</span>; Reset to default deletes it.`
       : `Saving writes your version to <span class="mono">${esc(ui.prompt.path)}</span> (not in git). The shipped prompt in <span class="mono">factory/agents/</span> stays as it is.`) +
       " Prompt changes take effect immediately, without Save settings, from the next stage this agent runs.";
   } catch (e) { ta.value = "Couldn’t load the prompt."; }
@@ -2518,6 +2411,7 @@ async function promptAction(kind) {
     const out = await postJson("/api/prompt", kind === "reset" ? { agent: p.agent, reset: true } : { agent: p.agent, prompt: $("pdText").value });
     if (!out.ok) { toast((out.errors || ["Couldn’t save the prompt."]).join(" ")); return; }
     ui.cfg.catalog[p.agent].prompt_override = out.overridden;
+    if (p.custom) [ui.cfg.settings, ui.draft].forEach((s) => { if (s.custom_agents && s.custom_agents[p.agent]) s.custom_agents[p.agent].prompt = out.prompt; });
     toast(kind === "reset" ? "Prompt reset to the default." : out.overridden ? "Prompt saved. It applies from the next stage this agent runs." : "That’s the default prompt, so no custom version is kept.");
     ui.prompt = null; dlg.close(); renderSettings(); fetchState();
   } catch (e) { toast("Couldn’t reach the dashboard server."); }
@@ -2709,7 +2603,7 @@ async function fetchState() {
     ui.data = await res.json(); ui.lastOk = Date.now(); ui.failing = false;
     document.body.classList.remove("stale");
   } catch (e) { ui.failing = true; document.body.classList.add("stale"); }
-  const busy = tipEl.classList.contains("show") || editingLoop() || (document.activeElement && document.activeElement.matches("select") && document.activeElement.closest("main:not([hidden])"));
+  const busy = tipEl.classList.contains("show") || (document.activeElement && document.activeElement.matches("select") && document.activeElement.closest("main:not([hidden])"));
   if (busy) pendingRender = true; else render();
 }
 setInterval(() => { if (!ui.paused && Date.now() - ui.lastFetch >= REFRESH_MS) fetchState(); }, 250);
@@ -2758,7 +2652,6 @@ document.addEventListener("click", async (e) => {
   if (t.id === "runBtn") { runNow(); return; }
   if (t.id === "submitBtn") { openSubmit(); return; }
   if (t.id === "subCancel") { $("subDlg").close(); return; }
-  if (t.dataset.loopEdit !== undefined || t.dataset.loopAct) { onLoopClick(t); return; }
   if (t.closest("#view-settings") && (await onSettingsClick(t))) return;
   if (t.closest("#view-setup") && (await onWizardClick(t))) return;
   if (t.dataset.filter) { ui.filter = t.dataset.filter; render(); return; }
@@ -2771,15 +2664,14 @@ document.addEventListener("click", async (e) => {
   if (seg && t.dataset.v) { ui.views[seg.dataset.view] = t.dataset.v; remember(); render(); return; }
   if (t.matches("tr.run")) toggleRun(t.dataset.run);
 });
-document.addEventListener("input", (e) => (e.target.closest(".loop-ed") ? onLoopInput(e) : e.target.closest("#view-setup") ? onWizardInput(e) : onSettingsInput(e)));
+document.addEventListener("input", (e) => (e.target.closest("#view-setup") ? onWizardInput(e) : onSettingsInput(e)));
 document.addEventListener("change", (e) => {
-  if (e.target.closest(".loop-ed")) { onLoopInput(e); return; }
   if (e.target.dataset.spend) { ui.spend[e.target.dataset.spend] = e.target.value; remember(); render(); return; }
   if (e.target.id === "planRun") { ui.planRun = e.target.value; render(); return; }
   if (e.target.closest("#view-setup")) { onWizardInput(e); return; }
   onSettingsInput(e);
 });
-document.addEventListener("focusout", () => setTimeout(() => { if (pendingRender && !tipEl.classList.contains("show") && !editingLoop()) { pendingRender = false; render(); } }, 0));
+document.addEventListener("focusout", () => setTimeout(() => { if (pendingRender && !tipEl.classList.contains("show")) { pendingRender = false; render(); } }, 0));
 document.addEventListener("keydown", (e) => {
   if (e.key === "Escape" && !$("projMenu").hidden) { toggleMenu(false); $("projBtn").focus(); return; }
   if (e.key === "Enter" && e.target.id === "startPath") { projectAction("open", e.target.value.trim()); return; }

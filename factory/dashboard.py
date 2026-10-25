@@ -4,7 +4,7 @@
     python3 factory/dashboard.py [--port 8787] [--home DIR]
 
 Serves on 127.0.0.1 only. The page polls /api/state every 5 seconds and shows the active project from
-config/projects.json; with no project selected it opens on the start screen.
+~/.katana/projects.json; with no project selected it opens on the start screen.
 """
 from __future__ import annotations
 
@@ -35,8 +35,9 @@ PAGE = HERE / "dashboard" / "index.html"
 INSTALL_SCRIPT = HERE.parent / "scripts" / "install-service.sh"
 LABEL = dispatch.LABEL
 SCRIPTS = HERE.parent / "scripts"
-LAUNCHD_LOG = HERE.parent / "logs" / "launchd.log"
+LAUNCHD_LOG = dispatch.LAUNCHD_LOG
 SERVICE_ACTIONS = ("install", "start", "stop", "uninstall")
+ASSETS = {"graph.js": "text/javascript; charset=utf-8", "graph.css": "text/css; charset=utf-8"}  # served from dashboard/
 TASK_LINE = re.compile(r"^\s*[-*]\s+\[([ xX])\]\s+(?:(T\d+)[:.)]?\s*)?(.+)$", re.M)
 TOKEN_KEYS = ("input", "cache_write", "cache_read", "output")
 _service_cache = {"at": 0.0, "value": None}
@@ -131,7 +132,7 @@ def budget_view(conf: dict, runs: list, beat: dict) -> dict:
 
 
 def agents_view(conf: dict) -> list:
-    catalog = settings.agent_catalog()
+    catalog = settings.agent_catalog(conf)
     order = list(conf["agents"]) + [n for n in catalog if n not in conf["agents"]]
     out = []
     for name in order:
@@ -140,7 +141,7 @@ def agents_view(conf: dict) -> list:
         a = settings.effective_agent(conf, catalog, name)
         out.append(dict({k: a.get(k) for k in ("name", "title", "role", "model", "effort", "tools", "enabled",
                                                "prompt_override")},
-                        writes_code=settings.writes_code(catalog, {"agent": name})))
+                        writes_code=settings.writes_code(catalog, {"agent": name}), custom=bool(a.get("custom"))))
     return out
 
 
@@ -270,7 +271,7 @@ def aggregate(events: list) -> dict:
 
 def home_status(root: Path) -> dict:
     return {"path": str(root), "exists": root.is_dir(),
-            "runs": len(list((root / "runs").glob("*/state.json"))) if root.is_dir() else 0,
+            "runs": len(list(projects.runs_dir(root).glob("*/state.json"))) if root.is_dir() else 0,
             "inputs": len([p for p in (root / "input").glob("*.md") if p.name.lower() != "readme.md"])
             if root.is_dir() else 0}
 
@@ -295,7 +296,7 @@ def state() -> dict:
     if not root or not root.is_dir():
         return dict(base, project=None, home=str(root) if root else None)
     conf = settings.load(root)
-    runs_dir = root / "runs"
+    runs_dir = projects.runs_dir(root)
     runs = []
     for path in sorted(runs_dir.glob("*/state.json"), reverse=True):
         run = read_json(path)
@@ -306,7 +307,7 @@ def state() -> dict:
     beat = read_json(runs_dir / ".factory.json", {})
     beat["alive"] = beat.get("state") in ("scanning", "working") and pid_alive(beat.get("pid"))
     try:
-        log_tail = (root / "logs" / "factory.log").read_text(errors="replace").splitlines()[-150:]
+        log_tail = (projects.logs_dir(root) / "factory.log").read_text(errors="replace").splitlines()[-150:]
     except OSError:
         log_tail = []
     trig = settings.trigger(conf)
@@ -316,7 +317,9 @@ def state() -> dict:
             "factory": beat, "service": svc, "agents": agents_view(conf), "trigger": trig,
             "busy": dispatch.busy(root), "budget": budget_view(conf, runs, beat),
             "settings": {k: conf.get(k) for k in ("mode", "pipeline", "max_iterations", "max_stations",
-                                                  "station_timeout_min", "max_parallel", "worktrees", "gates")},
+                                                  "station_timeout_min", "max_parallel", "worktrees", "gates",
+                                                  "artifacts")},
+            "artifacts": list(settings.artifact_table(conf).values()),
             "metrics": gates.METRICS,
             "queue": queue_view(root), "runs": runs, "events": events, "stats": aggregate(events), "log": log_tail}
 
@@ -324,21 +327,24 @@ def state() -> dict:
 def settings_payload() -> dict:
     root = settings.home()
     conf = settings.load(root)
-    catalog = settings.agent_catalog()
+    catalog = settings.agent_catalog(conf)
     conf["trigger"] = settings.trigger(conf)
-    runs_dir = root / "runs" if root else None
+    runs_dir = projects.runs_dir(root) if root else None
     return {"settings": conf, "defaults": settings.defaults(),
             "options": {"models": settings.MODELS, "efforts": settings.EFFORTS, "modes": settings.MODES,
                         "router": settings.ROUTER, "triggers": settings.TRIGGERS,
                         "metrics": gates.METRICS, "ops": list(gates.OPS),
                         "severities": gates.SEVERITIES, "levels": gates.LEVELS,
                         "unavailable": gates.UNAVAILABLE, "security_sources": gates.SECURITY_SOURCES,
+                        "gateways": settings.GATEWAYS, "default_tools": settings.DEFAULT_TOOLS,
                         "presets": settings.presets(), "notify_events": settings.NOTIFY_EVENTS,
                         "tool_pattern": settings.SAFE_TOOL.pattern,
                         "unsafe_commands": sorted(settings.UNSAFE_COMMANDS)},
             "catalog": {n: dict({k: a.get(k) for k in ("title", "role", "model", "effort", "tools", "prompt_override")},
-                                writes_code=settings.writes_code(catalog, {"agent": n}))
+                                writes_code=settings.writes_code(catalog, {"agent": n}), custom=bool(a.get("custom")),
+                                **({"prompt": a["prompt"]} if a.get("custom") else {}))
                         for n, a in catalog.items()},
+            "artifact_table": list(settings.artifact_table(conf).values()),
             "warnings": settings.warnings(settings.validate(conf)[0]),
             "budget": budget_view(conf, [r for r in map(read_json, runs_dir.glob("*/state.json")) if r]
                                   if runs_dir else [], read_json(runs_dir / ".factory.json", {}) if runs_dir else {}),
@@ -422,8 +428,10 @@ def prompt_view(name: str) -> dict | None:
     if name not in catalog:
         return None
     a = catalog[name]
+    custom = bool(a.get("custom"))  # a custom agent's prompt is part of the project's settings
     return {"agent": name, "title": a.get("title", name), "prompt": a["prompt"], "default": a["default_prompt"],
-            "overridden": a["prompt_override"], "path": str(settings.PROMPTS_DIR / f"{name}.md")}
+            "overridden": a["prompt_override"], "custom": custom,
+            "path": str(settings.settings_path(settings.home())) if custom else str(settings.PROMPTS_DIR / f"{name}.md")}
 
 
 def post_settings(body: dict) -> tuple:
@@ -453,8 +461,44 @@ def post_prompt(body: dict) -> tuple:
         text = ""
     if not isinstance(text, str) or len(text) > 50_000:
         return 400, {"ok": False, "errors": ["The prompt must be text of at most 50,000 characters."]}
-    settings.save_prompt(name, text)
+    if settings.agent_catalog()[name].get("custom"):
+        if not text.strip():
+            return 400, {"ok": False, "errors": ["A custom agent needs a prompt; it has no default to go back to."]}
+        settings.set_custom_prompt(name, text)
+    else:
+        settings.save_prompt(name, text)
     return 200, dict(prompt_view(name), ok=True)
+
+
+def post_validate(body: dict) -> tuple:
+    """Checks a settings draft without saving it, for the graph editor: errors and warnings per stage."""
+    return 200, dict(settings.diagnose(body), ok=True)
+
+
+def post_approval(body: dict) -> tuple:
+    """A person's answer at a manual gateway: approve (carry on), rework (send back) or reject (fail the run).
+    The answer is written into the run's state, and a scan starts at once if none is running."""
+    root = settings.home()
+    if not root or not root.is_dir():
+        return 409, {"ok": False, "errors": ["Pick a project first."]}
+    run_id, decision = str(body.get("run") or ""), body.get("decision")
+    if not re.fullmatch(r"[\w.-]+", run_id) or decision not in ("approve", "rework", "reject"):
+        return 400, {"ok": False, "errors": ["Choose approve, rework or reject for a run."]}
+    path = projects.runs_dir(root) / run_id / "state.json"
+    run = read_json(path)
+    if not run:
+        return 404, {"ok": False, "errors": ["That run doesn't exist."]}
+    ap = run.get("approval")
+    if run.get("status") != "approval" or not ap or ap.get("decision") or (body.get("stage") and body["stage"] != ap["stage"]):
+        return 409, {"ok": False, "errors": ["This run isn't waiting for that decision (anymore)."]}
+    ap.update(decision=decision, note=str(body.get("note") or "").strip()[:500], decided=datetime.now().isoformat())
+    tmp = path.with_suffix(".tmp")
+    tmp.write_text(json.dumps(run, indent=2))
+    tmp.replace(path)
+    started = not dispatch.busy(root)
+    if started:
+        dispatch.spawn_worker(root, scheduled=False)
+    return 200, {"ok": True, "started": started}
 
 
 def post_auth(body: dict) -> tuple:
@@ -488,7 +532,7 @@ def post_notify_test(body: dict) -> tuple:
     return (500 if problems else 200), {"ok": not problems, "errors": problems}
 
 
-POST_ROUTES = {"/api/settings": post_settings, "/api/service": post_service, "/api/prompt": post_prompt,
+POST_ROUTES = {"/api/settings": post_settings, "/api/validate": post_validate, "/api/approval": post_approval, "/api/service": post_service, "/api/prompt": post_prompt,
                "/api/notify-test": post_notify_test, "/api/projects": project_action,
                "/api/browse": lambda body: (200, choose_folder()), "/api/run": lambda body: run_now(),
                "/api/submit": submit, "/api/auth": post_auth}
@@ -501,7 +545,7 @@ def report(query: dict) -> str | None:
     run_id, name = query.get("run", [""])[0], query.get("name", [""])[0]
     if not re.fullmatch(r"[\w.-]+", run_id) or not re.fullmatch(r"[\w-]+(/[\w-]+)*\.md", name):
         return None
-    run_dir = root / "runs" / run_id
+    run_dir = projects.runs_dir(root) / run_id
     for path in (run_dir / "reports" / name, run_dir / "workspace" / name, run_dir / "workspace" / "docs" / name,
                  run_dir / name):
         if path.is_file() and run_dir.resolve() in path.resolve().parents:
@@ -532,6 +576,8 @@ class Handler(BaseHTTPRequestHandler):
         url = urlparse(self.path)
         if url.path == "/":
             self.send(200, PAGE.read_bytes(), "text/html; charset=utf-8")
+        elif url.path.startswith("/assets/") and url.path[8:] in ASSETS:
+            self.send(200, (HERE / "dashboard" / url.path[8:]).read_bytes(), ASSETS[url.path[8:]])
         elif url.path == "/api/state":
             self.json(200, state())
         elif url.path == "/api/settings":

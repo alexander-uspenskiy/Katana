@@ -19,7 +19,7 @@ How other sources would plug in (not implemented yet):
   issue; it writes the summary, description and acceptance criteria as requirements.md. ack() adds a
   comment with the run id. report() comments SUMMARY.md and transitions to "Done" or, for a failed or
   blocked run, to a status such as "Needs input". Credentials come from the macOS keychain, never from
-  settings.json.
+  katana.config.json.
 - Confluence: fetch() runs a CQL search for pages carrying a label such as `katana-ready`. claim() swaps
   the label for `katana-claimed` and exports the page body as markdown. report() adds a page comment and
   swaps the label for `katana-done` or `katana-failed`.

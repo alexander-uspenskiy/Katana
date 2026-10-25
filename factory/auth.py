@@ -1,7 +1,7 @@
 """Katana authentication: how the agents sign in to Claude, and the API keys kept in the macOS keychain.
 
 Agents sign in with the Claude subscription (the default) or an Anthropic API key. The choice is shared by
-every project and lives in config/auth.json (not in git). API keys never touch a file: they are generic
+every project and lives in ~/.katana/auth.json. API keys never touch a file: they are generic
 passwords in the login keychain under the service "katana", one per provider. The `security` command
 gets each secret on stdin, so it never shows in the process list, and agents may not run `security`.
 """
@@ -16,8 +16,10 @@ import subprocess
 import time
 from pathlib import Path
 
+import projects
+
 REPO = Path(__file__).resolve().parent.parent
-AUTH_PATH = REPO / "config" / "auth.json"
+AUTH_PATH = projects.USER_DIR / "auth.json"
 KEYCHAIN_SERVICE = "katana"
 METHODS = ("subscription", "api_key")
 
@@ -112,7 +114,7 @@ def method() -> str:
 
 
 def set_method(value: str) -> None:
-    AUTH_PATH.parent.mkdir(exist_ok=True)
+    AUTH_PATH.parent.mkdir(parents=True, exist_ok=True)
     tmp = AUTH_PATH.with_suffix(".tmp")
     tmp.write_text(json.dumps({"claude": value}, indent=2) + "\n")
     tmp.replace(AUTH_PATH)
