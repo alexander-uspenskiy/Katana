@@ -24,7 +24,6 @@ from __future__ import annotations
 
 import argparse
 import fcntl
-import glob
 import json
 import os
 import re
@@ -37,6 +36,7 @@ from concurrent.futures import ThreadPoolExecutor
 from datetime import date, datetime
 from pathlib import Path
 
+import auth
 import budget
 import dispatch
 import gates
@@ -51,12 +51,6 @@ WATCH_SETTLE_SECONDS = 5  # folder-watch: a new file must be unchanged this long
 WATCH_WAIT_SECONDS = 30   # ...and a watch scan waits at most this long for it
 SETTING_SOURCES = os.environ.get("CORTANA_SETTING_SOURCES", "project")
 
-# Any of these would make the CLI bill an API account instead of the subscription.
-API_ENV_VARS = (
-    "ANTHROPIC_API_KEY", "ANTHROPIC_AUTH_TOKEN", "ANTHROPIC_BASE_URL",
-    "CLAUDE_CODE_USE_BEDROCK", "CLAUDE_CODE_USE_VERTEX", "CLAUDE_CODE_USE_FOUNDRY",
-    "CLAUDE_CODE_SIMPLE",
-)
 LIMIT_PATTERN = re.compile(
     r"usage limit|rate limit|limit reached|hit your limit|quota|overloaded|\b429\b", re.I)
 # Warnings that the subscription window is nearly used up (CLI stderr; rate_limit_event status in stream-json).
@@ -100,37 +94,6 @@ def log(msg: str) -> None:
 
 # ---------------------------------------------------------------- claude CLI
 
-def find_claude() -> str:
-    candidates = [os.environ.get("CORTANA_CLAUDE_BIN"), shutil.which("claude"),
-                  str(Path.home() / ".local/bin/claude")]
-    # Fallback: the CLI bundled with the Claude desktop app, newest version first.
-    bundled = glob.glob(str(Path.home() / "Library/Application Support/Claude/claude-code/*/*"
-                                          "/claude.app/Contents/MacOS/claude"))
-    version = lambda p: [int(x) for x in re.findall(r"\d+", Path(p).parents[4].name)]
-    candidates += sorted(bundled, key=version, reverse=True)
-    for c in candidates:
-        if c and os.access(c, os.X_OK):
-            return c
-    raise SystemExit("Claude Code CLI not found. Install it or set CORTANA_CLAUDE_BIN.")
-
-
-def subscription_env() -> dict:
-    return {k: v for k, v in os.environ.items() if k not in API_ENV_VARS}
-
-
-def check_subscription(claude: str) -> dict:
-    out = subprocess.run([claude, "auth", "status", "--json"], capture_output=True, text=True,
-                         env=subscription_env(), timeout=60)
-    try:
-        status = json.loads(out.stdout)
-    except json.JSONDecodeError:
-        raise SystemExit(f"Could not read auth status: {out.stderr.strip() or out.stdout.strip()}")
-    if not status.get("loggedIn") or not status.get("subscriptionType"):
-        raise SystemExit("Not logged in with a Claude subscription. Run `claude auth login` "
-                         "(or `claude setup-token` and set CLAUDE_CODE_OAUTH_TOKEN).")
-    return {"subscription": status.get("subscriptionType"), "method": status.get("authMethod")}
-
-
 def read_beat() -> dict:
     try:
         return json.loads((RUNS_DIR / ".factory.json").read_text())
@@ -159,7 +122,7 @@ def call_claude(cmd: list, prompt: str, cwd: Path, log_path: Path, watch=None) -
     deadline, stop = time.time() + timeout, None
     with open(log_path, "w") as out, open(err_path, "w+") as err:
         proc = subprocess.Popen(cmd, stdin=subprocess.PIPE, stdout=out, stderr=err,
-                                cwd=cwd, text=True, env=subscription_env())
+                                cwd=cwd, text=True, env=auth.agent_env())
         try:
             proc.stdin.write(prompt)
             proc.stdin.close()
@@ -364,7 +327,7 @@ def skip_disabled(run: dict, batch: list) -> list:
 def count_loop(run: dict, stage: dict, verdict: str) -> bool:
     """Counts a gate failure. Returns False (and fails the run) past the rework limit."""
     run["loops"][stage["id"]] = run["loops"].get(stage["id"], 0) + 1
-    limit = int(CONF.get("max_iterations", 3))
+    limit = int(stage.get("max_loops") or CONF.get("max_iterations", 3))
     if run["loops"][stage["id"]] > limit:
         run["status"] = "failed"
         run["reason"] = f"{stage['title']} still says {verdict} after {limit} rework loops"
@@ -627,7 +590,7 @@ def gate_context(run: dict, workspace: Path, out_dir: Path) -> dict:
             sources[role] = {"path": str(workspace / stage["output"]), "stage": stage["title"], "stale": idx < built}
     tokens = sum(sum((h.get("tokens") or {}).values()) for h in run["history"] + run["decisions"])
     return {"workspace": str(workspace), "out_dir": str(out_dir), "conf": CONF.get("gates") or {},
-            "sources": sources, "run_tokens": tokens, "env": subscription_env()}
+            "sources": sources, "run_tokens": tokens, "env": auth.subscription_env()}
 
 
 def run_gate(run: dict, gate: dict) -> str:
@@ -955,8 +918,8 @@ def scan(project: Path, scheduled: bool = True) -> None:
                 deadline = time.time() + WATCH_WAIT_SECONDS
                 while time.time() < deadline and any(i.waiting for i in TRIGGER.fetch()):
                     time.sleep(1)
-            claude = find_claude()
-            heartbeat(auth=check_subscription(claude), cli=claude)
+            claude = auth.find_claude()
+            heartbeat(auth=auth.check(claude), cli=claude)
             if factory_paused():
                 return
             todo = [r for r in load_runs() if r["status"] in ("running", "paused")] + claim_new_inputs()

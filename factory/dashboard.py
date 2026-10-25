@@ -20,6 +20,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
+import auth
 import budget
 import dispatch
 import gates
@@ -290,7 +291,7 @@ def projects_view() -> dict:
 
 def state() -> dict:
     root = settings.home()
-    base = {"generated": datetime.now().isoformat(), "projects": projects_view()}
+    base = {"generated": datetime.now().isoformat(), "projects": projects_view(), "auth": auth.status()}
     if not root or not root.is_dir():
         return dict(base, project=None, home=str(root) if root else None)
     conf = settings.load(root)
@@ -456,6 +457,26 @@ def post_prompt(body: dict) -> tuple:
     return 200, dict(prompt_view(name), ok=True)
 
 
+def post_auth(body: dict) -> tuple:
+    """save-key | delete-key | method | refresh. Keys go straight to the keychain; replies never carry them."""
+    action, provider = body.get("action"), body.get("provider")
+    if action in ("save-key", "delete-key") and provider not in auth.PROVIDERS:
+        return 400, {"ok": False, "errors": ["Unknown provider."]}
+    if action == "save-key":
+        error = auth.set_key(provider, str(body.get("key") or ""))
+        if error:
+            return 400, {"ok": False, "errors": [error], "auth": auth.status(fresh=True)}
+    elif action == "delete-key":
+        auth.delete_key(provider)
+    elif action == "method":
+        if body.get("method") not in auth.METHODS:
+            return 400, {"ok": False, "errors": ["Choose the subscription or an API key."]}
+        auth.set_method(body["method"])
+    elif action != "refresh":
+        return 400, {"ok": False, "errors": ["Unknown action."]}
+    return 200, {"ok": True, "auth": auth.status(fresh=True)}
+
+
 def post_notify_test(body: dict) -> tuple:
     errors = []
     conf = dict(settings.load(), notify=settings._validate_notify(body.get("notify") or {}, errors))
@@ -470,7 +491,7 @@ def post_notify_test(body: dict) -> tuple:
 POST_ROUTES = {"/api/settings": post_settings, "/api/service": post_service, "/api/prompt": post_prompt,
                "/api/notify-test": post_notify_test, "/api/projects": project_action,
                "/api/browse": lambda body: (200, choose_folder()), "/api/run": lambda body: run_now(),
-               "/api/submit": submit}
+               "/api/submit": submit, "/api/auth": post_auth}
 
 
 def report(query: dict) -> str | None:
@@ -519,6 +540,8 @@ class Handler(BaseHTTPRequestHandler):
             self.json(200, projects_view())
         elif url.path == "/api/service":
             self.json(200, service_view(fresh=True))
+        elif url.path == "/api/auth":
+            self.json(200, auth.status())
         elif url.path == "/api/prompt":
             view = prompt_view(parse_qs(url.query).get("agent", [""])[0])
             if view is None:

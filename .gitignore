@@ -14,3 +14,5 @@ config/projects.tmp
 config/settings.json.migrated
 .cortana/
 config/agents/
+config/auth.json
+config/auth.tmp

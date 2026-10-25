@@ -105,6 +105,7 @@ tokens. Each condition has a metric, an operator, a threshold and a severity (`b
 | [config/defaults.json](config/defaults.json) | Default trigger, mode, limits, parallelism, gate commands, agents, budgets, notifications and plan |
 | `config/projects.json` | The registered projects and the active one (not in git) |
 | `<project>/.cortana/settings.json` | That project's changes to the defaults, written by the setup wizard and Settings tab |
+| `config/auth.json` | How agents sign in: `subscription` or `api_key` (not in git). The keys themselves are in the keychain |
 | `config/agents/<name>.md` | Your edited agent prompts, written by Settings → Agents → Prompt (not in git). Shared by all projects |
 | `<project>/runs/<id>/` | Per run: `workspace/` (the generated project, its own git repo), `reports/`, `logs/`, `gates/`, `state.json`, `SUMMARY.md` |
 
@@ -112,8 +113,13 @@ tokens. Each condition has a metric, an operator, a threshold and a severity (`b
 to `<project>/.cortana/settings.json` for the project folder it named (or this repository), registers that
 project, and renames the old file to `settings.json.migrated`.
 
-**Subscription only:** before every scan the orchestrator checks `claude auth status` for a subscription
-login. It also removes `ANTHROPIC_API_KEY` and other API or provider variables from the agents' environment.
+**Authentication:** Settings → Authentication shows whether the agents can sign in, and how. By default they
+use your Claude subscription: before every scan the orchestrator checks `claude auth status` for a subscription
+login, and it removes `ANTHROPIC_API_KEY` and other API or provider variables from the agents' environment.
+Switch to **Anthropic API key** there and the agents get the saved key instead, billed per token. API keys
+(Anthropic, OpenAI, Google Gemini) are saved in your macOS login keychain under the service `cortana`, never in a
+file; the dashboard shows only their last four characters. Only the Anthropic key reaches agents, and only in
+API key mode. The choice is shared by all projects and saved in `config/auth.json`.
 
 **Recovery:**
 - If a usage limit is hit, the run pauses and resumes on the next scan.

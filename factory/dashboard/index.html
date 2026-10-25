@@ -148,7 +148,7 @@ main { max-width: 1560px; margin: 0 auto; padding: 20px 24px 48px; display: grid
 .field { display: grid; gap: 4px; min-width: 0; }
 .field > span { font-size: 12px; color: var(--ink-2); font-weight: 500; }
 .field small { font-size: 11.5px; color: var(--muted); }
-input[type="text"], input[type="number"], input[type="url"], select, textarea {
+input[type="text"], input[type="number"], input[type="url"], input[type="password"], select, textarea {
   height: 32px; padding: 0 10px; border-radius: 8px; border: 1px solid var(--axis); background: var(--surface); min-width: 0; width: 100%;
 }
 textarea { height: auto; min-height: 56px; padding: 7px 10px; resize: vertical; line-height: 1.45; }
@@ -369,6 +369,15 @@ tr.open .chev { transform: rotate(90deg); }
 .step .io { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 12px; color: var(--muted); }
 .gatebox { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 12.5px; padding: 6px 10px; border-radius: 8px; background: var(--surface-2); border: 1px dashed var(--axis); }
 .loopback { color: var(--ink-2); display: inline-flex; align-items: center; gap: 4px; }
+.ph.loop-col { flex: none; width: 250px; max-width: none; align-items: stretch; }
+.loop-row { display: grid; gap: 4px; padding: 8px 10px; border: 1px dashed var(--axis); border-radius: 10px; background: var(--surface); font-size: 12px; min-width: 0; }
+.loop-row.rework { border-color: var(--warning); border-style: solid; }
+.loop-row .loop-h { display: flex; align-items: center; gap: 6px; min-width: 0; }
+.loop-row .loop-h b { font-size: 12.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.loop-row .loop-h .btn { margin-left: auto; height: 22px; padding: 0 7px; font-size: 11.5px; }
+.loop-ed { display: grid; gap: 8px; padding: 10px; border: 1px solid var(--accent); border-radius: 10px; background: var(--surface); min-width: 0; }
+.loop-ed .acts { display: flex; gap: 6px; flex-wrap: wrap; }
+.loop-ed .errors { margin: 0; }
 .swim { display: flex; align-items: flex-start; gap: 0; overflow-x: auto; padding: 4px 2px 12px; }
 .ph { flex: 1 1 0; min-width: 176px; max-width: 260px; display: flex; flex-direction: column; gap: 8px; padding: 10px; border-radius: 12px; background: var(--wash); border: 1px solid var(--border); }
 .ph.now { border-color: color-mix(in srgb, var(--accent) 45%, var(--border)); background: var(--accent-wash); }
@@ -542,6 +551,11 @@ tr.open .chev { transform: rotate(90deg); }
 .svc-status b { font-size: 15px; }
 .svc-btns { display: flex; gap: 8px; flex-wrap: wrap; margin: 12px 0 14px; }
 .svc-btns .btn { height: 32px; padding: 0 14px; }
+.key-row { display: grid; grid-template-columns: minmax(0, 1fr) minmax(180px, 320px) auto; gap: 8px 12px; align-items: center; padding: 12px 0; border-top: 1px solid var(--border); }
+.key-row .who { display: grid; gap: 4px; min-width: 0; }
+.key-row .who small { font-size: 11.5px; color: var(--muted); }
+.key-row .btns { display: flex; gap: 8px; }
+@media (max-width: 640px) { .key-row { grid-template-columns: minmax(0, 1fr); } }
 
 /* ---------- setup wizard ---------- */
 #view-setup { max-width: 820px; }
@@ -1051,15 +1065,16 @@ function renderTop(d) {
   const m = MODE_TEXT[d.settings.mode] || [d.settings.mode];
   $("modePill").innerHTML = `<span class="k">Mode</span>${esc(m[0])}`;
   $("modePill").title = m[1] || "";
-  const a = f.auth || {};
-  $("authPill").innerHTML = `<span class="k">Auth</span>${a.subscription ? esc(a.subscription[0].toUpperCase() + a.subscription.slice(1)) + " subscription" : "unknown"}`;
-  $("authPill").title = a.method ? "Login method: " + a.method + (f.cli ? "\nCLI: " + f.cli : "") : "";
+  const a = d.auth || {}, sub = (a.claude || {}).subscription;
+  const authLabel = a.method === "api_key" ? (a.ready ? "Anthropic API key" : "API key needed") : sub ? cap1(sub) + " subscription" : "Not signed in";
+  $("authPill").innerHTML = `${a.ready === false ? `<span class="dot serious"></span>` : ""}<span class="k">Auth</span>${esc(authLabel)}`;
+  $("authPill").title = (a.message || "") + (a.cli ? "\nCLI: " + a.cli : "") + "\nChange it in Settings → Authentication.";
   $("navPlanCount").textContent = flat(d.settings.pipeline).length;
   const busy = d.busy || f.alive;
   $("runBtn").disabled = busy;
   $("runBtn").textContent = busy ? "Running…" : "Run now";
   renderNext();
-  $("foot").innerHTML = `Refreshes every 5 s · project folder <span class="mono">${esc(d.home)}</span> · dollar figures are the API-equivalent list price; runs are billed to your subscription.`;
+  $("foot").innerHTML = `Refreshes every 5 s · project folder <span class="mono">${esc(d.home)}</span> · dollar figures are the API-equivalent list price; runs are billed to ${(d.auth || {}).method === "api_key" ? "your Anthropic API account" : "your subscription"}.`;
 }
 function renderNext() {
   const d = ui.data; if (!d || !d.project) return;
@@ -1129,7 +1144,7 @@ function renderKpis(d) {
     ${stack(tokens, total)}
     ${tokenLegend(tokens)}
     ${sparkCols(d)}
-    <div class="foot">API-equivalent value <b class="ink2">${usd(cost)}</b> · billed to subscription · output ${compact(tokens.output)} of ${compact(total)}</div>
+    <div class="foot">API-equivalent value <b class="ink2">${usd(cost)}</b> · billed to ${(d.auth || {}).method === "api_key" ? "API account" : "subscription"} · output ${compact(tokens.output)} of ${compact(total)}</div>
   </div>
   <div class="card tile"><div class="label">Active agents</div><div class="value">${liveAgents.length}<small> / ${d.settings.max_parallel || 1} at once</small></div>
     <div class="foot">${liveAgents.length ? liveAgents.map((x) => esc(agentInfo(x.current.agent).title)).join(", ") + " working" : live.length ? "Cortana is measuring a gate" : "No agent running now"}</div></div>
@@ -1621,9 +1636,42 @@ function renderPlan(d) {
         ${g.required ? `<span>${icon("check", 11)} required before done</span>` : ""}
         ${m ? `<span>measured ${ago(m.entry.finished)}${chosen ? ` · run ${m.entry.visit}` : ` in ${esc(m.run.source.replace(/\.md$/, ""))}`}</span>` : `<span>not measured yet</span>`}</div>`;
   };
+  // Loops: every stage that can send work back. Editable on the current plan; a run's plan is frozen.
+  const limitOf = (s) => s.max_loops || d.settings.max_iterations;
+  const loopList = stages.filter(gated), free = stages.filter((s) => !gated(s));
+  const ed = !chosen && ui.loopEdit;
+  const loopForm = () => {
+    const src = stages.find((s) => s.id === ed.id) || {};
+    return `<div class="loop-ed" role="group" aria-label="${ed.isNew ? "New loop" : `Edit the ${esc(src.title)} loop`}">
+      <b style="font-size:12.5px">${ed.isNew ? "New loop" : esc(src.title)}</b>
+      ${ed.isNew ? `<label class="field"><span>After stage</span><select data-loop="id">${free.map((o) => `<option value="${esc(o.id)}" ${o.id === ed.id ? "selected" : ""}>${esc(pos[o.id])}. ${esc(o.title)}</option>`).join("")}</select></label>` : ""}
+      ${isGate(src) ? `<div class="muted" style="font-size:12px">Loops back when a blocking condition fails.</div>`
+        : `<label class="field"><span>Passes on</span><input type="text" class="mono" data-loop="pass" value="${esc(ed.pass)}" placeholder="APPROVE" spellcheck="false" autocomplete="off"><small>Any other verdict loops back.</small></label>`}
+      <label class="field"><span>Then go back to</span><select data-loop="on_fail"><option value="">Nearest build stage</option>${stages.filter((o) => o.id !== ed.id).map((o) => `<option value="${esc(o.id)}" ${ed.on_fail === o.id ? "selected" : ""}>${esc(pos[o.id])}. ${esc(o.title)}</option>`).join("")}</select></label>
+      <label class="field"><span>Max rework loops</span><input type="number" min="1" max="10" data-loop="max_loops" value="${esc(ed.max_loops)}" placeholder="${esc(d.settings.max_iterations)} (default)"></label>
+      ${ed.errors && ed.errors.length ? `<ul class="errors">${ed.errors.map((e) => `<li>${esc(e)}</li>`).join("")}</ul>` : ""}
+      <div class="acts"><button class="btn primary" data-loop-act="save" ${ed.saving ? "disabled" : ""}>Save loop</button><button class="btn" data-loop-act="cancel">Cancel</button>${!ed.isNew && !isGate(src) ? `<button class="btn ghost" data-loop-act="remove" ${ed.saving ? "disabled" : ""}>Remove</button>` : ""}</div>
+    </div>`;
+  };
+  const loopRow = (s) => {
+    if (ed && !ed.isNew && ed.id === s.id) return loopForm();
+    const used = chosen ? (chosen.loops || {})[s.id] || 0 : 0, to = backOf(s);
+    return `<div class="loop-row ${used ? "rework" : ""}">
+      <div class="loop-h">${icon("loop", 12)}<b>${esc(s.title)}</b>${chosen ? "" : `<button class="btn" data-loop-edit="${esc(s.id)}" aria-label="Edit the ${esc(s.title)} loop">Edit</button>`}</div>
+      <span class="muted">${isGate(s) ? "unless every blocking condition holds" : `unless ${s.pass.map(esc).join(" or ")}`}</span>
+      <span class="ink2">back to ${to ? `${esc(pos[to] || "")}. ${esc(title(to))}` : "—"}</span>
+      <span class="muted">${chosen ? `${used} of ${limitOf(s)} loops used` : `max ${limitOf(s)}×${s.max_loops ? "" : " (default)"}`}</span>
+    </div>`;
+  };
+  const loopCol = `<div class="ph loop-col"><div class="ph-h"><b>Loops</b><span class="chip">${loopList.length}</span></div>
+    ${loopList.map(loopRow).join("")}${ed && ed.isNew ? loopForm() : ""}
+    ${loopList.length || (ed && ed.isNew) ? "" : `<div class="muted" style="font-size:12px">No loops: every stage runs once.</div>`}
+    ${chosen ? `<div class="muted" style="font-size:11.5px">Frozen with this run. Choose <b>Current plan</b> to edit loops.</div>`
+      : ed && ed.isNew ? "" : `<button class="btn ghost" data-loop-edit="" ${free.length ? "" : `disabled title="Every stage already loops"`}>+ Add loop</button>`}</div>`;
   const swim = `<div class="swim" aria-label="Plan phases">${phases.map((ph, i) => (i ? `<span class="ph-arrow" aria-hidden="true"></span>` : "") +
     (ph.every(isGate) ? `<div class="ph gate-col ${i === nowPhase ? "now" : ""}"><div class="ph-h"><b>Phase ${i + 1}</b><span class="chip">gate</span></div>${ph.map(gateCard).join('<hr style="border:0;border-top:1px solid var(--grid);width:100%">')}</div>`
       : `<div class="ph ${i === nowPhase ? "now" : ""}"><div class="ph-h"><b>Phase ${i + 1}</b>${ph.length > 1 ? `<span class="chip">${ph.length} in parallel</span>` : ""}</div>${ph.map(card).join("")}</div>`)).join("")}
+    <span class="ph-arrow" aria-hidden="true"></span>${loopCol}
     ${mode === "deterministic" ? `<span class="ph-arrow" aria-hidden="true"></span><div class="end-col ${chosen ? ({ done: "done", failed: "failed", blocked: "failed" }[chosen.status] || "") : ""}">${chosen && ["failed", "blocked"].includes(chosen.status) ? icon(chosen.status === "blocked" ? "warn" : "x", 13) + STATUS[chosen.status].label : icon("check", 13) + "Done"}</div>` : ""}</div>`;
   const keep = document.querySelector("#planHead .swim"), scrolled = keep ? keep.scrollLeft : 0;  // survive the 5 s refresh
   $("planHead").innerHTML = `
@@ -1648,7 +1696,7 @@ function renderPlan(d) {
             <div class="right"><span class="chip">no LLM call</span>${chosen ? `<span class="chip">${esc(STATE_LABEL[x.state])}</span>` : ""}</div></div>
           ${gateConds(s, m)}
           <div class="gatebox">${icon("gate", 14)}<b>Gate</b> passes when every blocking condition holds
-            <span class="loopback">${icon("loop", 13)} on fail → ${esc(pos[backOf(s)] || "")}. ${esc(title(backOf(s)))}, which gets <span class="mono">${esc(s.output)}</span> (max ${d.settings.max_iterations}×)</span>
+            <span class="loopback">${icon("loop", 13)} on fail → ${esc(pos[backOf(s)] || "")}. ${esc(title(backOf(s)))}, which gets <span class="mono">${esc(s.output)}</span> (max ${s.max_loops || d.settings.max_iterations}×)</span>
             ${s.required ? `<span class="chip accent">required before done</span>` : mode === "auto" ? `<span class="chip">optional</span>` : ""}</div>
           ${runLine}
         </div></div></li>`;
@@ -1662,7 +1710,7 @@ function renderPlan(d) {
         <div class="task">${esc(s.task)}</div>
         <div class="io"><span>Writes <button class="btn ghost mono" style="height:auto;padding:0;font-size:12px" ${chosen ? `data-report="${esc(chosen.id)}" data-name="${esc(s.output)}"` : "disabled"}>${esc(s.output)}</button></span>${a.role ? `<span>${esc(a.role)}</span>` : ""}</div>
         ${s.pass ? `<div class="gatebox">${icon("gate", 14)}<b>Gate</b> passes on ${s.pass.map((v) => `<span class="chip">${esc(v)}</span>`).join(" ")}
-          ${mode === "deterministic" ? `<span class="loopback">${icon("loop", 13)} on fail → ${esc(pos[backOf(s)] || "")}. ${esc(title(backOf(s)))} (max ${d.settings.max_iterations}×)</span>` : ""}
+          ${mode === "deterministic" ? `<span class="loopback">${icon("loop", 13)} on fail → ${esc(pos[backOf(s)] || "")}. ${esc(title(backOf(s)))} (max ${s.max_loops || d.settings.max_iterations}×)</span>` : ""}
           ${s.required ? `<span class="chip accent">required before done</span>` : mode === "auto" ? `<span class="chip">optional</span>` : ""}</div>` : ""}
         ${runLine}
       </div></div>
@@ -1673,6 +1721,69 @@ function renderPlan(d) {
       const picks = [].concat(x.chosen || []);
       return (i ? `<span class="arrow" aria-hidden="true"></span>` : "") + `<div class="fs" ${tipAttr((x.reason || "") + (x.override ? "\n" + x.override : ""))}><span class="n">${i + 1}</span><b style="font-size:13px">${picks[0] === "done" ? "Done" : picks.length ? picks.map((id) => esc(title(id))).join(" + ") : esc(x.outcome)}</b>${x.override ? icon("warn", 12) : ""}</div>`;
     }).join("")}</div></div>` : "");
+}
+
+/* ---------- loops (edited on the plan chart, saved straight to settings) ---------- */
+const VERDICT_HINT = { reviewer: "APPROVE", security: "APPROVE", tester: "PASS", architect: "READY", ba: "READY", developer: "DONE" };
+const loopDraft = (s, isNew) => ({ id: s.id, isNew, pass: (s.pass || [VERDICT_HINT[s.agent] || "APPROVE"]).join(", "),
+  on_fail: s.on_fail || "", max_loops: s.max_loops || "", errors: [], saving: false });
+const editingLoop = () => !!(document.activeElement && document.activeElement.closest && document.activeElement.closest(".loop-ed"));
+function openLoopEditor(focus) {
+  render();
+  const box = document.querySelector("#planHead .loop-ed");
+  if (!box) return;
+  box.scrollIntoView({ block: "nearest", inline: "nearest" });
+  const f = box.querySelector(focus || "select, input"); if (f) f.focus();
+}
+function onLoopInput(e) {
+  const ed = ui.loopEdit, f = e.target.dataset.loop;
+  if (!ed || !f) return;
+  if (f === "id") {
+    if (e.type !== "change") return;
+    const s = flat(ui.data.settings.pipeline).find((o) => o.id === e.target.value);
+    if (s) ui.loopEdit = loopDraft(s, true);
+    openLoopEditor('[data-loop="id"]');
+    return;
+  }
+  ed[f] = e.target.value;
+}
+async function onLoopClick(t) {
+  if (t.dataset.loopEdit !== undefined) {
+    const plan = flat(ui.data.settings.pipeline);
+    const s = t.dataset.loopEdit ? plan.find((o) => o.id === t.dataset.loopEdit) : plan.find((o) => !gated(o));
+    if (s) { ui.loopEdit = loopDraft(s, !t.dataset.loopEdit); openLoopEditor(); }
+    return;
+  }
+  if (t.dataset.loopAct === "cancel") { ui.loopEdit = null; render(); return; }
+  await saveLoop(t.dataset.loopAct === "remove");
+}
+async function saveLoop(remove) {
+  const ed = ui.loopEdit;
+  if (!ed) return;
+  const pass = ed.pass.split(",").map((v) => v.trim().toUpperCase()).filter(Boolean);
+  const apply = (conf) => {
+    const p = flat(conf.pipeline).find((o) => o.id === ed.id);
+    if (!p) return;
+    if (remove) { delete p.pass; delete p.on_fail; delete p.required; delete p.max_loops; return; }
+    if (!isGate(p)) { p.pass = pass; p.required = !!p.required; }
+    p.on_fail = ed.on_fail || null;
+    if (ed.max_loops === "") delete p.max_loops; else p.max_loops = Number(ed.max_loops);
+  };
+  const src = flat(ui.data.settings.pipeline).find((o) => o.id === ed.id);
+  ed.errors = !ui.cfg ? ["Settings are still loading. Try again in a moment."]
+    : !remove && src && !isGate(src) && !pass.length ? ["Add at least one passing verdict, such as APPROVE."] : [];
+  if (ed.errors.length) { render(); return; }
+  const body = clone(ui.cfg.settings), wasDirty = dirty();
+  apply(body);
+  ed.saving = true; render();
+  const out = await post("/api/settings", body);
+  ed.saving = false;
+  if (!out.ok) { ed.errors = out.errors || ["Couldn’t save."]; render(); return; }
+  ui.cfg = out; ui.cfg.settings.pipeline = phasesOf(out.settings.pipeline); ui.cfg.defaults.pipeline = phasesOf(out.defaults.pipeline);
+  if (wasDirty) apply(ui.draft); else ui.draft = clone(ui.cfg.settings);  // keep unsaved settings edits
+  ui.loopEdit = null; render();
+  toast(remove ? "Loop removed. It applies to new runs." : "Loop saved. It applies to new runs.");
+  fetchState();
 }
 
 /* ---------- settings ---------- */
@@ -1793,6 +1904,7 @@ function renderSettings() {
 
   ${budgetsSection(c, s)}
   ${notifySection(c, s)}
+  ${authSection()}
   ${serviceSection()}
 
   <div class="savebar"><div class="savebar-in">
@@ -1867,6 +1979,8 @@ function defaultCondition(metric) {
 function onSettingsInput(e) {
   const t = e.target, s = ui.draft;
   if (!s || !t.closest("#view-settings")) return;
+  if (t.dataset.authKey !== undefined) return;  // keys are saved by their own button, never in the draft
+  if (t.dataset.authMethod !== undefined) { if (e.type === "change") setAuthMethod(t.value); return; }
   if (t.dataset.trig) {
     const f = t.dataset.trig;
     s.trigger = Object.assign({}, s.trigger, { [f]: f === "interval_min" ? (t.value === "" ? "" : Number(t.value)) : t.value });
@@ -2091,7 +2205,7 @@ const SVC_BUSY = { install: "Installing…", start: "Starting…", stop: "Stoppi
 const M = 1e6;
 const cap1 = (x) => x[0].toUpperCase() + x.slice(1);
 const postJson = (url, body) => fetch(url, { method: "POST", headers: { "Content-Type": "application/json", "X-Cortana": "1" }, body: JSON.stringify(body) }).then((r) => r.json());
-Object.assign(ui, { toolsOpen: new Set(), svc: null, svcBusy: null, wiz: null, prompt: null, firstRunShown: false });
+Object.assign(ui, { toolsOpen: new Set(), svc: null, auth: null, svcBusy: null, wiz: null, prompt: null, firstRunShown: false });
 
 function agentConf(s, c, n) { const a = c.catalog[n]; return Object.assign({ model: a.model, effort: a.effort }, s.agents[n]); }
 function agentTools(s, c, n) { const v = s.agents[n] || {}; return Array.isArray(v.tools) ? v.tools : c.catalog[n].tools; }
@@ -2198,6 +2312,62 @@ function notifySection(c, s) {
     <div style="display:flex;gap:8px;align-items:center;margin-top:12px;flex-wrap:wrap"><button class="btn" data-act="notify-test">Send test notification</button><span class="muted" style="font-size:12px">Uses the values above, even before you save.</span></div>
   </div></section>`;
 }
+function authSection() {
+  return `<section class="card" data-group="System"><div class="card-h"><h2>Authentication</h2><span class="sub">how agents sign in, and your API keys · shared by all projects · buttons act immediately</span>
+    <div class="right"><button class="btn" data-act="auth-refresh">Refresh</button></div></div><div class="card-b" data-auth-box>${authBox(ui.auth)}</div></section>`;
+}
+const AUTH_TEXT = {
+  subscription: ["Claude subscription", "Flat cost within your plan’s usage limits. Cortana removes API keys and provider variables from the agents’ environment."],
+  api_key: ["Anthropic API key", "Billed per token to your API account, with no subscription usage window. Uses the Anthropic key saved below."],
+};
+function authBox(a) {
+  if (!a) return `<div class="empty">Checking sign-in…</div>`;
+  const cl = a.claude || {}, anth = a.providers.find((p) => p.id === "anthropic") || {};
+  const head = a.ready ? "Ready" : a.method === "api_key" ? "API key needed" : "Sign-in needed";
+  const login = cl.subscription ? `${esc(cap1(cl.subscription))}${cl.email ? ` · ${esc(cl.email)}` : ""}` : cl.logged_in ? "Signed in, but not with a subscription" : "Not signed in";
+  const keyRow = (p) => `<div class="key-row">
+      <div class="who"><div><b>${esc(p.title)}</b> <span class="mono muted" style="font-size:12px">${esc(p.env)}</span></div>
+        <div>${p.saved ? `<span class="chip">${icon("check", 12)}In keychain · ${esc(p.hint)}</span>` : `<span class="chip">Not set</span>`}</div>
+        ${p.env_set ? `<small>${esc(p.env)} is also set in the dashboard’s environment. Cortana ignores it and uses the keychain.</small>` : ""}</div>
+      <input type="password" data-auth-key="${p.id}" placeholder="${p.saved ? "Paste a new key to replace it" : `Paste your key${p.prefix ? ` (${esc(p.prefix)}…)` : ""}`}" autocomplete="off" spellcheck="false" aria-label="${esc(p.title)} API key">
+      <div class="btns"><button class="btn" data-auth-save="${p.id}">${p.saved ? "Replace" : "Save"}</button>${p.saved ? `<button class="btn" data-auth-del="${p.id}">Remove</button>` : ""}</div>
+    </div>`;
+  return `<div class="svc-status"><span class="dot ${a.ready ? "good" : "serious"}"></span><b>${head}</b><span class="ink2" style="font-size:13px">${esc(a.message || "")}</span></div>
+    ${!cl.subscription && a.method === "subscription" ? `<p class="sec-desc">Sign in from a terminal, then press Refresh:<code class="snippet">claude auth login</code></p>` : ""}
+    <dl class="facts" style="margin:14px 0"><div><dt>Claude subscription</dt><dd>${login}</dd></div>${cl.org ? `<div><dt>Organization</dt><dd>${esc(cl.org)}</dd></div>` : ""}${cl.auth_method ? `<div><dt>Login method</dt><dd>${esc(cl.auth_method)}</dd></div>` : ""}
+      <div style="grid-column:1 / -1"><dt>Claude CLI</dt><dd class="mono" style="word-break:break-all">${esc(a.cli || "not found")}</dd></div></dl>
+    <div class="field"><span>Agents sign in with</span><div class="modes" role="radiogroup" aria-label="How agents sign in">${a.methods.map((m) => `<label class="mode-card"><input type="radio" name="auth-method" value="${m}" data-auth-method ${a.method === m ? "checked" : ""}><div><b>${AUTH_TEXT[m][0]}</b><p>${AUTH_TEXT[m][1]}</p></div></label>`).join("")}</div>
+      ${a.method === "api_key" && !anth.saved ? `<small>${icon("warn", 12)} Save an Anthropic API key below, or scans stop with “API key needed”.</small>` : ""}</div>
+    <div class="field" style="margin-top:16px"><span>API keys</span></div>
+    ${a.providers.map(keyRow).join("")}
+    <p class="sec-desc">Keys are saved in your macOS login keychain under the service <span class="mono">${esc(a.keychain_service)}</span>, never in a settings file or <span class="mono">.env</span>, and the dashboard never sends them back to this page. Agents get only the Anthropic key, and only when they sign in with an API key. The OpenAI and Gemini keys are stored for later use; agents don’t receive them.</p>`;
+}
+function paintAuth() { document.querySelectorAll("[data-auth-box]").forEach((el) => (el.innerHTML = authBox(ui.auth))); }
+async function refreshAuth(fresh) {
+  try {
+    if (fresh) { const out = await postJson("/api/auth", { action: "refresh" }); if (out.auth) ui.auth = out.auth; }
+    else { const res = await fetch("/api/auth", { cache: "no-store" }); if (res.ok) ui.auth = await res.json(); }
+  } catch (e) {}
+  paintAuth();
+}
+async function authAct(body, done) {
+  try {
+    const out = await postJson("/api/auth", body);
+    if (out.auth) ui.auth = out.auth;
+    toast(out.ok ? done : (out.errors || ["Couldn’t update authentication."]).join(" "));
+  } catch (e) { toast("Couldn’t reach the dashboard server."); }
+  paintAuth(); fetchState();
+}
+async function saveKey(id) {
+  const input = document.querySelector(`[data-auth-key="${id}"]`), key = input ? input.value.trim() : "";
+  if (!key) { toast("Paste the key first."); if (input) input.focus(); return; }
+  const p = ui.auth.providers.find((x) => x.id === id);
+  await authAct({ action: "save-key", provider: id, key }, `${p.title} key saved in the keychain.`);
+}
+async function setAuthMethod(m) {
+  if (m === "api_key" && !confirm("Switch agents to your Anthropic API key? From the next stage, runs are billed per token to your API account instead of using your subscription.")) { paintAuth(); return; }
+  await authAct({ action: "method", method: m }, m === "api_key" ? "Agents now sign in with your Anthropic API key." : "Agents now sign in with your Claude subscription.");
+}
 function serviceSection() {
   return `<section class="card" data-group="System"><div class="card-h"><h2>Service</h2><span class="sub">the launchd agent that scans on a schedule · buttons act immediately</span>
     <div class="right"><button class="btn" data-act="svc-refresh">Refresh</button></div></div><div class="card-b" data-svc-box>${serviceBox(ui.svc)}</div></section>`;
@@ -2252,6 +2422,7 @@ function afterSettingsRender() {
     `<div class="grp"><span>Setup</span><a class="btn setup-link" href="#setup">${icon("loop", 13)} Run setup again</a></div>`;
   spySettings();
   if (!ui.svc) refreshService();
+  if (!ui.auth) refreshAuth();
 }
 function spySettings() {
   if (ui.tab !== "settings") return;
@@ -2305,11 +2476,18 @@ async function onControlClick(t, s, c) {
   }
   if (t.dataset.preset) { applyPreset(s, c, t.dataset.preset); renderSettings(); toast(`${c.options.presets[t.dataset.preset].title} preset applied. Adjust any agent, then save.`); return true; }
   if (t.dataset.svc) { await serviceAct(t.dataset.svc); return true; }
+  if (t.dataset.authSave) { await saveKey(t.dataset.authSave); return true; }
+  if (t.dataset.authDel) {
+    const p = ui.auth.providers.find((x) => x.id === t.dataset.authDel);
+    if (confirm(`Remove the ${p.title} key from the keychain?`)) await authAct({ action: "delete-key", provider: p.id }, `${p.title} key removed.`);
+    return true;
+  }
   const act = t.dataset.act;
   if (act === "reset-tools") { const v = Object.assign({}, s.agents[t.dataset.agent]); delete v.tools; s.agents[t.dataset.agent] = v; renderSettings(); return true; }
   if (act === "prompt") { openPrompt(t.dataset.agent); return true; }
   if (act === "notify-test") { await notifyTest(s.notify); return true; }
   if (act === "svc-refresh") { await refreshService(); return true; }
+  if (act === "auth-refresh") { await refreshAuth(true); return true; }
   return false;
 }
 
@@ -2531,7 +2709,7 @@ async function fetchState() {
     ui.data = await res.json(); ui.lastOk = Date.now(); ui.failing = false;
     document.body.classList.remove("stale");
   } catch (e) { ui.failing = true; document.body.classList.add("stale"); }
-  const busy = tipEl.classList.contains("show") || (document.activeElement && document.activeElement.matches("select") && document.activeElement.closest("main:not([hidden])"));
+  const busy = tipEl.classList.contains("show") || editingLoop() || (document.activeElement && document.activeElement.matches("select") && document.activeElement.closest("main:not([hidden])"));
   if (busy) pendingRender = true; else render();
 }
 setInterval(() => { if (!ui.paused && Date.now() - ui.lastFetch >= REFRESH_MS) fetchState(); }, 250);
@@ -2580,6 +2758,7 @@ document.addEventListener("click", async (e) => {
   if (t.id === "runBtn") { runNow(); return; }
   if (t.id === "submitBtn") { openSubmit(); return; }
   if (t.id === "subCancel") { $("subDlg").close(); return; }
+  if (t.dataset.loopEdit !== undefined || t.dataset.loopAct) { onLoopClick(t); return; }
   if (t.closest("#view-settings") && (await onSettingsClick(t))) return;
   if (t.closest("#view-setup") && (await onWizardClick(t))) return;
   if (t.dataset.filter) { ui.filter = t.dataset.filter; render(); return; }
@@ -2592,17 +2771,19 @@ document.addEventListener("click", async (e) => {
   if (seg && t.dataset.v) { ui.views[seg.dataset.view] = t.dataset.v; remember(); render(); return; }
   if (t.matches("tr.run")) toggleRun(t.dataset.run);
 });
-document.addEventListener("input", (e) => (e.target.closest("#view-setup") ? onWizardInput(e) : onSettingsInput(e)));
+document.addEventListener("input", (e) => (e.target.closest(".loop-ed") ? onLoopInput(e) : e.target.closest("#view-setup") ? onWizardInput(e) : onSettingsInput(e)));
 document.addEventListener("change", (e) => {
+  if (e.target.closest(".loop-ed")) { onLoopInput(e); return; }
   if (e.target.dataset.spend) { ui.spend[e.target.dataset.spend] = e.target.value; remember(); render(); return; }
   if (e.target.id === "planRun") { ui.planRun = e.target.value; render(); return; }
   if (e.target.closest("#view-setup")) { onWizardInput(e); return; }
   onSettingsInput(e);
 });
-document.addEventListener("focusout", () => setTimeout(() => { if (pendingRender && !tipEl.classList.contains("show")) { pendingRender = false; render(); } }, 0));
+document.addEventListener("focusout", () => setTimeout(() => { if (pendingRender && !tipEl.classList.contains("show") && !editingLoop()) { pendingRender = false; render(); } }, 0));
 document.addEventListener("keydown", (e) => {
   if (e.key === "Escape" && !$("projMenu").hidden) { toggleMenu(false); $("projBtn").focus(); return; }
   if (e.key === "Enter" && e.target.id === "startPath") { projectAction("open", e.target.value.trim()); return; }
+  if (e.key === "Enter" && e.target.dataset && e.target.dataset.authKey) { saveKey(e.target.dataset.authKey); return; }
   const tr = e.target.closest && e.target.closest("tr.run");
   if (tr && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); toggleRun(tr.dataset.run); }
 });

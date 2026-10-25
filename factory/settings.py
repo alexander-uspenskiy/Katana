@@ -281,6 +281,7 @@ def validate(new: dict) -> tuple:
                      "task": str(s.get("task") or "")[:2000]}
             if verdicts:
                 stage.update({"pass": verdicts, "on_fail": on_fail, "required": bool(s.get("required"))})
+                stage.update(max_loops(s, label, errors))
             out_phase.append(stage)
         check_phase(catalog, out_phase, p, errors)
         clean["pipeline"].append(out_phase)
@@ -394,7 +395,22 @@ def validate_gate(s: dict, sid: str, label: str, on_fail, errors: list) -> dict:
     if not OUTPUT_PATH.match(output):
         errors.append(f"{label}: the gate report must be a relative .md path such as {gates.REPORT}.")
     return {"id": sid, "title": str(s.get("title") or sid)[:60], "kind": "gate", "output": output,
-            "conditions": conditions, "on_fail": on_fail, "required": bool(s.get("required"))}
+            "conditions": conditions, "on_fail": on_fail, "required": bool(s.get("required")),
+            **max_loops(s, label, errors)}
+
+
+def max_loops(s: dict, label: str, errors: list) -> dict:
+    """A loop's own rework limit, kept only when set. Without it the loop uses max_iterations."""
+    if s.get("max_loops") in (None, ""):
+        return {}
+    try:
+        n = int(s["max_loops"])
+        if not 1 <= n <= 10:
+            raise ValueError
+        return {"max_loops": n}
+    except (TypeError, ValueError):
+        errors.append(f"{label}: max rework loops must be a whole number from 1 to 10.")
+        return {}
 
 
 def check_phase(catalog: dict, phase: list, p: int, errors: list) -> None:
