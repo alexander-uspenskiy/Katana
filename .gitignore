@@ -9,3 +9,7 @@ __pycache__/
 logs/
 config/settings.json
 config/settings.tmp
+config/projects.json
+config/projects.tmp
+config/settings.json.migrated
+.cortana/

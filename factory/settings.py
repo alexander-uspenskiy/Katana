@@ -1,4 +1,4 @@
-"""Cortana settings: defaults in config/defaults.json, user changes in config/settings.json.
+"""Cortana settings: defaults in config/defaults.json, each project's changes in <project>/.cortana/settings.json.
 
 Shared by the orchestrator (reads them before every station) and the dashboard (edits them).
 """
@@ -10,14 +10,19 @@ import os
 import re
 from pathlib import Path
 
+import projects
+
 REPO = Path(__file__).resolve().parent.parent
 AGENTS_DIR = REPO / "factory" / "agents"
 DEFAULTS_PATH = REPO / "config" / "defaults.json"
-SETTINGS_PATH = REPO / "config" / "settings.json"
 
 MODELS = ["fable", "opus", "sonnet", "haiku"]
 EFFORTS = ["low", "medium", "high", "xhigh", "max"]
 MODES = ["deterministic", "auto"]
+# What starts a project's runs. folder-interval and folder-watch are run by the service; once and manual
+# only by Run now in the dashboard or `orchestrator.py run`. See factory/triggers/ for the connectors.
+TRIGGERS = ["folder-interval", "folder-watch", "once", "manual"]
+SERVICE_TRIGGERS = ("folder-interval", "folder-watch")
 ROUTER = "orchestrator"  # the agent that picks the next stage in auto mode; never a pipeline stage
 
 STAGE_ID = re.compile(r"^[a-z0-9][a-z0-9-]{0,39}$")
@@ -29,12 +34,20 @@ def defaults() -> dict:
     return json.loads(DEFAULTS_PATH.read_text())
 
 
-def load() -> dict:
+def settings_path(project: Path) -> Path:
+    return Path(project) / ".cortana" / "settings.json"
+
+
+def load(project: Path | None = None) -> dict:
+    """Defaults merged with the settings of `project` (the active project if omitted)."""
+    project = project or home()
     merged = defaults()
     try:
-        user = json.loads(SETTINGS_PATH.read_text())
+        user = json.loads(settings_path(project).read_text()) if project else {}
     except (OSError, json.JSONDecodeError):
         user = {}
+    if project and "project" not in user:
+        merged["project"] = Path(project).name
     for key, value in user.items():
         if key == "agents" and isinstance(value, dict):
             for name, conf in value.items():
@@ -44,10 +57,16 @@ def load() -> dict:
     return merged
 
 
-def home(conf: dict) -> Path:
-    """The project folder: holds input/, runs/ and logs/."""
+def home(conf: dict | None = None) -> Path | None:
+    """The active project folder (holds input/, runs/, logs/ and .cortana/), or None before one is chosen.
+    CORTANA_HOME overrides it, for testing. `conf` is accepted for older callers and ignored."""
     override = os.environ.get("CORTANA_HOME")
-    return Path(override or conf.get("home") or REPO).expanduser().resolve()
+    return Path(override).expanduser().resolve() if override else projects.active()
+
+
+def trigger(conf: dict) -> dict:
+    t = dict(defaults()["trigger"], **(conf.get("trigger") or {}))
+    return t if t["type"] in TRIGGERS else defaults()["trigger"]
 
 
 def load_agent(name: str) -> dict:
@@ -70,16 +89,16 @@ def validate(new: dict) -> tuple:
     errors, catalog = [], agent_catalog()
     clean = {"project": str(new.get("project") or "Cortana")[:60]}
 
-    folder = str(new.get("home") or "").strip()
-    if folder:
-        path = Path(folder).expanduser()
-        if not path.is_absolute():
-            errors.append("Project folder must be an absolute path.")
-        elif path.exists() and not path.is_dir():
-            errors.append("Project folder exists but is not a folder.")
-        elif not path.exists() and not path.parent.is_dir():
-            errors.append("Project folder's parent folder does not exist.")
-    clean["home"] = folder
+    t = new.get("trigger") or {}
+    clean["trigger"] = {"type": t.get("type")}
+    if t.get("type") not in TRIGGERS:
+        errors.append("Choose what starts a run.")
+    try:
+        clean["trigger"]["interval_min"] = int(t.get("interval_min"))
+        if not 1 <= clean["trigger"]["interval_min"] <= 1440:
+            raise ValueError
+    except (TypeError, ValueError):
+        errors.append("Scan interval must be a whole number of minutes from 1 to 1440.")
 
     clean["mode"] = new.get("mode")
     if clean["mode"] not in MODES:
@@ -136,11 +155,12 @@ def validate(new: dict) -> tuple:
     return clean, errors
 
 
-def save(clean: dict) -> None:
-    SETTINGS_PATH.parent.mkdir(exist_ok=True)
-    tmp = SETTINGS_PATH.with_suffix(".tmp")
+def save(clean: dict, project: Path | None = None) -> None:
+    path = settings_path(project or home())
+    path.parent.mkdir(parents=True, exist_ok=True)
+    tmp = path.with_suffix(".tmp")
     tmp.write_text(json.dumps(clean, indent=2) + "\n")
-    tmp.replace(SETTINGS_PATH)
+    tmp.replace(path)
 
 
 def effective_agent(conf: dict, catalog: dict, name: str) -> dict:

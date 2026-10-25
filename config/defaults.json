@@ -1,7 +1,7 @@
 {
   "project": "Cortana",
-  "home": "",
   "mode": "deterministic",
+  "trigger": {"type": "folder-interval", "interval_min": 10},
   "max_iterations": 3,
   "max_stations": 20,
   "station_timeout_min": 60,

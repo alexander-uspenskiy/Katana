@@ -65,6 +65,26 @@ button, input, select, textarea { font: inherit; color: inherit; }
 .brand svg { flex: none; }
 .brand b { font-size: 17px; letter-spacing: -.015em; }
 .brand .home { color: var(--muted); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; max-width: 40vw; }
+.proj { position: relative; min-width: 0; }
+.proj-btn { display: inline-flex; align-items: center; gap: 6px; border: 0; background: none; padding: 1px 6px; margin-left: -6px; border-radius: 6px; cursor: pointer; }
+.proj-btn:hover, .proj-btn[aria-expanded="true"] { background: var(--surface-2); }
+.proj-btn b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: min(46vw, 420px); }
+.proj-btn svg { flex: none; color: var(--muted); }
+.menu { position: absolute; z-index: 30; top: calc(100% + 6px); left: -6px; width: min(400px, calc(100vw - 32px)); padding: 6px; display: grid; gap: 2px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; box-shadow: 0 10px 32px rgba(0,0,0,.16); }
+.menu .item { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 2px 10px; align-items: center; text-align: left; width: 100%; padding: 7px 10px; border: 0; border-radius: 8px; background: none; cursor: pointer; text-decoration: none; }
+.menu .item:hover, .menu .item:focus-visible { background: var(--wash); }
+.menu .item[aria-current="true"] { background: var(--accent-wash); }
+.menu .item .p { grid-column: 1; font-size: 11.5px; color: var(--muted); font-family: var(--mono); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.menu .item b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 600; }
+.menu .item .chip { grid-column: 2; grid-row: 1 / span 2; }
+.menu a.item { color: var(--ink); }
+.menu hr { border: 0; border-top: 1px solid var(--grid); margin: 4px 0; }
+.noproj .nav, .noproj .needs-proj { display: none !important; }
+@media (max-width: 640px) {
+  .top-row { position: relative; }
+  .proj { position: static; }
+  .menu { left: 0; right: 0; width: auto; top: 46px; }
+}
 .topbits { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
 .nav { display: flex; gap: 2px; margin-bottom: -1px; overflow-x: auto; scrollbar-width: none; }
 .nav a {
@@ -346,12 +366,37 @@ tr.open .chev { transform: rotate(90deg); }
 .hub .mono-badge { width: 48px; height: 48px; font-size: 15px; }
 .catalog { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
 
+/* ---------- start screen ---------- */
+.start { max-width: 780px; width: 100%; margin: 0 auto; display: grid; gap: 20px; }
+.start-h { display: flex; gap: 14px; align-items: center; padding-top: 12px; }
+.start-h svg { flex: none; }
+.start-h h1 { margin: 0; font-size: 22px; letter-spacing: -.02em; }
+.start-h p { margin: 2px 0 0; color: var(--ink-2); }
+.plist { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.plist li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px; align-items: center; }
+.prow { display: grid; grid-template-columns: 34px minmax(0, 1fr) auto; gap: 12px; align-items: center; width: 100%; text-align: left; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--border); background: var(--surface); cursor: pointer; }
+.prow:hover:not(:disabled) { background: var(--wash); border-color: color-mix(in srgb, var(--accent) 35%, var(--border)); }
+.prow:disabled { cursor: default; opacity: .6; }
+.plist li.cur .prow { border-color: color-mix(in srgb, var(--accent) 45%, var(--border)); background: var(--accent-wash); }
+.prow .pt { display: grid; min-width: 0; }
+.prow .pt b, .prow .pt span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.prow .pm { display: flex; gap: 6px; flex-wrap: wrap; justify-content: flex-end; }
+.pathrow { display: flex; gap: 8px; flex-wrap: wrap; }
+.pathrow input { flex: 1 1 260px; }
+.actions { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 12px; }
+.actions .btn { height: 32px; padding: 0 14px; }
+@media (max-width: 640px) { .prow { grid-template-columns: 34px minmax(0, 1fr); } .prow .pm { grid-column: 2; justify-content: flex-start; } }
+
 /* ---------- settings ---------- */
 .settings-grid { display: grid; gap: 20px; }
 .sec-desc { color: var(--muted); font-size: 12.5px; margin: 4px 0 0; }
 .row-fields { display: grid; gap: 14px; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); }
+.path-box { min-height: 32px; display: flex; align-items: center; padding: 0 10px; border-radius: 8px; border: 1px dashed var(--axis); background: var(--surface-2); overflow-wrap: anywhere; }
+.snippet { display: block; margin-top: 6px; padding: 6px 10px; border-radius: 8px; background: var(--surface-2); font: 12px/1.5 var(--mono); overflow-wrap: anywhere; }
 .folder-status { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; font-size: 12.5px; color: var(--ink-2); margin-top: 6px; }
 .modes { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); }
+.modes.two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+@media (max-width: 640px) { .modes.two { grid-template-columns: minmax(0, 1fr); } }
 .mode-card { display: grid; grid-template-columns: 22px minmax(0, 1fr); gap: 10px; padding: 14px; border-radius: 12px; border: 1.5px solid var(--border); cursor: pointer; background: var(--surface); }
 .mode-card:has(input:checked) { border-color: var(--accent); background: var(--accent-wash); }
 .mode-card input { margin: 3px 0 0; accent-color: var(--accent); width: 16px; height: 16px; }
@@ -393,6 +438,12 @@ dialog { width: min(920px, calc(100vw - 32px)); max-height: calc(100vh - 64px); 
 dialog::backdrop { background: rgba(0,0,0,.4); }
 dialog .dh { display: flex; align-items: center; gap: 10px; padding: 12px 16px; border-bottom: 1px solid var(--grid); position: sticky; top: 0; background: var(--surface); }
 dialog .dh b { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+dialog .dlg-b { padding: 14px 16px; display: grid; gap: 12px; }
+dialog .df { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; padding: 12px 16px; border-top: 1px solid var(--grid); }
+dialog .df .muted { margin-right: auto; font-size: 12.5px; }
+#subTitle { flex: none; }
+#subSub { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-size: 12px; }
+#subText { min-height: 240px; font: 12.5px/1.55 var(--mono); }
 dialog pre { margin: 0; padding: 16px; white-space: pre-wrap; word-break: break-word; font: 12.5px/1.6 var(--mono); }
 #toast { position: fixed; z-index: 60; left: 50%; bottom: 24px; transform: translate(-50%, 20px); opacity: 0; transition: .2s; background: var(--ink); color: var(--surface); padding: 10px 16px; border-radius: 10px; font-size: 13px; pointer-events: none; max-width: calc(100vw - 32px); }
 #toast.show { opacity: 1; transform: translate(-50%, 0); }
@@ -422,18 +473,24 @@ footer { max-width: 1560px; margin: 0 auto; padding: 0 24px 32px; color: var(--m
     <div class="top-row">
       <div class="brand">
         <svg width="30" height="30" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="8" fill="currentColor"/><circle cx="16" cy="16" r="8.5" fill="none" stroke="var(--accent)" stroke-width="3"/><circle cx="16" cy="16" r="3" fill="var(--accent)"/></svg>
-        <div style="min-width:0"><b id="projectName">Cortana</b><div class="home" id="home"></div></div>
+        <div class="proj">
+          <button class="proj-btn" id="projBtn" aria-haspopup="true" aria-expanded="false" aria-controls="projMenu" title="Switch project"><b id="projectName">Cortana</b><svg width="12" height="12" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 6l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+          <div class="home" id="home"></div>
+          <div class="menu" id="projMenu" role="menu" aria-label="Projects" hidden></div>
+        </div>
       </div>
       <div class="topbits">
-        <span class="pill" id="factoryPill"><span class="dot"></span>Connecting…</span>
-        <span class="pill" id="modePill"><span class="k">Mode</span>—</span>
-        <span class="pill" id="authPill"><span class="k">Auth</span>—</span>
-        <span class="pill" id="nextPill"><span class="k">Next scan</span>—</span>
-        <span class="pill" title="Data refreshes every 5 seconds">
+        <span class="pill needs-proj" id="factoryPill"><span class="dot"></span>Connecting…</span>
+        <span class="pill needs-proj" id="modePill"><span class="k">Mode</span>—</span>
+        <span class="pill needs-proj" id="authPill"><span class="k">Auth</span>—</span>
+        <span class="pill needs-proj" id="nextPill"><span class="k">Next scan</span>—</span>
+        <button class="btn needs-proj" id="submitBtn" title="Paste a requirement; it becomes a file in input/">+ Requirement</button>
+        <button class="btn primary needs-proj" id="runBtn" title="Process what’s in input/ now">Run now</button>
+        <span class="pill needs-proj" title="Data refreshes every 5 seconds">
           <svg class="refresh-ring" viewBox="0 0 16 16" aria-hidden="true"><circle class="bg" cx="8" cy="8" r="6"/><circle class="fg" id="ring" cx="8" cy="8" r="6" stroke-dasharray="37.7" stroke-dashoffset="37.7"/></svg>
           <span id="updated">—</span>
         </span>
-        <button class="btn" id="pauseBtn" aria-pressed="false" title="Pause auto-refresh">Pause</button>
+        <button class="btn needs-proj" id="pauseBtn" aria-pressed="false" title="Pause auto-refresh">Pause</button>
         <button class="btn" id="themeBtn" title="Switch theme">Theme: auto</button>
       </div>
     </div>
@@ -446,6 +503,35 @@ footer { max-width: 1560px; margin: 0 auto; padding: 0 24px 32px; color: var(--m
 </header>
 
 <div class="banners" id="banners" aria-live="polite"></div>
+
+<!-- ================= START: PROJECTS ================= -->
+<main id="view-projects" hidden>
+  <div class="start">
+    <div class="start-h">
+      <svg width="44" height="44" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="8" fill="currentColor"/><circle cx="16" cy="16" r="8.5" fill="none" stroke="var(--accent)" stroke-width="3"/><circle cx="16" cy="16" r="3" fill="var(--accent)"/></svg>
+      <div><h1>Choose a project</h1><p>Each project is a folder with its own requirements, runs and settings. The dashboard shows one at a time; the service runs them all.</p></div>
+    </div>
+    <div id="startNote"></div>
+    <section class="card" aria-labelledby="h-recent">
+      <div class="card-h"><h2 id="h-recent">Recent projects</h2><span class="sub" id="recentSub"></span></div>
+      <div class="card-b" id="recent"></div>
+    </section>
+    <section class="card" aria-labelledby="h-openf">
+      <div class="card-h"><h2 id="h-openf">Open or create a project</h2></div>
+      <div class="card-b">
+        <label class="field"><span>Project folder</span>
+          <div class="pathrow"><input type="text" id="startPath" aria-label="Project folder" placeholder="/Users/you/Projects/my-app" spellcheck="false" autocomplete="off"><button class="btn" id="browseBtn" style="height:32px">Browse…</button></div>
+          <small>Full path. Browse opens the macOS folder dialog on this Mac.</small></label>
+        <div class="actions">
+          <button class="btn primary" id="openBtn">Open project</button>
+          <button class="btn" id="createBtn">Create new project</button>
+          <span class="muted" style="font-size:12.5px">Create makes the folder, with <span class="mono">input/</span>, <span class="mono">runs/</span>, <span class="mono">logs/</span> and <span class="mono">.cortana/</span> inside.</span>
+        </div>
+        <ul class="errors" id="startErr"></ul>
+      </div>
+    </section>
+  </div>
+</main>
 
 <!-- ================= OVERVIEW ================= -->
 <main id="view-overview">
@@ -549,6 +635,17 @@ footer { max-width: 1560px; margin: 0 auto; padding: 0 24px 32px; color: var(--m
 <footer id="foot"></footer>
 <div id="tip" role="tooltip"></div>
 <div id="toast" role="status" aria-live="polite"></div>
+<dialog id="subDlg" aria-labelledby="subTitle">
+  <form id="subForm" novalidate>
+    <div class="dh"><b id="subTitle">Submit requirement</b><span class="muted" id="subSub"></span><button type="button" class="btn" style="margin-left:auto" id="subCancel">Cancel</button></div>
+    <div class="dlg-b">
+      <label class="field"><span>Title</span><input type="text" id="subName" maxlength="120" placeholder="Todo app with sharing" autocomplete="off"><small>Becomes the file name in <span class="mono">input/</span> and the run’s name.</small></label>
+      <label class="field"><span>Requirement (markdown)</span><textarea id="subText" placeholder="## Goal&#10;&#10;## Users&#10;&#10;## Acceptance criteria&#10;- …" spellcheck="true"></textarea></label>
+      <ul class="errors" id="subErr"></ul>
+    </div>
+    <div class="df"><span class="muted" id="subHint"></span><button type="submit" class="btn primary" id="subGo">Submit</button></div>
+  </form>
+</dialog>
 <dialog id="dlg" aria-labelledby="dlgTitle">
   <div class="dh"><b id="dlgTitle"></b><span class="muted" id="dlgSub"></span><button class="btn" style="margin-left:auto" id="dlgClose">Close</button></div>
   <pre id="dlgBody"></pre>
@@ -579,6 +676,14 @@ const MODE_TEXT = {
   deterministic: ["Deterministic", "Classic SDLC pipeline: stages run in plan order; a failed gate loops back to its ‘on fail’ stage."],
   auto: ["Full auto", "The Orchestrator agent chooses which stage runs next; required gates must pass before a run is done."],
 };
+const TRIGGER_TEXT = {
+  "folder-interval": ["Scan on a schedule", "The service scans input/ every few minutes and starts a run for each new file."],
+  "folder-watch": ["Watch the folder", "A run starts as soon as a file lands in input/. The service also rescans on the interval below, as a fallback."],
+  once: ["Run once on request", "No service. Run now processes what’s in input/ and stops. Submitting a requirement starts it straight away."],
+  manual: ["Manual", "Nothing starts by itself, not even a submitted requirement. Press Run now, or run the CLI, when you want."],
+};
+const SERVICE_TRIGGERS = ["folder-interval", "folder-watch"];
+const triggerShort = (t) => !t ? "—" : t.type === "folder-interval" ? `Every ${t.interval_min} min` : t.type === "folder-watch" ? "Watching input/" : t.type === "once" ? "Run once" : "Manual";
 
 const ui = {
   data: null, tab: "overview", paused: false, lastOk: 0, lastFetch: 0, failing: false,
@@ -721,11 +826,13 @@ function renderTop(d) {
   document.title = (d.project || "Cortana") + (ui.tab !== "overview" ? " · " + ui.tab[0].toUpperCase() + ui.tab.slice(1) : "");
   $("home").textContent = d.home;
   const f = d.factory || {}, svc = d.service || {};
+  const onRequest = !SERVICE_TRIGGERS.includes(d.trigger.type);
   const recent = f.updated && (Date.now() - new Date(f.updated)) / 1000 < (f.interval || 600) + 120;
   let dot = "", label = "";
   if (f.alive && f.state === "working") { dot = "live"; label = "Working"; }
   else if (f.alive && f.state === "scanning") { dot = "live"; label = "Scanning input"; }
   else if (f.error) { dot = "critical"; label = "Last scan failed"; }
+  else if (onRequest) { dot = "good"; label = "Idle · runs on request"; }
   else if (svc.loaded) { dot = "good"; label = "Idle · service on"; }
   else if (recent) { dot = "good"; label = "Idle · manual mode"; }
   else { dot = "serious"; label = svc.installed ? "Service stopped" : "Service not installed"; }
@@ -737,21 +844,30 @@ function renderTop(d) {
   $("authPill").innerHTML = `<span class="k">Auth</span>${a.subscription ? esc(a.subscription[0].toUpperCase() + a.subscription.slice(1)) + " subscription" : "unknown"}`;
   $("authPill").title = a.method ? "Login method: " + a.method + (f.cli ? "\nCLI: " + f.cli : "") : "";
   $("navPlanCount").textContent = d.settings.pipeline.length;
+  const busy = d.busy || f.alive;
+  $("runBtn").disabled = busy;
+  $("runBtn").textContent = busy ? "Running…" : "Run now";
   renderNext();
   $("foot").innerHTML = `Refreshes every 5 s · project folder <span class="mono">${esc(d.home)}</span> · dollar figures are the API-equivalent list price; runs are billed to your subscription.`;
 }
 function renderNext() {
-  const d = ui.data; if (!d) return;
-  const f = d.factory || {}, svc = d.service || {};
+  const d = ui.data; if (!d || !d.project) return;
+  const f = d.factory || {}, svc = d.service || {}, t = d.trigger;
+  $("nextPill").title = TRIGGER_TEXT[t.type][1];
   if (f.alive) { $("nextPill").innerHTML = `<span class="k">Scan</span>in progress · ${clock((Date.now() - new Date(f.tick_started)) / 1000)}`; return; }
+  if (t.type !== "folder-interval") {
+    const last = f.tick_finished || f.tick_started;
+    $("nextPill").innerHTML = `<span class="k">Trigger</span>${esc(triggerShort(t))}${t.type === "folder-watch" && svc.loaded && !svc.watched ? " · not watched yet" : ""}${last ? ` <span class="muted">· last scan ${ago(last)}</span>` : ""}`;
+    return;
+  }
   if (!f.tick_started) { $("nextPill").innerHTML = `<span class="k">Next scan</span>no scan yet`; return; }
-  const next = new Date(f.tick_started).getTime() + (f.interval || 600) * 1000;
+  const next = new Date(f.tick_started).getTime() + t.interval_min * 60 * 1000;
   const left = (next - Date.now()) / 1000;
-  const scheduled = svc.loaded || (Date.now() - new Date(f.updated)) / 1000 < (f.interval || 600) + 120;
+  const scheduled = svc.loaded || (Date.now() - new Date(f.updated)) / 1000 < t.interval_min * 60 + 120;
   $("nextPill").innerHTML = scheduled
     ? `<span class="k">Next scan</span><span class="num">${left > 0 ? "in " + clock(left) : "due now"}</span>`
     : `<span class="k">Last scan</span>${ago(f.tick_finished || f.tick_started)}`;
-  $("nextPill").title = "Last scan started " + dateTime(f.tick_started);
+  $("nextPill").title = `Scans every ${t.interval_min} min · last scan started ${dateTime(f.tick_started)}`;
 }
 function renderBanners(d) {
   const out = [];
@@ -761,7 +877,9 @@ function renderBanners(d) {
   const paused = d.runs.filter((r) => r.status === "paused");
   if (paused.length) out.push(["warn", `<b>Usage limit reached${f.limit_hit ? " at " + time(f.limit_hit) : ""}.</b> ${paused.length} run${paused.length > 1 ? "s" : ""} paused; ${paused.length > 1 ? "they resume" : "it resumes"} on the next scan after your subscription window resets.`]);
   const svc = d.service || {};
-  if (!svc.loaded && !f.alive && ui.tab === "overview") out.push(["info", `The 10-minute service isn’t running. Start it with <span class="mono">scripts/install-service.sh</span> or run <span class="mono">python3 factory/orchestrator.py watch</span>.`]);
+  const auto = SERVICE_TRIGGERS.includes(d.trigger.type);
+  if (auto && !svc.loaded && !f.alive && ui.tab === "overview") out.push(["info", `The service isn’t running, so this project isn’t scanned automatically. Start it with <span class="mono">scripts/install-service.sh</span>, run <span class="mono">python3 factory/orchestrator.py watch</span>, or press <b>Run now</b>.`]);
+  else if (d.trigger.type === "folder-watch" && svc.loaded && !svc.watched && ui.tab === "overview") out.push(["info", `The service doesn’t watch this project’s <span class="mono">input/</span> yet, so new files wait for the ${d.trigger.interval_min}-minute fallback scan. Run <span class="mono">scripts/install-service.sh</span> to add it.`]);
   $("banners").innerHTML = out.map(([k, html]) => `<div class="banner"><span class="ico">${icon(k === "err" ? "err" : k === "warn" ? "pause" : "info", 16)}</span><div>${html}</div></div>`).join("");
 }
 
@@ -905,7 +1023,7 @@ function renderLive(d) {
   $("liveSub").textContent = live.length ? `${live.length} working now · activity updates every 5 s` : "";
   if (!live.length) {
     const f = d.factory || {};
-    $("live").innerHTML = `<div class="empty">${icon("info", 16)}<br>No agent is working right now.<br><span class="ink2">Drop a requirements .md file into <span class="mono">input/</span>; the next scan picks it up.</span>${f.tick_finished ? `<br><span class="muted">Last scan finished ${ago(f.tick_finished)}.</span>` : ""}</div>`;
+    $("live").innerHTML = `<div class="empty">${icon("info", 16)}<br>No agent is working right now.<br><span class="ink2">${startHint(d)}</span>${f.tick_finished ? `<br><span class="muted">Last scan finished ${ago(f.tick_finished)}.</span>` : ""}</div>`;
     return;
   }
   const timeoutS = (d.settings.station_timeout_min || 60) * 60;
@@ -1162,9 +1280,14 @@ function renderQueue(d) {
     const st = r.pipeline.find((s) => s.id === r.stage);
     lines.push(`<li>${icon(r.status === "paused" ? "pause" : "clock")}<span class="fn">${esc(r.source)}</span><span class="r"><span class="chip">${r.history.length ? "resumes at" : "waiting · starts at"} ${esc(st ? st.title : "Orchestrator")}</span></span></li>`);
   });
-  q.forEach((f) => lines.push(`<li>${icon(f.draft ? "text" : f.settling ? "pause" : "info")}<span class="fn" title="${esc(f.name)}">${esc(f.name)}</span><span class="r"><span class="muted num" style="font-size:12px">${f.bytes < 1024 ? f.bytes + " B" : (f.bytes / 1024).toFixed(1) + " KB"}</span>${f.draft ? `<span class="chip">draft · ignored</span>` : f.settling ? `<span class="chip">being written</span>` : `<span class="chip">next scan</span>`}</span></li>`));
+  q.forEach((f) => lines.push(`<li>${icon(f.draft ? "text" : f.settling ? "pause" : "info")}<span class="fn" title="${esc(f.name)}">${esc(f.name)}</span><span class="r"><span class="muted num" style="font-size:12px">${f.bytes < 1024 ? f.bytes + " B" : (f.bytes / 1024).toFixed(1) + " KB"}</span>${f.draft ? `<span class="chip">draft · ignored</span>` : f.settling ? `<span class="chip">being written</span>` : `<span class="chip">${SERVICE_TRIGGERS.includes(d.trigger.type) ? "next scan" : "waiting for Run now"}</span>`}</span></li>`));
   $("queue").innerHTML = lines.length ? `<ul class="qlist">${lines.join("")}</ul><p class="muted" style="font-size:12px;margin:10px 0 0">Files are picked up once they’ve been unchanged for 60 s. Names starting with <span class="mono">_</span> are drafts.</p>`
-    : `<div class="empty">Nothing planned. Drop a requirements <span class="mono">.md</span> file into <span class="mono">input/</span>.</div>`;
+    : `<div class="empty">Nothing planned. ${startHint(d)}</div>`;
+}
+function startHint(d) {
+  const how = `Drop a requirements <span class="mono">.md</span> file into <span class="mono">input/</span> or use <b>+ Requirement</b>`;
+  return how + ({ "folder-interval": "; the next scan picks it up.", "folder-watch": "; it starts straight away.",
+    once: ", then press <b>Run now</b> (a submitted requirement starts by itself).", manual: ", then press <b>Run now</b>." }[d.trigger.type] || ".");
 }
 function renderLog(d) {
   const view = ui.views.log; setSeg("log", view);
@@ -1262,17 +1385,35 @@ function renderSettings() {
   const cap = (x) => x[0].toUpperCase() + x.slice(1);
   const agentNames = Object.keys(c.catalog);
   const stageAgents = agentNames.filter((n) => n !== c.options.router);
-  const hs = c.home;
+  const hs = c.home || { path: "", runs: 0, inputs: 0 };
+  const tr = s.trigger, svc = c.service || {};
+  const inputDir = hs.path + "/input";
+  const watched = (svc.watching || []).includes(inputDir);
+  const trigStatus = tr.type === "folder-interval" || tr.type === "folder-watch"
+    ? (!svc.installed ? `${icon("info", 13)} The service isn’t installed yet. Run <span class="mono">scripts/install-service.sh</span> once; it covers every project.`
+      : !svc.loaded ? `${icon("warn", 13)} The service is installed but not loaded. Run <span class="mono">scripts/install-service.sh</span> again.`
+      : tr.type === "folder-watch" && !watched ? `${icon("info", 13)} Saving updates the service so it watches <span class="mono">${esc(inputDir)}</span>.`
+      : `${icon("check", 13)} The service is running${tr.type === "folder-watch" ? ` and watches <span class="mono">${esc(inputDir)}</span>` : ""}.`)
+    : `${icon("info", 13)} The service skips this project. Use <b>Run now</b> in the top bar, or from a terminal:<code class="snippet">python3 factory/orchestrator.py run --project ${esc(hs.path)}</code>`;
   $("settingsBody").innerHTML = `
-  <section class="card"><div class="card-h"><h2>Project</h2></div><div class="card-b">
+  <section class="card"><div class="card-h"><h2>Project</h2><div class="right"><a class="btn" href="#projects">Switch project</a></div></div><div class="card-b">
     <div class="row-fields">
       <label class="field"><span>Project name</span><input type="text" data-k="project" value="${esc(s.project)}" maxlength="60"></label>
-      <label class="field" style="grid-column: span 2"><span>Project folder</span><input type="text" data-k="home" value="${esc(s.home)}" placeholder="${esc(c.defaults.home || "(this repository)")}" spellcheck="false" autocomplete="off">
-        <small>Absolute path. Cortana reads <span class="mono">input/</span> and writes <span class="mono">runs/</span> and <span class="mono">logs/</span> here, creating them if needed. Leave empty to use this repository.</small></label>
+      <div class="field" style="grid-column: span 2"><span>Project folder</span><div class="path-box mono">${esc(hs.path)}</div>
+        <small>Cortana reads <span class="mono">input/</span> and writes <span class="mono">runs/</span> and <span class="mono">logs/</span> here. These settings are saved in <span class="mono">.cortana/settings.json</span> inside it.</small></div>
     </div>
-    <div class="folder-status">${icon(hs.exists ? "check" : "info", 13)} In use now: <span class="mono">${esc(hs.path)}</span> · ${hs.runs} run${hs.runs === 1 ? "" : "s"} · ${hs.inputs} file${hs.inputs === 1 ? "" : "s"} in input/
-      ${c.env_override ? `<span class="chip">${icon("warn", 12)} overridden by CORTANA_HOME or --home</span>` : ""}</div>
-    <p class="sec-desc">Changing the folder doesn’t move existing runs. Runs in the old folder stay there, and the dashboard shows the new folder after you save.</p>
+    <div class="folder-status">${icon("check", 13)} ${hs.runs} run${hs.runs === 1 ? "" : "s"} · ${hs.inputs} file${hs.inputs === 1 ? "" : "s"} in input/
+      ${c.env_override ? `<span class="chip">${icon("warn", 12)} fixed by CORTANA_HOME</span>` : ""}</div>
+  </div></section>
+
+  <section class="card"><div class="card-h"><h2>Trigger</h2><span class="sub">what starts a run in this project</span></div><div class="card-b">
+    <div class="modes two" role="radiogroup" aria-label="Trigger">
+      ${c.options.triggers.map((t) => `<label class="mode-card"><input type="radio" name="trigger" value="${t}" data-trig="type" ${tr.type === t ? "checked" : ""}><div><b>${TRIGGER_TEXT[t][0]}</b><p>${TRIGGER_TEXT[t][1]}</p></div></label>`).join("")}
+    </div>
+    ${SERVICE_TRIGGERS.includes(tr.type) ? `<div class="row-fields" style="margin-top:16px">
+      <label class="field"><span>${tr.type === "folder-watch" ? "Fallback scan every (minutes)" : "Scan every (minutes)"}</span><input type="number" min="1" max="1440" data-trig="interval_min" value="${esc(tr.interval_min)}">
+        <small>${tr.type === "folder-watch" ? "Also resumes runs paused by a usage limit." : "Runs paused by a usage limit resume on the next scan."}</small></label></div>` : ""}
+    <div class="folder-status" style="margin-top:12px">${trigStatus}</div>
   </div></section>
 
   <section class="card"><div class="card-h"><h2>How the SDLC runs</h2></div><div class="card-b">
@@ -1337,7 +1478,11 @@ function renderSettings() {
 function onSettingsInput(e) {
   const t = e.target, s = ui.draft;
   if (!s || !t.closest("#view-settings")) return;
-  if (t.dataset.k) {
+  if (t.dataset.trig) {
+    const f = t.dataset.trig;
+    s.trigger = Object.assign({}, s.trigger, { [f]: f === "interval_min" ? (t.value === "" ? "" : Number(t.value)) : t.value });
+    if (f === "type") { renderSettings(); return; }
+  } else if (t.dataset.k) {
     const k = t.dataset.k;
     s[k] = t.type === "number" ? (t.value === "" ? "" : Number(t.value)) : t.value;
     if (k === "mode") { renderSettings(); return; }
@@ -1393,20 +1538,133 @@ async function saveSettings() {
     if (!out.ok) { ui.errors = out.errors || ["Couldn’t save."]; }
     else {
       ui.cfg = out; ui.draft = clone(out.settings); ui.errors = [];
-      toast("Settings saved. The plan and mode apply to new runs; models and effort apply from the next stage.");
+      toast(out.note || "Settings saved. The plan and mode apply to new runs; models and effort apply from the next stage.");
       renderSettings(); fetchState();
     }
   } catch (e) { ui.errors = ["Couldn’t reach the dashboard server."]; }
   ui.saving = false; updateSaveBar();
 }
 
+/* ---------- projects: start screen + switcher ---------- */
+async function post(url, body) {
+  try {
+    const res = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json", "X-Cortana": "1" }, body: JSON.stringify(body || {}) });
+    return await res.json();
+  } catch (e) { return { ok: false, errors: ["Couldn’t reach the dashboard server."] }; }
+}
+const initials = (name) => (String(name || "?").match(/[A-Za-z0-9]+/g) || ["?"]).slice(0, 2).map((w) => w[0]).join("").toUpperCase();
+function projectChips(p) {
+  if (!p.exists) return `<span class="chip">${icon("warn", 12)}folder missing</span>`;
+  return `${p.busy ? `<span class="chip"><span class="dot live"></span>working</span>` : ""}<span class="chip">${esc(triggerShort(p.trigger))}</span><span class="chip">${p.runs} run${p.runs === 1 ? "" : "s"}</span>${p.inputs ? `<span class="chip">${p.inputs} queued</span>` : ""}`;
+}
+function renderStart(d) {
+  const reg = d.projects || { projects: [] };
+  const notes = [];
+  if (reg.override) notes.push(`${icon("warn", 14)} <span><span class="mono">CORTANA_HOME</span> is set, so this dashboard always shows <span class="mono">${esc(d.home)}</span>. Unset it to switch projects.</span>`);
+  if (!d.project && d.home) notes.push(`${icon("warn", 14)} <span>The project folder <span class="mono">${esc(d.home)}</span> can’t be found. Open another project, or create it again.</span>`);
+  $("startNote").innerHTML = notes.map((n) => `<div class="banner">${n}</div>`).join("");
+  $("recentSub").textContent = reg.projects.length ? `${reg.projects.length} project${reg.projects.length === 1 ? "" : "s"} · most recent first` : "";
+  $("recent").innerHTML = reg.projects.length ? `<ul class="plist">${reg.projects.map((p) => `<li class="${p.path === reg.active ? "cur" : ""}">
+      <button class="prow" data-open="${esc(p.path)}" ${p.exists ? "" : "disabled"} aria-label="Open ${esc(p.name)}">
+        <span class="mono-badge" aria-hidden="true">${esc(initials(p.name))}</span>
+        <span class="pt"><b>${esc(p.name)}${p.path === reg.active ? ` <span class="muted" style="font-weight:400">· open now</span>` : ""}</b><span class="mono muted" title="${esc(p.path)}">${esc(p.path)}</span></span>
+        <span class="pm">${projectChips(p)}</span>
+      </button>
+      <button class="btn icon ghost" data-forget="${esc(p.path)}" title="Remove from the list (the folder stays)" aria-label="Remove ${esc(p.name)} from the list">${icon("x")}</button>
+    </li>`).join("")}</ul>` : `<div class="empty">No projects yet. Open a folder or create a new project below.</div>`;
+}
+function renderMenu() {
+  const reg = (ui.data && ui.data.projects) || { projects: [] };
+  $("projMenu").innerHTML = reg.projects.filter((p) => p.exists).slice(0, 8).map((p) =>
+    `<button class="item" role="menuitem" data-open="${esc(p.path)}" aria-current="${p.path === reg.active}"><b>${esc(p.name)}</b><span class="chip">${esc(triggerShort(p.trigger))}</span><span class="p" title="${esc(p.path)}">${esc(p.path)}</span></button>`).join("") +
+    `<hr><a class="item" role="menuitem" href="#projects"><b>Open or create a project…</b></a>`;
+}
+function toggleMenu(open) {
+  const m = $("projMenu");
+  open = open === undefined ? m.hidden : open;
+  if (open) renderMenu();
+  m.hidden = !open;
+  $("projBtn").setAttribute("aria-expanded", String(open));
+  if (open) { const first = m.querySelector(".item"); if (first) first.focus(); }
+}
+function resetProjectUi() {
+  ui.cfg = null; ui.draft = null; ui.errors = [];
+  ui.open.clear(); ui.runTab = {}; ui.planRun = ""; ui.filter = "all"; ui.spend.project = "all";
+}
+async function projectAction(action, path) {
+  $("startErr").innerHTML = "";
+  if (action !== "forget" && dirty() && !confirm("You have unsaved settings in this project. Discard them and switch?")) return;
+  const out = await post("/api/projects", { action, path });
+  toggleMenu(false);
+  if (!out.ok) {
+    const errs = out.errors || ["Couldn’t open the project."];
+    if (ui.tab === "projects") $("startErr").innerHTML = errs.map((e) => `<li>${esc(e)}</li>`).join("");
+    else toast(errs.join(" "));
+    return;
+  }
+  if (action === "forget") { toast("Removed from the list. The folder and its files weren’t touched."); fetchState(); return; }
+  resetProjectUi();
+  $("startPath").value = "";
+  const p = out.projects.projects.find((x) => x.path === out.path);
+  toast(out.note || (action === "create" ? "Created " : "Opened ") + (p ? p.name : out.path));
+  await fetchState();
+  if (ui.tab === "projects") location.hash = "#overview"; else route();
+}
+async function browse() {
+  const b = $("browseBtn");
+  b.disabled = true; b.textContent = "Choose in the dialog…";
+  const out = await post("/api/browse");
+  b.disabled = false; b.textContent = "Browse…";
+  if (out.ok) { $("startPath").value = out.path; $("startErr").innerHTML = ""; $("startPath").focus(); }
+  else if (!out.cancelled) $("startErr").innerHTML = (out.errors || []).map((e) => `<li>${esc(e)}</li>`).join("");
+}
+async function runNow() {
+  $("runBtn").disabled = true;
+  const out = await post("/api/run");
+  toast(!out.ok ? (out.errors || []).join(" ") : out.started ? "Started. Cortana is processing input/ in the background." : out.note);
+  fetchState();
+}
+function openSubmit() {
+  const d = ui.data;
+  $("subSub").textContent = d ? "→ " + d.home + "/input/" : "";
+  const svc = (d && d.service) || {};
+  $("subHint").innerHTML = !d ? "" : SERVICE_TRIGGERS.includes(d.trigger.type) && !svc.loaded ? "The service isn’t running: press Run now after submitting."
+    : { "folder-interval": `Starts on the next scan, within ${d.trigger.interval_min} min.`, "folder-watch": svc.watched ? "Starts as soon as it’s saved." : `Starts on the next scan, within ${d.trigger.interval_min} min.`,
+      once: "Starts as soon as it’s saved.", manual: "Saved to input/. Press Run now to start it." }[d.trigger.type];
+  $("subErr").innerHTML = "";
+  $("subDlg").showModal();
+  $("subName").focus();
+}
+async function sendSubmit(e) {
+  e.preventDefault();
+  $("subGo").disabled = true;
+  const out = await post("/api/submit", { title: $("subName").value, markdown: $("subText").value });
+  $("subGo").disabled = false;
+  if (!out.ok) { $("subErr").innerHTML = (out.errors || []).map((x) => `<li>${esc(x)}</li>`).join(""); return; }
+  $("subDlg").close(); $("subName").value = ""; $("subText").value = "";
+  const d = ui.data, svc = (d && d.service) || {};
+  toast(`Saved as input/${out.name}. ` + (out.started ? "Started." : SERVICE_TRIGGERS.includes(out.trigger) && !svc.loaded ? "Press Run now to start it; the service isn’t running." : {
+    "folder-interval": "It starts on the next scan.", "folder-watch": svc.watched ? "It starts in a moment." : "It starts on the next scan.",
+    once: "A scan is already running; it picks this up too.", manual: "Press Run now to start it." }[out.trigger] || ""));
+  fetchState();
+}
+
 /* ---------- render + fetch ---------- */
 function render() {
   const d = ui.data;
+  if (d && !d.project && ui.tab !== "projects") { ui.tab = "projects"; history.replaceState(null, "", "#projects"); }
+  document.body.classList.toggle("noproj", !!d && !d.project);
   document.querySelectorAll(".nav a").forEach((a) => a.setAttribute("aria-current", a.dataset.nav === ui.tab ? "page" : "false"));
-  ["overview", "plan", "settings"].forEach((t) => ($("view-" + t).hidden = ui.tab !== t));
+  ["projects", "overview", "plan", "settings"].forEach((t) => ($("view-" + t).hidden = ui.tab !== t));
   if (!d) return;
   const y = window.scrollY;
+  if (ui.tab === "projects") renderStart(d);
+  if (!d.project) {
+    $("projectName").textContent = "Cortana"; $("home").textContent = ""; document.title = "Cortana · Choose a project";
+    $("banners").innerHTML = ""; $("foot").innerHTML = "";
+    window.scrollTo(0, y);
+    return;
+  }
   renderTop(d); renderBanners(d);
   if (ui.tab === "overview") {
     renderKpis(d); renderSpend(d); renderLive(d); renderRoster(d); renderRuns(d); renderTimeline(d);
@@ -1449,7 +1707,9 @@ setInterval(() => {
 function route() {
   const t = (location.hash || "#overview").slice(1);
   if (ui.tab === "settings" && t !== "settings" && dirty()) toast("You have unsaved settings. They’re kept until you save or discard.");
-  ui.tab = ["overview", "plan", "settings"].includes(t) ? t : "overview";
+  ui.tab = ["projects", "overview", "plan", "settings"].includes(t) ? t : "overview";
+  if (ui.data && !ui.data.project) ui.tab = "projects";
+  toggleMenu(false);
   if (ui.tab === "settings" && !ui.cfg) loadSettings(); else if (ui.tab === "settings") renderSettings();
   render();
   window.scrollTo(0, 0);
@@ -1458,8 +1718,17 @@ window.addEventListener("hashchange", route);
 window.addEventListener("beforeunload", (e) => { if (dirty()) { e.preventDefault(); e.returnValue = ""; } });
 
 document.addEventListener("click", async (e) => {
+  if (!$("projMenu").hidden && !e.target.closest(".proj")) toggleMenu(false);
   const t = e.target.closest("button, tr.run");
   if (!t) return;
+  if (t.id === "projBtn") { toggleMenu(); return; }
+  if (t.dataset.open) { if (ui.data && t.dataset.open === ui.data.projects.active && ui.data.project) { toggleMenu(false); if (ui.tab === "projects") location.hash = "#overview"; return; } projectAction("open", t.dataset.open); return; }
+  if (t.dataset.forget) { projectAction("forget", t.dataset.forget); return; }
+  if (t.id === "browseBtn") { browse(); return; }
+  if (t.id === "openBtn" || t.id === "createBtn") { projectAction(t.id === "openBtn" ? "open" : "create", $("startPath").value.trim()); return; }
+  if (t.id === "runBtn") { runNow(); return; }
+  if (t.id === "submitBtn") { openSubmit(); return; }
+  if (t.id === "subCancel") { $("subDlg").close(); return; }
   if (t.closest("#view-settings") && (await onSettingsClick(t))) return;
   if (t.dataset.filter) { ui.filter = t.dataset.filter; render(); return; }
   if (t.dataset.runTab) { ui.runTab[t.dataset.runTab] = t.dataset.tab; render(); return; }
@@ -1479,6 +1748,8 @@ document.addEventListener("change", (e) => {
 });
 document.addEventListener("focusout", () => setTimeout(() => { if (pendingRender && !tipEl.classList.contains("show")) { pendingRender = false; render(); } }, 0));
 document.addEventListener("keydown", (e) => {
+  if (e.key === "Escape" && !$("projMenu").hidden) { toggleMenu(false); $("projBtn").focus(); return; }
+  if (e.key === "Enter" && e.target.id === "startPath") { projectAction("open", e.target.value.trim()); return; }
   const tr = e.target.closest && e.target.closest("tr.run");
   if (tr && (e.key === "Enter" || e.key === " ")) { e.preventDefault(); toggleRun(tr.dataset.run); }
 });
@@ -1516,6 +1787,7 @@ async function openReport(run, name) {
   } catch (e) { $("dlgBody").textContent = "Couldn’t load the document."; }
 }
 $("dlgClose").addEventListener("click", () => $("dlg").close());
+$("subForm").addEventListener("submit", sendSubmit);
 $("dlg").addEventListener("click", (e) => { if (e.target === $("dlg")) $("dlg").close(); });
 
 const tipEl = $("tip");
