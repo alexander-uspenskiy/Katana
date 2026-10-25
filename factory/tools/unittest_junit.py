@@ -3,7 +3,7 @@
 
     python3 factory/tools/unittest_junit.py junit.xml [start dir]
 
-Cortana's default test command for Python projects when pytest is not installed. Stdlib only.
+Katana's default test command for Python projects when pytest is not installed. Stdlib only.
 """
 import sys
 import time

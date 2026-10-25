@@ -1,5 +1,5 @@
 {
-  "project": "Cortana",
+  "project": "Katana",
   "mode": "deterministic",
   "trigger": {"type": "folder-interval", "interval_min": 10},
   "max_iterations": 3,

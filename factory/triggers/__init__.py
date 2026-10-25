@@ -1,4 +1,4 @@
-"""Requirement sources ("triggers") for Cortana. See base.py for the interface and how Jira and Confluence
+"""Requirement sources ("triggers") for Katana. See base.py for the interface and how Jira and Confluence
 connectors would plug in.
 
 A project's settings say what starts its runs (settings["trigger"]["type"]); CONNECTORS maps that type to

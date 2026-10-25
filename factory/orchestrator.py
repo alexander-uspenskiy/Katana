@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""Cortana orchestrator.
+"""Katana orchestrator.
 
 Takes requirements from each registered project's trigger (its input/ folder today; see factory/triggers/)
-and drives each one through the plan in that project's .cortana/settings.json, calling the Claude Code CLI
+and drives each one through the plan in that project's .katana/settings.json, calling the Claude Code CLI
 headless on the user's subscription.
 
 - deterministic mode: runs the plan's phases in order. The stages of a phase run at the same time (up to
@@ -12,7 +12,7 @@ headless on the user's subscription.
 - disabled agents: their stages are skipped (deterministic) or never offered to the Orchestrator (auto).
 - budgets: a token cap per run fails the run; a daily token cap pauses the factory until midnight.
 
-Gate steps (`"kind": "gate"`) are measured by Cortana itself, with no LLM call: see gates.py.
+Gate steps (`"kind": "gate"`) are measured by Katana itself, with no LLM call: see gates.py.
 
     python3 factory/orchestrator.py run [--project PATH]   # process the current input now, then exit
     python3 factory/orchestrator.py tick      # scan every folder-interval and folder-watch project now
@@ -46,10 +46,10 @@ import settings
 import streamlog
 import triggers
 
-MAX_ATTEMPTS = int(os.environ.get("CORTANA_MAX_ATTEMPTS", "3"))
+MAX_ATTEMPTS = int(os.environ.get("KATANA_MAX_ATTEMPTS", "3"))
 WATCH_SETTLE_SECONDS = 5  # folder-watch: a new file must be unchanged this long before it is claimed
 WATCH_WAIT_SECONDS = 30   # ...and a watch scan waits at most this long for it
-SETTING_SOURCES = os.environ.get("CORTANA_SETTING_SOURCES", "project")
+SETTING_SOURCES = os.environ.get("KATANA_SETTING_SOURCES", "project")
 
 LIMIT_PATTERN = re.compile(
     r"usage limit|rate limit|limit reached|hit your limit|quota|overloaded|\b429\b", re.I)
@@ -57,7 +57,7 @@ LIMIT_PATTERN = re.compile(
 NEAR_LIMIT_PATTERN = re.compile(
     r"approaching (your |the )?(usage |rate )?limit|close to (your |the )?(usage )?limit|allowed_warning", re.I)
 NEAR_LIMIT_UTILIZATION = 0.9
-BUDGET_POLL = float(os.environ.get("CORTANA_BUDGET_POLL", "5"))  # seconds between token checks during a call
+BUDGET_POLL = float(os.environ.get("KATANA_BUDGET_POLL", "5"))  # seconds between token checks during a call
 BUDGET_CODE = -9  # exit code call_claude reports when it stopped a call at a token cap
 
 COMMON_RULES = """
@@ -211,8 +211,8 @@ def claim_new_inputs() -> list:
             continue
         shutil.copy(run_dir / "requirements.md", workspace / "docs/00-requirements.md")
         git(workspace, "init", "-q", "-b", "main")
-        git(workspace, "config", "user.name", "Cortana")
-        git(workspace, "config", "user.email", "cortana@localhost")
+        git(workspace, "config", "user.name", "Katana")
+        git(workspace, "config", "user.email", "katana@localhost")
         git(workspace, "add", "-A")
         git(workspace, "commit", "-q", "-m", "Add requirements")
         # The plan and mode are frozen per run, so editing settings never breaks a run in flight.
@@ -366,7 +366,7 @@ def advance_phase(run: dict) -> None:
 def describe(run: dict, s: dict, catalog: dict) -> str:
     if settings.is_gate(s):
         conds = "; ".join(gates.describe(c) for c in s.get("conditions") or [])
-        return (f"{s['id']}: {s['title']}, a gate step Cortana measures itself (no agent, no tokens): {conds}. "
+        return (f"{s['id']}: {s['title']}, a gate step Katana measures itself (no agent, no tokens): {conds}. "
                 f"On fail the Developer gets {s['output']}.{' Required.' if s.get('required') else ''}")
     gate = f" Gate: passes on {', '.join(s['pass'])}." if s.get("pass") else ""
     code = " Changes code." if settings.writes_code(catalog, s) else " Writes only its report."
@@ -411,7 +411,7 @@ def decide(claude: str, run: dict):
     cmd = [claude, "-p", "--append-system-prompt", router["prompt"], "--model", router["model"],
            "--effort", router["effort"], "--tools", "", "--permission-prompts", "none",
            "--setting-sources", SETTING_SOURCES, "--output-format", "json",
-           "--json-schema", json.dumps(schema), "--name", f"cortana-{run['id']}-orchestrator-{visit}"]
+           "--json-schema", json.dumps(schema), "--name", f"katana-{run['id']}-orchestrator-{visit}"]
 
     started = time.time()
     log_path = run_dir / "logs" / f"orchestrator-{visit}-{datetime.now():%H%M%S}.json"
@@ -518,7 +518,7 @@ def run_station(claude: str, run: dict, stage: dict, alongside: list, snapshot: 
            "--permission-mode", "acceptEdits", "--permission-prompts", "none",
            "--setting-sources", SETTING_SOURCES,
            "--output-format", "stream-json", "--verbose",
-           "--name", f"cortana-{run['id']}-{stage['id']}-{visit}"]
+           "--name", f"katana-{run['id']}-{stage['id']}-{visit}"]
 
     started = time.time()
     stamp = f"{stage['id']}-run{visit}-{datetime.now():%H%M%S}"
@@ -594,7 +594,7 @@ def gate_context(run: dict, workspace: Path, out_dir: Path) -> dict:
 
 
 def run_gate(run: dict, gate: dict) -> str:
-    """Measures a gate step: Cortana runs the checks itself, with no CLI call. Returns ok or error."""
+    """Measures a gate step: Katana runs the checks itself, with no CLI call. Returns ok or error."""
     run_dir = RUNS_DIR / run["id"]
     workspace = run_dir / "workspace"
     visit = run["visits"].get(gate["id"], 0) + 1
@@ -687,7 +687,7 @@ def write_summary(run: dict) -> None:
              "| # | Phase | Stage | Agent | Run | Outcome | Verdict | Model | Effort | Seconds |",
              "|---|---|---|---|---|---|---|---|---|---|"]
     for n, h in enumerate(run["history"], 1):
-        lines.append(f"| {n} | {phase_of(run, h['stage']) + 1} | {h['title']} | {h.get('agent') or 'Cortana'} | "
+        lines.append(f"| {n} | {phase_of(run, h['stage']) + 1} | {h['title']} | {h.get('agent') or 'Katana'} | "
                      f"{h['visit']} | {h['outcome']} | {h.get('verdict') or ''} | {h.get('model') or '-'} | "
                      f"{h.get('effort') or '-'} | {h['seconds']} |")
     gate_runs = [h for h in run["history"] if h.get("kind") == "gate" and h.get("results")]

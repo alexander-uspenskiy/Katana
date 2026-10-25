@@ -20,16 +20,16 @@ import settings
 from triggers import FolderTrigger
 
 HERE = Path(__file__).resolve().parent
-LABEL = "com.cortana.orchestrator"
+LABEL = "com.katana.orchestrator"
 PLIST_PATH = Path.home() / "Library/LaunchAgents" / f"{LABEL}.plist"
-DISPATCH_SECONDS = int(os.environ.get("CORTANA_DISPATCH_INTERVAL", "60"))
+DISPATCH_SECONDS = int(os.environ.get("KATANA_DISPATCH_INTERVAL", "60"))
 SLACK_SECONDS = 30  # launchd fires a little early or late; count a project as due this close to its time
 
 
 def service_projects() -> list:
     """(folder, settings) for every registered project the service runs: folder-interval or folder-watch.
-    CORTANA_HOME limits this to that one folder, for testing."""
-    override = os.environ.get("CORTANA_HOME")
+    KATANA_HOME limits this to that one folder, for testing."""
+    override = os.environ.get("KATANA_HOME")
     folders = [Path(override).expanduser().resolve()] if override else projects.registered()
     out = []
     for folder in folders:

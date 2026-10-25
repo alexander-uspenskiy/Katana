@@ -27,7 +27,7 @@ Do not edit code. Overwrite your output file with:
 Block only for real defects or missing requirements. Style preferences do not block.
 
 Just above the verdict, write one line with the number of must-fix items, for example `MUST_FIX: 2`.
-Cortana's quality gate reads it.
+Katana's quality gate reads it.
 
 End your output file with exactly one verdict line:
 - `VERDICT: APPROVE` if there are no must-fix items.

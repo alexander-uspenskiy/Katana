@@ -1,24 +1,24 @@
 #!/bin/bash
-# Installs (or regenerates) the launchd agent that runs Cortana while you are logged in.
+# Installs (or regenerates) the launchd agent that runs Katana while you are logged in.
 #
 # The plist is built from config/projects.json: launchd runs `orchestrator.py dispatch` every
-# CORTANA_DISPATCH_INTERVAL seconds (60) and also as soon as the input/ folder of any folder-watch project
+# KATANA_DISPATCH_INTERVAL seconds (60) and also as soon as the input/ folder of any folder-watch project
 # changes (WatchPaths). dispatch starts a background worker for each project that is due. Run this again
 # after adding a folder-watch project; the dashboard does that for you when the service is installed.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-LABEL="com.cortana.orchestrator"
+LABEL="com.katana.orchestrator"
 PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"
-INTERVAL="${CORTANA_DISPATCH_INTERVAL:-60}"
+INTERVAL="${KATANA_DISPATCH_INTERVAL:-60}"
 
 # launchd starts jobs with a bare PATH; give the agents the tools they need.
 NODE_DIR="$(dirname "$(command -v node 2>/dev/null)" 2>/dev/null || true)"
 PATH_VALUE="$HOME/.local/bin:/opt/homebrew/bin:/usr/local/bin:${NODE_DIR:+$NODE_DIR:}/usr/bin:/bin:/usr/sbin:/sbin"
 
 mkdir -p "$ROOT/logs" "$HOME/Library/LaunchAgents"
-# CORTANA_HOME limits the orchestrator to one project, which would drop the others from the plist.
-env -u CORTANA_HOME CORTANA_DISPATCH_INTERVAL="$INTERVAL" \
+# KATANA_HOME limits the orchestrator to one project, which would drop the others from the plist.
+env -u KATANA_HOME KATANA_DISPATCH_INTERVAL="$INTERVAL" \
   /usr/bin/python3 "$ROOT/factory/orchestrator.py" service-plist --path "$PATH_VALUE" > "$PLIST.tmp"
 plutil -lint -s "$PLIST.tmp"
 mv "$PLIST.tmp" "$PLIST"

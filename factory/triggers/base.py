@@ -13,16 +13,16 @@ in the run's state.json as run["origin"], so report() still works after a restar
 How other sources would plug in (not implemented yet):
 
 - Jira: fetch() polls a JQL query such as
-  `project = APP AND status = "Ready for Cortana" ORDER BY priority DESC`, mapping each issue to an Item
+  `project = APP AND status = "Ready for Katana" ORDER BY priority DESC`, mapping each issue to an Item
   (key = issue key, title = summary, ref = {"key": ..., "url": ...}). claim() transitions the issue to
   "In Progress" and only counts the claim if the transition succeeds, so two factories never take the same
   issue; it writes the summary, description and acceptance criteria as requirements.md. ack() adds a
   comment with the run id. report() comments SUMMARY.md and transitions to "Done" or, for a failed or
   blocked run, to a status such as "Needs input". Credentials come from the macOS keychain, never from
   settings.json.
-- Confluence: fetch() runs a CQL search for pages carrying a label such as `cortana-ready`. claim() swaps
-  the label for `cortana-claimed` and exports the page body as markdown. report() adds a page comment and
-  swaps the label for `cortana-done` or `cortana-failed`.
+- Confluence: fetch() runs a CQL search for pages carrying a label such as `katana-ready`. claim() swaps
+  the label for `katana-claimed` and exports the page body as markdown. report() adds a page comment and
+  swaps the label for `katana-done` or `katana-failed`.
 
 Register a new connector in factory/triggers/__init__.py and add its settings to settings.validate().
 """

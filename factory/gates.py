@@ -1,4 +1,4 @@
-"""Cortana quality gates: plan steps that Cortana measures itself, with no LLM call.
+"""Katana quality gates: plan steps that Katana measures itself, with no LLM call.
 
 A gate step has conditions such as `coverage >= 80`. Each condition reads one metric:
 
@@ -472,7 +472,7 @@ def condition_text(r: dict) -> str:
 def render_report(gate: dict, result: dict, visit: int, back_to: str | None) -> str:
     """docs/gate-report.md: every finding of a gate run, merged, for the Developer."""
     lines = [f"# {gate['title']}: run {visit}", "",
-             f"Measured by Cortana. Verdict **{result['verdict']}**: {result['blocking']} blocking, "
+             f"Measured by Katana. Verdict **{result['verdict']}**: {result['blocking']} blocking, "
              f"{result['warnings']} warning(s).", "",
              "| Condition | Measured | Result | Severity | Detail |", "|---|---|---|---|---|"]
     for r in result["results"]:

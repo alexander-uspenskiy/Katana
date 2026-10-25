@@ -1,4 +1,4 @@
-# Cortana
+# Katana
 
 An SDLC factory of autonomous AI agents built on Claude: requirements in, a designed, built, tested, reviewed
 and security-audited project out. Phase 0 runs on your Mac with your Claude subscription only.
@@ -7,8 +7,8 @@ and security-audited project out. Phase 0 runs on your Mac with your Claude subs
 
 ## How it works
 
-Cortana works on **projects**. A project is a folder holding `input/` (requirement files), `runs/`, `logs/`
-and `.cortana/settings.json` (that project's settings). Each requirement `.md` file in `input/` becomes a
+Katana works on **projects**. A project is a folder holding `input/` (requirement files), `runs/`, `logs/`
+and `.katana/settings.json` (that project's settings). Each requirement `.md` file in `input/` becomes a
 run that follows the project's **plan**: a list of **phases**, each holding one or more stages
 that run at the same time. What starts a run is the project's **trigger**:
 
@@ -39,7 +39,7 @@ There are two SDLC modes, chosen in Settings:
 - **Deterministic:** the classic pipeline. Phases run in plan order, and failed gates loop back.
 - **Full auto:** before every step, the Orchestrator agent reads the history and the documents and
   chooses the next stage or stages (several at once, if at most one of them changes code), or `done`.
-  Cortana refuses `done` until every required gate, including gate steps, has passed after the latest build.
+  Katana refuses `done` until every required gate, including gate steps, has passed after the latest build.
 
 The plan and mode are frozen when a run starts, so editing settings never breaks a run in flight. Old flat
 plans, in older project settings or in runs started before phases existed, still load: each stage becomes
@@ -56,14 +56,14 @@ its own phase.
 - **Worktrees (off by default):** report-only stages normally read the shared workspace while the phase's
   code-writing stage changes it. That is fine for reviews of a finished build, and it keeps one copy of the
   code. With `worktrees` on, each report-only stage in a parallel phase gets a `git worktree` snapshot of the
-  workspace (HEAD plus uncommitted changes) taken when the phase starts, and Cortana copies its report back.
+  workspace (HEAD plus uncommitted changes) taken when the phase starts, and Katana copies its report back.
   Turn it on if reviewers get confused by tests appearing mid-review.
 - If one stage hits a usage limit or errors, the others finish, and the next scan reruns only the stages of
   the phase that did not finish.
 
 ### Quality gates
 
-A **gate step** (`"kind": "gate"`) is a plan step that Cortana measures itself, with no LLM call and no
+A **gate step** (`"kind": "gate"`) is a plan step that Katana measures itself, with no LLM call and no
 tokens. Each condition has a metric, an operator, a threshold and a severity (`block` or `warn`):
 
 | Metric | Measured from |
@@ -78,7 +78,7 @@ tokens. Each condition has a metric, an operator, a threshold and a severity (`b
 - The default quality gate blocks unless the test pass rate is 100%, coverage is at least 80%, there are no
   high or critical security findings, and the review has no must-fix items.
 - **Test and coverage commands** come from Settings. Empty means detect: Python projects use
-  `pytest --junitxml` when pytest is installed, else Cortana's stdlib runner
+  `pytest --junitxml` when pytest is installed, else Katana's stdlib runner
   [factory/tools/unittest_junit.py](factory/tools/unittest_junit.py), and run under coverage.py when it is
   installed. Node projects use `node --test` with the JUnit and lcov reporters. Commands get `{junit}` and
   `{coverage}` placeholders for the files to write.
@@ -104,20 +104,20 @@ tokens. Each condition has a metric, an operator, a threshold and a severity (`b
 | [factory/notify.py](factory/notify.py) | macOS and Teams notifications |
 | [config/defaults.json](config/defaults.json) | Default trigger, mode, limits, parallelism, gate commands, agents, budgets, notifications and plan |
 | `config/projects.json` | The registered projects and the active one (not in git) |
-| `<project>/.cortana/settings.json` | That project's changes to the defaults, written by the setup wizard and Settings tab |
+| `<project>/.katana/settings.json` | That project's changes to the defaults, written by the setup wizard and Settings tab |
 | `config/auth.json` | How agents sign in: `subscription` or `api_key` (not in git). The keys themselves are in the keychain |
 | `config/agents/<name>.md` | Your edited agent prompts, written by Settings → Agents → Prompt (not in git). Shared by all projects |
 | `<project>/runs/<id>/` | Per run: `workspace/` (the generated project, its own git repo), `reports/`, `logs/`, `gates/`, `state.json`, `SUMMARY.md` |
 
-**Upgrading:** settings used to live in `config/settings.json`. On the first start, Cortana moves that file
-to `<project>/.cortana/settings.json` for the project folder it named (or this repository), registers that
+**Upgrading:** settings used to live in `config/settings.json`. On the first start, Katana moves that file
+to `<project>/.katana/settings.json` for the project folder it named (or this repository), registers that
 project, and renames the old file to `settings.json.migrated`.
 
 **Authentication:** Settings → Authentication shows whether the agents can sign in, and how. By default they
 use your Claude subscription: before every scan the orchestrator checks `claude auth status` for a subscription
 login, and it removes `ANTHROPIC_API_KEY` and other API or provider variables from the agents' environment.
 Switch to **Anthropic API key** there and the agents get the saved key instead, billed per token. API keys
-(Anthropic, OpenAI, Google Gemini) are saved in your macOS login keychain under the service `cortana`, never in a
+(Anthropic, OpenAI, Google Gemini) are saved in your macOS login keychain under the service `katana`, never in a
 file; the dashboard shows only their last four characters. Only the Anthropic key reaches agents, and only in
 API key mode. The choice is shared by all projects and saved in `config/auth.json`.
 
@@ -152,7 +152,7 @@ command. Bare `Bash`, `Bash(*)`, shells, and network or system commands such as 
 
 **Notifications:** a macOS notification when a run is done, failed, blocked or paused, with a toggle for
 each event. If you add a Teams incoming-webhook URL, which must be an https URL on `webhook.office.com`,
-`logic.azure.com` or `powerplatform.com`, Cortana also posts a card there. Nothing is sent to Teams
+`logic.azure.com` or `powerplatform.com`, Katana also posts a card there. Nothing is sent to Teams
 without one.
 
 ## Dashboard
@@ -163,7 +163,7 @@ python3 factory/dashboard.py
 
 Then open http://127.0.0.1:8787. With no project selected it opens on the **start screen**: your recent
 projects, a path field with **Browse…** (the native macOS folder dialog), **Open project**, and
-**Create new project**, which makes the folder with `input/`, `runs/`, `logs/` and `.cortana/` inside.
+**Create new project**, which makes the folder with `input/`, `runs/`, `logs/` and `.katana/` inside.
 `--home DIR` opens a folder directly.
 
 Once a project is open, the project name in the top bar switches between recent projects, and every tab
@@ -256,9 +256,9 @@ Run the script again after adding a `folder-watch` project. When the service is 
 does this for you whenever the watched folders change. `scripts/uninstall-service.sh` removes the service.
 Settings → Service runs the same scripts, and starts or stops the agent with `launchctl`.
 
-Environment variables: `CORTANA_DISPATCH_INTERVAL` (60 s), `CORTANA_MAX_ATTEMPTS` (3), `CORTANA_BUDGET_POLL`
-(how often a running stage is checked against the token caps, 5 s), `CORTANA_CLAUDE_BIN` (path to the CLI),
-and `CORTANA_HOME`, which pins the dashboard and the orchestrator to one project folder
+Environment variables: `KATANA_DISPATCH_INTERVAL` (60 s), `KATANA_MAX_ATTEMPTS` (3), `KATANA_BUDGET_POLL`
+(how often a running stage is checked against the token caps, 5 s), `KATANA_CLAUDE_BIN` (path to the CLI),
+and `KATANA_HOME`, which pins the dashboard and the orchestrator to one project folder
 for testing.
 
 The orchestrator finds the CLI on `PATH`, then in `~/.local/bin`, then uses the copy bundled with the
@@ -288,13 +288,13 @@ restart. `FolderTrigger` is the only connector today: it claims by moving the fi
 its report is the run's `SUMMARY.md`.
 
 Planned connectors would plug in like this; they are not built yet:
-- **Jira:** `fetch()` polls a JQL query such as `status = "Ready for Cortana"`. `claim()` transitions the
+- **Jira:** `fetch()` polls a JQL query such as `status = "Ready for Katana"`. `claim()` transitions the
   issue to *In Progress*, and only a successful transition counts as a claim. `ack()` comments the run
   id. `report()` comments the summary and transitions the issue to *Done*, or to a status such as
   *Needs input* for a failed or blocked run.
-- **Confluence:** `fetch()` runs a CQL search for pages labelled `cortana-ready`. `claim()` swaps the label
-  for `cortana-claimed` and exports the page as markdown. `report()` adds a page comment and labels the
-  page `cortana-done` or `cortana-failed`.
+- **Confluence:** `fetch()` runs a CQL search for pages labelled `katana-ready`. `claim()` swaps the label
+  for `katana-claimed` and exports the page as markdown. `report()` adds a page comment and labels the
+  page `katana-done` or `katana-failed`.
 
 A new connector registers its trigger type in `CONNECTORS` in
 [factory/triggers/__init__.py](factory/triggers/__init__.py) and adds its fields to `settings.validate()`.

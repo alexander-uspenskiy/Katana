@@ -1,6 +1,6 @@
-"""Cortana project registry: config/projects.json lists the project folders Cortana knows and the active one.
+"""Katana project registry: config/projects.json lists the project folders Katana knows and the active one.
 
-A project folder holds input/, runs/, logs/ and .cortana/settings.json (that project's settings).
+A project folder holds input/, runs/, logs/ and .katana/settings.json (that project's settings).
 The dashboard shows the active project; the service processes every registered project.
 """
 from __future__ import annotations
@@ -13,7 +13,7 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parent.parent
 REGISTRY_PATH = REPO / "config" / "projects.json"
 LEGACY_SETTINGS = REPO / "config" / "settings.json"  # before projects, settings lived here
-SUBDIRS = ("input", "runs", "logs", ".cortana")
+SUBDIRS = ("input", "runs", "logs", ".katana")
 MAX_RECENT = 20
 
 
@@ -70,7 +70,7 @@ def check_folder(path: str, must_exist: bool) -> str | None:
 
 
 def open_project(path, activate: bool = True) -> Path:
-    """Registers a project folder (creating input/, runs/, logs/ and .cortana/ in it) and makes it active."""
+    """Registers a project folder (creating input/, runs/, logs/ and .katana/ in it) and makes it active."""
     p = Path(_norm(path))
     ensure_structure(p)
     reg = load()
@@ -103,7 +103,7 @@ def migrate() -> None:
             old = {}
         project = Path(os.path.expanduser(old.pop("home", "") or str(REPO))).resolve()
         ensure_structure(project)
-        target = project / ".cortana" / "settings.json"
+        target = project / ".katana" / "settings.json"
         if not target.exists():
             target.write_text(json.dumps(old, indent=2) + "\n")
         LEGACY_SETTINGS.rename(LEGACY_SETTINGS.with_suffix(".json.migrated"))

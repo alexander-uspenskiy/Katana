@@ -1,9 +1,9 @@
-"""Cortana settings: defaults in config/defaults.json, each project's changes in <project>/.cortana/settings.json.
+"""Katana settings: defaults in config/defaults.json, each project's changes in <project>/.katana/settings.json.
 
 Shared by the orchestrator (reads them before every station) and the dashboard (edits them).
 
 The plan (`pipeline`) is a list of phases; each phase is a list of stages that run at the same time.
-A stage is an agent stage, or a gate step (`"kind": "gate"`) that Cortana measures itself (see gates.py).
+A stage is an agent stage, or a gate step (`"kind": "gate"`) that Katana measures itself (see gates.py).
 Old flat plans, a list of stages, load as one stage per phase.
 """
 from __future__ import annotations
@@ -67,7 +67,7 @@ def defaults() -> dict:
 
 
 def settings_path(project: Path) -> Path:
-    return Path(project) / ".cortana" / "settings.json"
+    return Path(project) / ".katana" / "settings.json"
 
 
 def load(project: Path | None = None) -> dict:
@@ -120,9 +120,9 @@ def writes_code(catalog: dict, stage: dict) -> bool:
 
 
 def home(conf: dict | None = None) -> Path | None:
-    """The active project folder (holds input/, runs/, logs/ and .cortana/), or None before one is chosen.
-    CORTANA_HOME overrides it, for testing. `conf` is accepted for older callers and ignored."""
-    override = os.environ.get("CORTANA_HOME")
+    """The active project folder (holds input/, runs/, logs/ and .katana/), or None before one is chosen.
+    KATANA_HOME overrides it, for testing. `conf` is accepted for older callers and ignored."""
+    override = os.environ.get("KATANA_HOME")
     return Path(override).expanduser().resolve() if override else projects.active()
 
 
@@ -193,7 +193,7 @@ def tool_problem(tool: str) -> str | None:
 def validate(new: dict) -> tuple:
     """Returns (clean settings, list of errors). Only known keys survive."""
     errors, catalog = [], agent_catalog()
-    clean = {"project": str(new.get("project") or "Cortana")[:60]}
+    clean = {"project": str(new.get("project") or "Katana")[:60]}
 
     t = new.get("trigger") or {}
     clean["trigger"] = {"type": t.get("type")}

@@ -3,8 +3,8 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Cortana</title>
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230b0b0b'/%3E%3Ccircle cx='16' cy='16' r='8.5' fill='none' stroke='%233987e5' stroke-width='3'/%3E%3Ccircle cx='16' cy='16' r='3' fill='%233987e5'/%3E%3C/svg%3E">
+<title>Katana</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%230b0b0b'/%3E%3Cpolygon points='26,6 15.2,20.8 11.2,16.8' fill='%233987e5'/%3E%3Cpath d='M9.5 15.1L16.9 22.5M13.2 18.8L7 25' fill='none' stroke='%233987e5' stroke-width='2.4' stroke-linecap='round'/%3E%3C/svg%3E">
 <style>
 :root {
   color-scheme: light;
@@ -642,9 +642,9 @@ footer { max-width: 1560px; margin: 0 auto; padding: 0 24px 32px; color: var(--m
   <div class="top-in">
     <div class="top-row">
       <div class="brand">
-        <svg width="30" height="30" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="8" fill="currentColor"/><circle cx="16" cy="16" r="8.5" fill="none" stroke="var(--accent)" stroke-width="3"/><circle cx="16" cy="16" r="3" fill="var(--accent)"/></svg>
+        <svg width="30" height="30" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="8" fill="currentColor"/><polygon points="26,6 15.2,20.8 11.2,16.8" fill="var(--accent)"/><path d="M9.5 15.1L16.9 22.5M13.2 18.8L7 25" fill="none" stroke="var(--accent)" stroke-width="2.4" stroke-linecap="round"/></svg>
         <div class="proj">
-          <button class="proj-btn" id="projBtn" aria-haspopup="true" aria-expanded="false" aria-controls="projMenu" title="Switch project"><b id="projectName">Cortana</b><svg width="12" height="12" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 6l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+          <button class="proj-btn" id="projBtn" aria-haspopup="true" aria-expanded="false" aria-controls="projMenu" title="Switch project"><b id="projectName">Katana</b><svg width="12" height="12" viewBox="0 0 16 16" aria-hidden="true"><path d="M4 6l4 4 4-4" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
           <div class="home" id="home"></div>
           <div class="menu" id="projMenu" role="menu" aria-label="Projects" hidden></div>
         </div>
@@ -678,7 +678,7 @@ footer { max-width: 1560px; margin: 0 auto; padding: 0 24px 32px; color: var(--m
 <main id="view-projects" hidden>
   <div class="start">
     <div class="start-h">
-      <svg width="44" height="44" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="8" fill="currentColor"/><circle cx="16" cy="16" r="8.5" fill="none" stroke="var(--accent)" stroke-width="3"/><circle cx="16" cy="16" r="3" fill="var(--accent)"/></svg>
+      <svg width="44" height="44" viewBox="0 0 32 32" aria-hidden="true"><rect width="32" height="32" rx="8" fill="currentColor"/><polygon points="26,6 15.2,20.8 11.2,16.8" fill="var(--accent)"/><path d="M9.5 15.1L16.9 22.5M13.2 18.8L7 25" fill="none" stroke="var(--accent)" stroke-width="2.4" stroke-linecap="round"/></svg>
       <div><h1>Choose a project</h1><p>Each project is a folder with its own requirements, runs and settings. The dashboard shows one at a time; the service runs them all.</p></div>
     </div>
     <div id="startNote"></div>
@@ -695,7 +695,7 @@ footer { max-width: 1560px; margin: 0 auto; padding: 0 24px 32px; color: var(--m
         <div class="actions">
           <button class="btn primary" id="openBtn">Open project</button>
           <button class="btn" id="createBtn">Create new project</button>
-          <span class="muted" style="font-size:12.5px">Create makes the folder, with <span class="mono">input/</span>, <span class="mono">runs/</span>, <span class="mono">logs/</span> and <span class="mono">.cortana/</span> inside.</span>
+          <span class="muted" style="font-size:12.5px">Create makes the folder, with <span class="mono">input/</span>, <span class="mono">runs/</span>, <span class="mono">logs/</span> and <span class="mono">.katana/</span> inside.</span>
         </div>
         <ul class="errors" id="startErr"></ul>
       </div>
@@ -878,10 +878,10 @@ const ui = {
   spend: { model: "all", effort: "all", project: "all", stack: "type", range: "all" },
   cfg: null, draft: null, errors: [], saving: false,
 };
-try { ui.theme = localStorage.getItem("cortana-theme") || "auto"; } catch (e) {}
-try { const v = JSON.parse(localStorage.getItem("cortana-views") || "null"); if (v) Object.assign(ui.views, v); } catch (e) {}
-try { const v = JSON.parse(localStorage.getItem("cortana-spend") || "null"); if (v) Object.assign(ui.spend, v); } catch (e) {}
-const remember = () => { try { localStorage.setItem("cortana-views", JSON.stringify(ui.views)); localStorage.setItem("cortana-spend", JSON.stringify(ui.spend)); } catch (e) {} };
+try { ui.theme = localStorage.getItem("katana-theme") || "auto"; } catch (e) {}
+try { const v = JSON.parse(localStorage.getItem("katana-views") || "null"); if (v) Object.assign(ui.views, v); } catch (e) {}
+try { const v = JSON.parse(localStorage.getItem("katana-spend") || "null"); if (v) Object.assign(ui.spend, v); } catch (e) {}
+const remember = () => { try { localStorage.setItem("katana-views", JSON.stringify(ui.views)); localStorage.setItem("katana-spend", JSON.stringify(ui.spend)); } catch (e) {} };
 
 /* ---------- helpers ---------- */
 const $ = (id) => document.getElementById(id);
@@ -929,7 +929,7 @@ function modelName(id) {
 const usd = (n) => "$" + (n || 0).toFixed(n >= 100 ? 0 : 2);
 const mono = (agent) => (!agent ? "◆" : MONO[agent] || String(agent).slice(0, 2).replace(/^./, (c) => c.toUpperCase()));
 function agentInfo(name) {
-  if (!name) return { name: null, title: "Cortana", role: "measures gate steps itself, no LLM call" };
+  if (!name) return { name: null, title: "Katana", role: "measures gate steps itself, no LLM call" };
   return ((ui.data && ui.data.agents) || []).find((a) => a.name === name) || { name, title: name };
 }
 function icon(name, size = 14) {
@@ -1047,8 +1047,8 @@ const loops = (run) => sum(run.loops);
 
 /* ---------- top bar + banners ---------- */
 function renderTop(d) {
-  $("projectName").textContent = d.project || "Cortana";
-  document.title = (d.project || "Cortana") + (ui.tab !== "overview" ? " · " + ui.tab[0].toUpperCase() + ui.tab.slice(1) : "");
+  $("projectName").textContent = d.project || "Katana";
+  document.title = (d.project || "Katana") + (ui.tab !== "overview" ? " · " + ui.tab[0].toUpperCase() + ui.tab.slice(1) : "");
   $("home").textContent = d.home;
   const f = d.factory || {}, svc = d.service || {};
   const onRequest = !SERVICE_TRIGGERS.includes(d.trigger.type);
@@ -1147,7 +1147,7 @@ function renderKpis(d) {
     <div class="foot">API-equivalent value <b class="ink2">${usd(cost)}</b> · billed to ${(d.auth || {}).method === "api_key" ? "API account" : "subscription"} · output ${compact(tokens.output)} of ${compact(total)}</div>
   </div>
   <div class="card tile"><div class="label">Active agents</div><div class="value">${liveAgents.length}<small> / ${d.settings.max_parallel || 1} at once</small></div>
-    <div class="foot">${liveAgents.length ? liveAgents.map((x) => esc(agentInfo(x.current.agent).title)).join(", ") + " working" : live.length ? "Cortana is measuring a gate" : "No agent running now"}</div></div>
+    <div class="foot">${liveAgents.length ? liveAgents.map((x) => esc(agentInfo(x.current.agent).title)).join(", ") + " working" : live.length ? "Katana is measuring a gate" : "No agent running now"}</div></div>
   <div class="card tile"><div class="label">Runs</div><div class="value">${d.runs.length}<small> total</small></div>
     <div class="statusline">${Object.keys(STATUS).filter((s) => counts[s]).map((s) => `<span>${icon(STATUS[s].icon, 12)}${counts[s]} ${STATUS[s].label.toLowerCase()}</span>`).join("") || "<span>none yet</span>"}</div></div>
   <div class="card tile"><div class="label">Planned · in queue</div><div class="value">${queued}<small> file${queued === 1 ? "" : "s"}</small></div>
@@ -1254,7 +1254,7 @@ function feedItems(events) {
 function renderLive(d) {
   const live = d.runs.flatMap((r) => cur(r).map((c) => [r, c]));
   const agents = live.filter(([, c]) => c.kind !== "gate").length;
-  $("liveSub").textContent = live.length ? `${agents} agent${agents === 1 ? "" : "s"} working${live.length > agents ? " · Cortana measuring a gate" : ""} · max ${d.settings.max_parallel || 1} at once · updates every 5 s` : "";
+  $("liveSub").textContent = live.length ? `${agents} agent${agents === 1 ? "" : "s"} working${live.length > agents ? " · Katana measuring a gate" : ""} · max ${d.settings.max_parallel || 1} at once · updates every 5 s` : "";
   if (!live.length) {
     const f = d.factory || {};
     $("live").innerHTML = `<div class="empty">${icon("info", 16)}<br>No agent is working right now.<br><span class="ink2">${startHint(d)}</span>${f.tick_finished ? `<br><span class="muted">Last scan finished ${ago(f.tick_finished)}.</span>` : ""}</div>`;
@@ -1273,7 +1273,7 @@ function renderLive(d) {
       </div>`;
     if (c.kind === "gate") {
       const def = flat(r.pipeline).find((s) => s.id === c.stage) || { conditions: [] };
-      return `<article class="agent">${head("◆", "Cortana · " + esc(c.title))}
+      return `<article class="agent">${head("◆", "Katana · " + esc(c.title))}
         <div class="chips"><span class="chip accent">${icon("gate", 12)}Gate step · no LLM call</span><span class="chip">${(def.conditions || []).length} conditions</span></div>
         <ul class="conds">${(def.conditions || []).map((x) => `<li><span>${icon("run", 12)}</span><span>${esc(condText(x))}</span><span class="v muted">measuring…</span></li>`).join("")}</ul>
       </article>`;
@@ -1330,7 +1330,7 @@ function track(run) {
   const st = stageStates(run), pos = stagePos(run.pipeline);
   const node = (s) => {
     const x = st[s.id], h = x.last;
-    const tip = `${pos[s.id]}. ${s.title} (${isGate(s) ? "gate step, measured by Cortana" : agentInfo(s.agent).title})\n${STATE_LABEL[x.state]}${x.runs ? ` · ${x.runs} run${x.runs > 1 ? "s" : ""}` : ""}${h && h.verdict ? `\nLast verdict: ${h.verdict}` : ""}${h && !isGate(s) ? `\n${modelName(h.resolved_model || h.model)} · ${h.effort} effort · ${dur(h.seconds)}` : ""}${h && h.results ? "\n" + h.results.map((r) => `${r.status === "pass" ? "✓" : r.status === "fail" ? "✗" : "·"} ${condText(r)}: ${measured(r)}`).join("\n") : ""}`;
+    const tip = `${pos[s.id]}. ${s.title} (${isGate(s) ? "gate step, measured by Katana" : agentInfo(s.agent).title})\n${STATE_LABEL[x.state]}${x.runs ? ` · ${x.runs} run${x.runs > 1 ? "s" : ""}` : ""}${h && h.verdict ? `\nLast verdict: ${h.verdict}` : ""}${h && !isGate(s) ? `\n${modelName(h.resolved_model || h.model)} · ${h.effort} effort · ${dur(h.seconds)}` : ""}${h && h.results ? "\n" + h.results.map((r) => `${r.status === "pass" ? "✓" : r.status === "fail" ? "✗" : "·"} ${condText(r)}: ${measured(r)}`).join("\n") : ""}`;
     if (isGate(s)) return `<span class="gwrap" ${tipAttr(tip)}><span class="node gate ${x.state}"><span>G</span></span>${x.runs > 1 ? `<sup>×${x.runs}</sup>` : ""}</span>`;
     return `<span class="node ${x.state}" ${tipAttr(tip)}><span>${mono(s.agent)}</span>${x.runs > 1 ? `<sup>×${x.runs}</sup>` : ""}</span>`;
   };
@@ -1402,7 +1402,7 @@ function runDetail(r) {
   } else if (tab === "decisions") {
     body = r.decisions.length ? `<ol class="decisions">${r.decisions.map((x, i) => {
       const picks = [].concat(x.chosen || []), targets = picks.map((id) => flat(r.pipeline).find((s) => s.id === id)).filter(Boolean);
-      return `<li><span class="n">${i + 1}</span><div style="min-width:0"><b>${picks[0] === "done" ? "Done" : targets.length ? targets.map((t) => esc(t.title)).join(" + ") : esc(x.outcome)}</b> <span class="muted">${targets.length ? "· " + targets.map((t) => esc(isGate(t) ? "Cortana" : agentInfo(t.agent).title)).join(", ") : ""}</span>
+      return `<li><span class="n">${i + 1}</span><div style="min-width:0"><b>${picks[0] === "done" ? "Done" : targets.length ? targets.map((t) => esc(t.title)).join(" + ") : esc(x.outcome)}</b> <span class="muted">${targets.length ? "· " + targets.map((t) => esc(isGate(t) ? "Katana" : agentInfo(t.agent).title)).join(", ") : ""}</span>
         <div class="ink2" style="font-size:12.5px">${esc(x.reason || x.error || "")}</div>${x.override ? `<div style="font-size:12px;margin-top:2px">${icon("warn", 12)} ${esc(x.override)}</div>` : ""}</div>
         <div class="muted num" style="font-size:12px;text-align:right">${time(x.at)}<br>${compact(sum(x.tokens))} tok · ${dur(x.seconds)}</div></li>`;
     }).join("")}</ol>` : `<div class="empty">The Orchestrator hasn’t decided anything yet.</div>`;
@@ -1426,7 +1426,7 @@ function runDetail(r) {
     body = `<div class="muted" style="font-size:12px;margin-bottom:6px">Current documents in the workspace</div><div class="reports">${r.docs.map((n) => `<button class="btn" data-report="${esc(r.id)}" data-name="${esc(n)}">${esc(n.replace("docs/", ""))}</button>`).join("")}<button class="btn" data-report="${esc(r.id)}" data-name="SUMMARY.md">SUMMARY.md</button></div>
       ${r.reports.length ? `<div class="muted" style="font-size:12px;margin:12px 0 6px">Archived output of every stage run</div><div class="reports">${r.reports.map((n) => `<button class="btn" data-report="${esc(r.id)}" data-name="${esc(n)}">${esc(n.replace(".md", ""))}</button>`).join("")}</div>` : ""}`;
   } else if (tab === "live" && cur(r).length) {
-    body = cur(r).map((c) => `<div class="muted" style="font-size:12px;margin:4px 0">${esc(c.kind === "gate" ? "Cortana" : agentInfo(c.agent).title)} · ${esc(c.title)}</div>
+    body = cur(r).map((c) => `<div class="muted" style="font-size:12px;margin:4px 0">${esc(c.kind === "gate" ? "Katana" : agentInfo(c.agent).title)} · ${esc(c.title)}</div>
       <ul class="feed" style="max-height:240px">${c.kind === "gate" ? `<li><span>${icon("run", 14)}</span><span class="what">Measuring gate conditions…</span></li>` : feedItems(c.live.events)}</ul>`).join("");
   }
   return `<div class="detail-in">
@@ -1548,7 +1548,7 @@ function renderTimeline(d) {
     const { placed, rows } = lanes(byRun[id]);
     return `<div class="tl-row"><span class="name" title="${esc(id)}">${esc(runsById[id].source.replace(/\.md$/, ""))}</span><div class="lane" style="height:${rows * 20 + 2}px">${placed.map(({ t, s, e, row }) => {
       const [cls, word] = segClass(t, runsById[id]);
-      const tip = t.kind === "gate" ? `${t.title}${t.visit > 1 ? " · run " + t.visit : ""}\nCortana · ${word}${t.results ? "\n" + t.results.map((r) => `${condText(r)}: ${measured(r)} (${r.status})`).join("\n") : ""}\n${dateTime(t.started)}`
+      const tip = t.kind === "gate" ? `${t.title}${t.visit > 1 ? " · run " + t.visit : ""}\nKatana · ${word}${t.results ? "\n" + t.results.map((r) => `${condText(r)}: ${measured(r)} (${r.status})`).join("\n") : ""}\n${dateTime(t.started)}`
         : `${t.title || t.stage}${t.visit > 1 ? " · run " + t.visit : ""}\n${agentInfo(t.agent).title} · ${word}${t.verdict ? " (" + t.verdict + ")" : ""}\n${modelName(t.model)} · ${t.effort} effort\n${dur((e - s) / 1000)} · ${compact(sum(t.tokens))} tokens\n${dateTime(t.started)}`;
       return `<span class="segm ${cls}" style="left:${((s - t0) / span) * 100}%;width:${((e - s) / span) * 100}%;top:${row * 20 + 3 + (t.kind === "gate" ? 2 : 0)}px" ${tipAttr(tip)}>${t.kind === "decision" || t.kind === "gate" ? "" : mono(t.agent)}</span>`;
     }).join("")}</div></div>`;
@@ -1630,7 +1630,7 @@ function renderPlan(d) {
   const gateCard = (g) => {
     const x = st[g.id] || { state: "pending", runs: 0 }, m = latestGate(source, g.id);
     return `<div class="diamond ${x.state}" aria-hidden="true"><span>${m ? (m.entry.verdict === "PASS" ? "✓" : "✗") : "◆"}</span></div>
-      <div style="text-align:center"><b style="font-size:13px">${esc(g.title)}</b><div class="muted" style="font-size:11.5px">measured by Cortana · no LLM call</div></div>
+      <div style="text-align:center"><b style="font-size:13px">${esc(g.title)}</b><div class="muted" style="font-size:11.5px">measured by Katana · no LLM call</div></div>
       ${gateConds(g, m)}
       <div class="muted" style="font-size:11.5px;display:grid;gap:2px">${mode === "deterministic" || g.on_fail ? `<span class="loopback">${icon("loop", 12)} on fail → ${esc(title(backOf(g)))} with ${esc(g.output)}</span>` : ""}
         ${g.required ? `<span>${icon("check", 11)} required before done</span>` : ""}
@@ -1677,7 +1677,7 @@ function renderPlan(d) {
   $("planHead").innerHTML = `
     <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px"><span class="badge">${icon(mode === "auto" ? "run" : "loop", 13)}${esc(mName)}</span><span class="ink2" style="font-size:13px">${esc(mDesc)}</span><span class="chip">up to ${d.settings.max_parallel || 1} stages at once</span></div>
     ${mode === "auto" ? `<div class="hub" style="margin-bottom:14px"><div class="mono-badge" aria-hidden="true">Or</div><div><b>Orchestrator agent</b> <span class="chip">${esc(modelName(router && router.model))}</span> ${effortMeter(router && router.effort)}
-      <div class="ink2" style="font-size:13px;margin-top:4px">Before every step it reads the history and the documents, then picks the next stage or stages from the catalogue below (several at once, if at most one changes code), or <b>done</b>. Cortana refuses <b>done</b> until every required gate has passed after the latest build, and stops a run after ${d.settings.max_stations} stages.</div></div></div>` : ""}
+      <div class="ink2" style="font-size:13px;margin-top:4px">Before every step it reads the history and the documents, then picks the next stage or stages from the catalogue below (several at once, if at most one changes code), or <b>done</b>. Katana refuses <b>done</b> until every required gate has passed after the latest build, and stops a run after ${d.settings.max_stations} stages.</div></div></div>` : ""}
     <div class="muted" style="font-size:12px;margin-bottom:4px">${mode === "auto" ? "Stage catalogue (the phases are a hint, not a rule)" : "Phases run left to right; the stages in a phase run at the same time"}</div>${swim}
     ${chosen ? `<div class="statusline" style="margin-top:8px">${statusBadge(shown(chosen))}<span>${chosen.history.length} steps run</span><span>${loops(chosen)} rework loops</span><span>${compact(sum(runTokens(chosen)))} tokens</span>${chosen.reason ? `<span>${esc(chosen.reason)}</span>` : ""}</div>` : ""}`;
   if (scrolled) document.querySelector("#planHead .swim").scrollLeft = scrolled;
@@ -1692,7 +1692,7 @@ function renderPlan(d) {
       return `<li class="step ${x.state}">
         <div class="rail"><span class="num">${x.state === "done" ? "✓" : esc(pos[s.id])}</span><span class="line"></span></div>
         <div class="body"><div class="sc">
-          <div class="sc-h"><span class="mono-badge" aria-hidden="true">◆</span><div style="min-width:0"><b>${esc(s.title)}</b><div class="muted" style="font-size:12px">Gate step · measured by Cortana · <span class="mono">${esc(s.id)}</span></div></div>
+          <div class="sc-h"><span class="mono-badge" aria-hidden="true">◆</span><div style="min-width:0"><b>${esc(s.title)}</b><div class="muted" style="font-size:12px">Gate step · measured by Katana · <span class="mono">${esc(s.id)}</span></div></div>
             <div class="right"><span class="chip">no LLM call</span>${chosen ? `<span class="chip">${esc(STATE_LABEL[x.state])}</span>` : ""}</div></div>
           ${gateConds(s, m)}
           <div class="gatebox">${icon("gate", 14)}<b>Gate</b> passes when every blocking condition holds
@@ -1834,10 +1834,10 @@ function renderSettings() {
     <div class="row-fields">
       <label class="field"><span>Project name</span><input type="text" data-k="project" value="${esc(s.project)}" maxlength="60"></label>
       <div class="field" style="grid-column: span 2"><span>Project folder</span><div class="path-box mono">${esc(hs.path)}</div>
-        <small>Cortana reads <span class="mono">input/</span> and writes <span class="mono">runs/</span> and <span class="mono">logs/</span> here. These settings are saved in <span class="mono">.cortana/settings.json</span> inside it.</small></div>
+        <small>Katana reads <span class="mono">input/</span> and writes <span class="mono">runs/</span> and <span class="mono">logs/</span> here. These settings are saved in <span class="mono">.katana/settings.json</span> inside it.</small></div>
     </div>
     <div class="folder-status">${icon("check", 13)} ${hs.runs} run${hs.runs === 1 ? "" : "s"} · ${hs.inputs} file${hs.inputs === 1 ? "" : "s"} in input/
-      ${c.env_override ? `<span class="chip">${icon("warn", 12)} fixed by CORTANA_HOME</span>` : ""}</div>
+      ${c.env_override ? `<span class="chip">${icon("warn", 12)} fixed by KATANA_HOME</span>` : ""}</div>
   </div></section>
 
   <section class="card"><div class="card-h"><h2>Trigger</h2><span class="sub">what starts a run in this project</span></div><div class="card-b">
@@ -1864,7 +1864,7 @@ function renderSettings() {
 
   ${agentsSection(c, s)}
 
-  <section class="card"><div class="card-h"><h2>Parallel stages &amp; quality gates</h2><span class="sub">how phases run, and how Cortana measures gate steps</span></div><div class="card-b">
+  <section class="card"><div class="card-h"><h2>Parallel stages &amp; quality gates</h2><span class="sub">how phases run, and how Katana measures gate steps</span></div><div class="card-b">
     <div class="row-fields">
       <label class="field"><span>Max stages at once</span><input type="number" min="1" max="8" data-k="max_parallel" value="${esc(s.max_parallel)}"><small>Stages of one phase run in parallel up to this many. Each one draws on your subscription’s usage window.</small></label>
       <label class="field"><span>When a gate tool is missing</span><select data-g="when_unavailable">${opt(c.options.unavailable, s.gates.when_unavailable, (x) => ({ warn: "Warn, don’t block", block: "Fail the condition", ignore: "Ignore it" }[x]))}</select><small>For example coverage.py not installed, or no test command.</small></label>
@@ -1876,7 +1876,7 @@ function renderSettings() {
       <label class="field"><span>Coverage command</span><input type="text" class="mono" data-g="coverage_command" value="${esc(s.gates.coverage_command)}" placeholder="auto: coverage.py when installed" spellcheck="false" autocomplete="off"><small>Runs after the tests. It must write coverage.py JSON, an istanbul summary or lcov to <span class="mono">{coverage}</span>.</small></label>
     </div>
     <label class="check" style="margin-top:8px"><input type="checkbox" data-k="worktrees" ${s.worktrees ? "checked" : ""}> Give each report-only stage in a parallel phase its own git worktree</label>
-    <p class="sec-desc">Off by default: report-only stages just read the shared workspace while the phase’s one code-writing stage changes it. On, each of them reads a snapshot taken when the phase starts (committed code plus uncommitted changes), and Cortana copies its report back.</p>
+    <p class="sec-desc">Off by default: report-only stages just read the shared workspace while the phase’s one code-writing stage changes it. On, each of them reads a snapshot taken when the phase starts (committed code plus uncommitted changes), and Katana copies its report back.</p>
   </div></section>
 
   <section class="card"><div class="card-h"><h2>Plan</h2><span class="sub">phases run in order; the stages in a phase run at the same time${s.mode === "auto" ? ". In full auto this is the Orchestrator’s catalogue" : ""}</span>
@@ -1947,7 +1947,7 @@ function stageEditor(p, i, k) {
             <button class="btn icon" data-act="cond-remove" data-cond="${key}.${n}" title="Remove condition" aria-label="Remove condition ${n + 1}">${icon("trash")}</button>
           </div>`).join("")}
           <button class="btn ghost" style="margin-top:6px" data-act="cond-add" data-s="${key}">+ Add condition</button>
-          <small class="muted" style="display:block;margin-top:4px">Cortana measures these itself after the phases before it. Block conditions that fail send the work back with the merged report; warn conditions are only reported.</small></div>
+          <small class="muted" style="display:block;margin-top:4px">Katana measures these itself after the phases before it. Block conditions that fail send the work back with the merged report; warn conditions are only reported.</small></div>
       </div>${ctrl}</div>`;
   }
   const stageAgents = Object.keys(c.catalog).filter((n) => n !== c.options.router);
@@ -2078,7 +2078,7 @@ async function onSettingsClick(t) {
 async function saveSettings() {
   ui.saving = true; updateSaveBar();
   try {
-    const res = await fetch("/api/settings", { method: "POST", headers: { "Content-Type": "application/json", "X-Cortana": "1" }, body: JSON.stringify(ui.draft) });
+    const res = await fetch("/api/settings", { method: "POST", headers: { "Content-Type": "application/json", "X-Katana": "1" }, body: JSON.stringify(ui.draft) });
     const out = await res.json();
     if (!out.ok) { ui.errors = out.errors || ["Couldn’t save."]; }
     else {
@@ -2094,7 +2094,7 @@ async function saveSettings() {
 /* ---------- projects: start screen + switcher ---------- */
 async function post(url, body) {
   try {
-    const res = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json", "X-Cortana": "1" }, body: JSON.stringify(body || {}) });
+    const res = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json", "X-Katana": "1" }, body: JSON.stringify(body || {}) });
     return await res.json();
   } catch (e) { return { ok: false, errors: ["Couldn’t reach the dashboard server."] }; }
 }
@@ -2108,7 +2108,7 @@ function projectChips(p) {
 function renderStart(d) {
   const reg = d.projects || { projects: [] };
   const notes = [];
-  if (reg.override) notes.push(`${icon("warn", 14)} <span><span class="mono">CORTANA_HOME</span> is set, so this dashboard always shows <span class="mono">${esc(d.home)}</span>. Unset it to switch projects.</span>`);
+  if (reg.override) notes.push(`${icon("warn", 14)} <span><span class="mono">KATANA_HOME</span> is set, so this dashboard always shows <span class="mono">${esc(d.home)}</span>. Unset it to switch projects.</span>`);
   if (!d.project && d.home) notes.push(`${icon("warn", 14)} <span>The project folder <span class="mono">${esc(d.home)}</span> can’t be found. Open another project, or create it again.</span>`);
   $("startNote").innerHTML = notes.map((n) => `<div class="banner">${n}</div>`).join("");
   $("recentSub").textContent = reg.projects.length ? `${reg.projects.length} project${reg.projects.length === 1 ? "" : "s"} · most recent first` : "";
@@ -2169,7 +2169,7 @@ async function browse() {
 async function runNow() {
   $("runBtn").disabled = true;
   const out = await post("/api/run");
-  toast(!out.ok ? (out.errors || []).join(" ") : out.started ? "Started. Cortana is processing input/ in the background." : out.note);
+  toast(!out.ok ? (out.errors || []).join(" ") : out.started ? "Started. Katana is processing input/ in the background." : out.note);
   fetchState();
 }
 function openSubmit() {
@@ -2204,7 +2204,7 @@ const EVENT_TEXT = { done: "Done", failed: "Failed", blocked: "Blocked", paused:
 const SVC_BUSY = { install: "Installing…", start: "Starting…", stop: "Stopping…", uninstall: "Uninstalling…" };
 const M = 1e6;
 const cap1 = (x) => x[0].toUpperCase() + x.slice(1);
-const postJson = (url, body) => fetch(url, { method: "POST", headers: { "Content-Type": "application/json", "X-Cortana": "1" }, body: JSON.stringify(body) }).then((r) => r.json());
+const postJson = (url, body) => fetch(url, { method: "POST", headers: { "Content-Type": "application/json", "X-Katana": "1" }, body: JSON.stringify(body) }).then((r) => r.json());
 Object.assign(ui, { toolsOpen: new Set(), svc: null, auth: null, svcBusy: null, wiz: null, prompt: null, firstRunShown: false });
 
 function agentConf(s, c, n) { const a = c.catalog[n]; return Object.assign({ model: a.model, effort: a.effort }, s.agents[n]); }
@@ -2298,7 +2298,7 @@ function budgetsSection(c, s) {
     <div class="budget-now"><div>Today so far: <b class="num">${compact(day)}</b> tokens${b.daily_tokens ? ` of ${compact(b.daily_tokens)} (${Math.round(pct)}%)` : ""}${avg ? ` · finished runs averaged <b class="num">${compact(avg)}</b>` : ""}</div>
       ${b.daily_tokens ? `<div class="meter ${pct >= 100 ? "crit" : pct >= 80 ? "warn" : ""}"><i style="width:${pct}%"></i></div>` : ""}</div>
     <label class="check" style="margin-top:10px"><input type="checkbox" data-budget="pause_near_limit" ${b.pause_near_limit ? "checked" : ""}> Pause when usage is near the subscription limit</label>
-    <p class="sec-desc">When the Claude CLI warns that your usage window is nearly used up, the run pauses after its current stage and resumes once the window resets. Without this, Cortana keeps going until the limit is hit, then pauses.</p>
+    <p class="sec-desc">When the Claude CLI warns that your usage window is nearly used up, the run pauses after its current stage and resumes once the window resets. Without this, Katana keeps going until the limit is hit, then pauses.</p>
     <p class="sec-desc">Tokens count input, cache writes, cache reads and output, the same as Spent tokens on the Overview. A stage that crosses a cap is stopped within a few seconds.</p>
   </div></section>`;
 }
@@ -2308,7 +2308,7 @@ function notifySection(c, s) {
     <label class="switch"><input type="checkbox" data-notify="macos" ${n.macos ? "checked" : ""}><span>macOS notifications in Notification Center</span></label>
     <div class="field" style="margin-top:14px"><span>Notify when a run is</span><div class="checks">${c.options.notify_events.map((e) => `<label class="check"><input type="checkbox" data-notify-event="${e}" ${(n.events || {})[e] ? "checked" : ""}> ${EVENT_TEXT[e] || e}</label>`).join("")}</div></div>
     <label class="field" style="margin-top:10px"><span>Microsoft Teams incoming webhook (optional)</span><input type="url" data-notify="teams_webhook" value="${esc(n.teams_webhook || "")}" placeholder="https://….webhook.office.com/webhookb2/…" spellcheck="false" autocomplete="off">
-      <small>Only called when set. Cortana posts a short card with the run, its status and the reason. Use a channel’s Incoming Webhook URL, or a Workflows “post to a channel when a webhook request is received” URL.</small></label>
+      <small>Only called when set. Katana posts a short card with the run, its status and the reason. Use a channel’s Incoming Webhook URL, or a Workflows “post to a channel when a webhook request is received” URL.</small></label>
     <div style="display:flex;gap:8px;align-items:center;margin-top:12px;flex-wrap:wrap"><button class="btn" data-act="notify-test">Send test notification</button><span class="muted" style="font-size:12px">Uses the values above, even before you save.</span></div>
   </div></section>`;
 }
@@ -2317,7 +2317,7 @@ function authSection() {
     <div class="right"><button class="btn" data-act="auth-refresh">Refresh</button></div></div><div class="card-b" data-auth-box>${authBox(ui.auth)}</div></section>`;
 }
 const AUTH_TEXT = {
-  subscription: ["Claude subscription", "Flat cost within your plan’s usage limits. Cortana removes API keys and provider variables from the agents’ environment."],
+  subscription: ["Claude subscription", "Flat cost within your plan’s usage limits. Katana removes API keys and provider variables from the agents’ environment."],
   api_key: ["Anthropic API key", "Billed per token to your API account, with no subscription usage window. Uses the Anthropic key saved below."],
 };
 function authBox(a) {
@@ -2328,7 +2328,7 @@ function authBox(a) {
   const keyRow = (p) => `<div class="key-row">
       <div class="who"><div><b>${esc(p.title)}</b> <span class="mono muted" style="font-size:12px">${esc(p.env)}</span></div>
         <div>${p.saved ? `<span class="chip">${icon("check", 12)}In keychain · ${esc(p.hint)}</span>` : `<span class="chip">Not set</span>`}</div>
-        ${p.env_set ? `<small>${esc(p.env)} is also set in the dashboard’s environment. Cortana ignores it and uses the keychain.</small>` : ""}</div>
+        ${p.env_set ? `<small>${esc(p.env)} is also set in the dashboard’s environment. Katana ignores it and uses the keychain.</small>` : ""}</div>
       <input type="password" data-auth-key="${p.id}" placeholder="${p.saved ? "Paste a new key to replace it" : `Paste your key${p.prefix ? ` (${esc(p.prefix)}…)` : ""}`}" autocomplete="off" spellcheck="false" aria-label="${esc(p.title)} API key">
       <div class="btns"><button class="btn" data-auth-save="${p.id}">${p.saved ? "Replace" : "Save"}</button>${p.saved ? `<button class="btn" data-auth-del="${p.id}">Remove</button>` : ""}</div>
     </div>`;
@@ -2538,7 +2538,7 @@ function addWizardStep(step, where = {}) {
 }
 addWizardStep({
   id: "mode", title: "Mode", heading: "How should runs move through the SDLC?",
-  render: (w) => `<p>Cortana turns requirement files into designed, built, tested and reviewed projects, with agents on your Claude subscription. A few choices and it’s ready; everything stays editable in Settings.</p>
+  render: (w) => `<p>Katana turns requirement files into designed, built, tested and reviewed projects, with agents on your Claude subscription. A few choices and it’s ready; everything stays editable in Settings.</p>
     <div class="modes" role="radiogroup" aria-label="SDLC mode">${ui.cfg.options.modes.map((m) => `<label class="mode-card"><input type="radio" name="wiz-mode" value="${m}" data-wiz-k="mode" ${w.draft.mode === m ? "checked" : ""}><div><b>${MODE_TEXT[m][0]}</b><p>${MODE_TEXT[m][1]}</p></div></label>`).join("")}</div>`,
   summary: (w) => MODE_TEXT[w.draft.mode][0],
 });
@@ -2604,7 +2604,7 @@ function renderWizard() {
   const w = ui.wiz, el = $("wizard");
   if (!ui.cfg || !w) { el.innerHTML = `<div class="empty">Loading setup…</div>`; return; }
   const steps = wizardSteps(), st = steps[w.at], last = w.at === steps.length - 1, again = !!ui.cfg.settings.setup_completed;
-  el.innerHTML = `<div class="wiz-h"><div><div class="kicker">${again ? "Setup" : "Welcome to Cortana"} · step ${w.at + 1} of ${steps.length}</div><h2 tabindex="-1">${esc(st.heading || st.title)}</h2></div>
+  el.innerHTML = `<div class="wiz-h"><div><div class="kicker">${again ? "Setup" : "Welcome to Katana"} · step ${w.at + 1} of ${steps.length}</div><h2 tabindex="-1">${esc(st.heading || st.title)}</h2></div>
       <button class="btn ghost" data-wiz="skip">${again ? "Cancel" : "Skip setup"}</button></div>
     <ol class="wiz-steps" aria-label="Setup steps">${steps.map((x, i) => `<li class="${i < w.at ? "done" : i === w.at ? "cur" : ""}" ${i === w.at ? 'aria-current="step"' : ""}><span class="n">${i < w.at ? "✓" : i + 1}</span><span>${esc(x.title)}</span></li>`).join("")}</ol>
     <div class="wiz-b">${st.render(w)}${w.errors.length ? `<ul class="errors">${w.errors.map((e) => `<li>${esc(e)}</li>`).join("")}</ul>` : ""}</div>
@@ -2687,7 +2687,7 @@ function render() {
   const y = window.scrollY;
   if (ui.tab === "projects") renderStart(d);
   if (!d.project) {
-    $("projectName").textContent = "Cortana"; $("home").textContent = ""; document.title = "Cortana · Choose a project";
+    $("projectName").textContent = "Katana"; $("home").textContent = ""; document.title = "Katana · Choose a project";
     $("banners").innerHTML = ""; $("foot").innerHTML = "";
     window.scrollTo(0, y);
     return;
@@ -2807,7 +2807,7 @@ function applyTheme() {
 }
 $("themeBtn").addEventListener("click", () => {
   ui.theme = { auto: "light", light: "dark", dark: "auto" }[ui.theme];
-  try { localStorage.setItem("cortana-theme", ui.theme); } catch (e) {}
+  try { localStorage.setItem("katana-theme", ui.theme); } catch (e) {}
   applyTheme();
 });
 applyTheme();

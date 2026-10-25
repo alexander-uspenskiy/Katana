@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Cortana dashboard: a local web page that shows the factory's live state and edits its settings.
+"""Katana dashboard: a local web page that shows the factory's live state and edits its settings.
 
     python3 factory/dashboard.py [--port 8787] [--home DIR]
 
@@ -69,7 +69,7 @@ def service_status(fresh: bool = False) -> dict:
 def sync_service() -> str | None:
     """Rewrites the launchd plist if the folders it should watch changed. Returns a note for the page."""
     installed = dispatch.installed_watch_paths()
-    if installed is None or os.environ.get("CORTANA_HOME") or installed == dispatch.watch_paths():
+    if installed is None or os.environ.get("KATANA_HOME") or installed == dispatch.watch_paths():
         return None
     out = subprocess.run([str(INSTALL_SCRIPT)], capture_output=True, text=True, timeout=60)
     _service_cache["at"] = 0
@@ -285,7 +285,7 @@ def projects_view() -> dict:
         items.append(dict(home_status(path), name=conf.get("project") or path.name, opened=entry.get("opened"),
                           trigger=settings.trigger(conf) if conf else None,
                           busy=path.is_dir() and dispatch.busy(path)))
-    return {"active": str(root) if root else None, "override": bool(os.environ.get("CORTANA_HOME")),
+    return {"active": str(root) if root else None, "override": bool(os.environ.get("KATANA_HOME")),
             "projects": items}
 
 
@@ -312,7 +312,7 @@ def state() -> dict:
     trig = settings.trigger(conf)
     svc = dict(service_status())
     svc["watched"] = str(root / "input") in svc.pop("watching")
-    return {**base, "project": conf.get("project", "Cortana"), "home": str(root),
+    return {**base, "project": conf.get("project", "Katana"), "home": str(root),
             "factory": beat, "service": svc, "agents": agents_view(conf), "trigger": trig,
             "busy": dispatch.busy(root), "budget": budget_view(conf, runs, beat),
             "settings": {k: conf.get(k) for k in ("mode", "pipeline", "max_iterations", "max_stations",
@@ -343,12 +343,12 @@ def settings_payload() -> dict:
             "budget": budget_view(conf, [r for r in map(read_json, runs_dir.glob("*/state.json")) if r]
                                   if runs_dir else [], read_json(runs_dir / ".factory.json", {}) if runs_dir else {}),
             "home": home_status(root) if root else None, "service": service_status(),
-            "env_override": bool(os.environ.get("CORTANA_HOME"))}
+            "env_override": bool(os.environ.get("KATANA_HOME"))}
 
 
 def choose_folder() -> dict:
     """Shows the native macOS folder dialog on this Mac. Waits until the user picks a folder or cancels."""
-    script = 'POSIX path of (choose folder with prompt "Choose a Cortana project folder")'
+    script = 'POSIX path of (choose folder with prompt "Choose a Katana project folder")'
     try:
         out = subprocess.run(["osascript", "-e", script], capture_output=True, text=True, timeout=600)
     except (OSError, subprocess.TimeoutExpired) as e:
@@ -372,8 +372,8 @@ def project_action(body: dict) -> tuple:
     error = projects.check_folder(path, must_exist=action == "open")
     if error:
         return 400, {"ok": False, "errors": [error]}
-    if os.environ.get("CORTANA_HOME"):
-        return 409, {"ok": False, "errors": ["CORTANA_HOME is set, so the dashboard can't switch projects."]}
+    if os.environ.get("KATANA_HOME"):
+        return 409, {"ok": False, "errors": ["KATANA_HOME is set, so the dashboard can't switch projects."]}
     folder = projects.open_project(path)
     return 200, {"ok": True, "path": str(folder), "projects": projects_view(), "note": sync_service()}
 
@@ -484,7 +484,7 @@ def post_notify_test(body: dict) -> tuple:
         return 400, {"ok": False, "errors": errors}
     if not conf["notify"]["macos"] and not conf["notify"]["teams_webhook"]:
         return 400, {"ok": False, "errors": ["Turn on macOS notifications or add a Teams webhook first."]}
-    problems = notify.send(conf, "test", "Test notification", "Notifications from Cortana work.", force=True)
+    problems = notify.send(conf, "test", "Test notification", "Notifications from Katana work.", force=True)
     return (500 if problems else 200), {"ok": not problems, "errors": problems}
 
 
@@ -560,7 +560,7 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self) -> None:
         # The custom header and JSON type force a CORS preflight, which this server never approves,
         # so other web pages cannot change settings.
-        if not self.local_host() or self.headers.get("X-Cortana") != "1" \
+        if not self.local_host() or self.headers.get("X-Katana") != "1" \
                 or not (self.headers.get("Content-Type") or "").startswith("application/json"):
             return self.send(403, b"forbidden", "text/plain")
         handler = POST_ROUTES.get(urlparse(self.path).path)
@@ -580,13 +580,13 @@ class Handler(BaseHTTPRequestHandler):
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__.splitlines()[0])
-    parser.add_argument("--port", type=int, default=int(os.environ.get("CORTANA_DASHBOARD_PORT", 8787)))
+    parser.add_argument("--port", type=int, default=int(os.environ.get("KATANA_DASHBOARD_PORT", 8787)))
     parser.add_argument("--home", help="open this project folder (registers it and makes it active)")
     args = parser.parse_args()
     if args.home:
         projects.open_project(Path(args.home).resolve())
     server = ThreadingHTTPServer(("127.0.0.1", args.port), Handler)
-    print(f"Cortana dashboard: http://127.0.0.1:{args.port}  (project {settings.home() or 'not chosen yet'})",
+    print(f"Katana dashboard: http://127.0.0.1:{args.port}  (project {settings.home() or 'not chosen yet'})",
           flush=True)
     server.serve_forever()
 

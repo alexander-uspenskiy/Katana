@@ -1,8 +1,8 @@
-"""Cortana authentication: how the agents sign in to Claude, and the API keys kept in the macOS keychain.
+"""Katana authentication: how the agents sign in to Claude, and the API keys kept in the macOS keychain.
 
 Agents sign in with the Claude subscription (the default) or an Anthropic API key. The choice is shared by
 every project and lives in config/auth.json (not in git). API keys never touch a file: they are generic
-passwords in the login keychain under the service "cortana", one per provider. The `security` command
+passwords in the login keychain under the service "katana", one per provider. The `security` command
 gets each secret on stdin, so it never shows in the process list, and agents may not run `security`.
 """
 from __future__ import annotations
@@ -18,10 +18,10 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
 AUTH_PATH = REPO / "config" / "auth.json"
-KEYCHAIN_SERVICE = "cortana"
+KEYCHAIN_SERVICE = "katana"
 METHODS = ("subscription", "api_key")
 
-# Providers whose keys Cortana stores. Only the Anthropic key is used today, and only in API key mode.
+# Providers whose keys Katana stores. Only the Anthropic key is used today, and only in API key mode.
 PROVIDERS = {
     "anthropic": {"title": "Anthropic (Claude API)", "env": "ANTHROPIC_API_KEY", "prefix": "sk-ant-",
                   "console": "https://console.anthropic.com/settings/keys"},
@@ -44,7 +44,7 @@ _status_cache = {"at": 0.0, "value": None}
 # ---------------------------------------------------------------- claude CLI
 
 def find_claude() -> str:
-    candidates = [os.environ.get("CORTANA_CLAUDE_BIN"), shutil.which("claude"),
+    candidates = [os.environ.get("KATANA_CLAUDE_BIN"), shutil.which("claude"),
                   str(Path.home() / ".local/bin/claude")]
     # Fallback: the CLI bundled with the Claude desktop app, newest version first.
     bundled = glob.glob(str(Path.home() / "Library/Application Support/Claude/claude-code/*/*"
@@ -54,7 +54,7 @@ def find_claude() -> str:
     for c in candidates:
         if c and os.access(c, os.X_OK):
             return c
-    raise SystemExit("Claude Code CLI not found. Install it or set CORTANA_CLAUDE_BIN.")
+    raise SystemExit("Claude Code CLI not found. Install it or set KATANA_CLAUDE_BIN.")
 
 
 def subscription_env() -> dict:
@@ -138,7 +138,7 @@ def set_key(provider: str, key: str) -> str | None:
         return "That doesn't look like an API key: paste the whole key, with no spaces."
     # security -i reads the command from stdin; KEY_PATTERN keeps quotes and spaces out of it.
     title = PROVIDERS[provider]["title"]
-    line = f'add-generic-password -U -s "{KEYCHAIN_SERVICE}" -a "{provider}" -l "Cortana: {title}" -w "{key}"\n'
+    line = f'add-generic-password -U -s "{KEYCHAIN_SERVICE}" -a "{provider}" -l "Katana: {title}" -w "{key}"\n'
     try:
         out = subprocess.run(["security", "-i"], input=line, capture_output=True, text=True, timeout=30)
     except (OSError, subprocess.SubprocessError) as e:

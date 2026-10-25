@@ -45,7 +45,7 @@ def send(conf: dict, event: str, subtitle: str, message: str, force: bool = Fals
     n = conf.get("notify") or {}
     if not force and not (n.get("events") or {}).get(event):
         return []
-    title, problems = f"{conf.get('project') or 'Cortana'}: {event}", []
+    title, problems = f"{conf.get('project') or 'Katana'}: {event}", []
     if n.get("macos"):
         try:
             macos(title, subtitle, message)
