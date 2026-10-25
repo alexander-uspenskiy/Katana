@@ -1,4 +1,4 @@
-# Darkfactory — Architecture & Options
+# Cortana — Architecture & Options
 
 A "lights-out" SDLC factory: a work item goes in, a reviewed, tested pull request comes out.
 Humans stay at the gates (spec approval, merge, release) until the metrics earn more autonomy.

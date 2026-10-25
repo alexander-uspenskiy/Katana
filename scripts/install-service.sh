@@ -1,11 +1,11 @@
 #!/bin/bash
-# Installs a launchd agent that runs the orchestrator every 10 minutes while you are logged in.
+# Installs a launchd agent that runs the Cortana orchestrator every 10 minutes while you are logged in.
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-LABEL="com.darkfactory.orchestrator"
+LABEL="com.cortana.orchestrator"
 PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"
-INTERVAL="${DF_INTERVAL:-600}"
+INTERVAL="${CORTANA_INTERVAL:-600}"
 
 # launchd starts jobs with a bare PATH; give the agents the tools they need.
 NODE_DIR="$(dirname "$(command -v node 2>/dev/null)" 2>/dev/null || true)"
@@ -30,13 +30,15 @@ cat > "$PLIST" <<EOF
   <key>EnvironmentVariables</key>
   <dict>
     <key>PATH</key><string>$PATH_VALUE</string>
+    <key>CORTANA_INTERVAL</key><string>$INTERVAL</string>
   </dict>
-  <key>StandardOutPath</key><string>$ROOT/logs/factory.log</string>
-  <key>StandardErrorPath</key><string>$ROOT/logs/factory.log</string>
+  <key>StandardOutPath</key><string>$ROOT/logs/launchd.log</string>
+  <key>StandardErrorPath</key><string>$ROOT/logs/launchd.log</string>
 </dict>
 </plist>
 EOF
 
 launchctl bootout "gui/$(id -u)/$LABEL" 2>/dev/null || true
 launchctl bootstrap "gui/$(id -u)" "$PLIST"
-echo "Installed $LABEL: scans $ROOT/input every ${INTERVAL}s. Log: $ROOT/logs/factory.log"
+echo "Installed $LABEL: scans the project folder set in Settings every ${INTERVAL}s."
+echo "Factory log: <project folder>/logs/factory.log · launchd output: $ROOT/logs/launchd.log"

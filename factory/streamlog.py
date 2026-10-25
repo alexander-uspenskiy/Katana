@@ -12,6 +12,10 @@ TOKEN_KEYS = (("input", "input_tokens"), ("cache_write", "cache_creation_input_t
               ("cache_read", "cache_read_input_tokens"), ("output", "output_tokens"))
 
 
+def tokens_from_usage(usage: dict) -> dict:
+    return {ours: usage.get(theirs) or 0 for ours, theirs in TOKEN_KEYS}
+
+
 def _detail(block: dict) -> str:
     args = block.get("input") or {}
     for key in ("command", "file_path", "pattern", "path", "url", "query", "description"):

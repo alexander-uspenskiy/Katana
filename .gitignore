@@ -7,3 +7,5 @@ node_modules/
 __pycache__/
 .venv/
 logs/
+config/settings.json
+config/settings.tmp
