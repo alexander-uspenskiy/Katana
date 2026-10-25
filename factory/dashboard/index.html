@@ -238,6 +238,11 @@ tr.open .chev { transform: rotate(90deg); }
 .node sup { position: absolute; top: -7px; right: -9px; font-size: 9.5px; background: var(--ink); color: var(--surface); border-radius: 6px; padding: 0 3px; line-height: 13px; }
 .link { width: 10px; height: 1.5px; background: var(--axis); flex: none; }
 .link.done { background: var(--good); }
+.par { display: inline-flex; gap: 3px; padding: 2px 3px; border-radius: 15px; background: var(--wash); border: 1px dashed var(--axis); flex: none; }
+.node.gate { border-radius: 5px; transform: rotate(45deg) scale(.82); }
+.node.gate > span { transform: rotate(-45deg); }
+.gwrap { position: relative; display: inline-flex; flex: none; }
+.gwrap > sup { position: absolute; top: -6px; right: -10px; font-size: 9.5px; font-weight: 700; background: var(--ink); color: var(--surface); border-radius: 6px; padding: 0 3px; line-height: 13px; }
 
 /* ---------- run detail ---------- */
 .detail-in { padding: 14px 18px 18px; display: grid; gap: 14px; }
@@ -260,7 +265,7 @@ tr.open .chev { transform: rotate(90deg); }
 
 /* ---------- live agents ---------- */
 .agents-live { display: grid; gap: 14px; grid-template-columns: repeat(auto-fit, minmax(320px, 1fr)); }
-.agent { border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--border)); border-radius: 12px; padding: 14px; background: linear-gradient(180deg, var(--accent-wash), transparent 70%); display: grid; gap: 12px; min-width: 0; container-type: inline-size; }
+.agent { border: 1px solid color-mix(in srgb, var(--accent) 35%, var(--border)); border-radius: 12px; padding: 14px; background: linear-gradient(180deg, var(--accent-wash), transparent 70%); display: grid; grid-template-columns: minmax(0, 1fr); gap: 12px; min-width: 0; container-type: inline-size; }
 .agent-h { display: flex; gap: 10px; align-items: center; }
 .mono-badge { width: 34px; height: 34px; border-radius: 9px; display: grid; place-items: center; font-weight: 700; font-size: 12.5px; background: var(--surface); border: 1px solid var(--border); flex: none; }
 .agent-h .t { min-width: 0; }
@@ -309,6 +314,8 @@ tr.open .chev { transform: rotate(90deg); }
 .segm.running { background: var(--accent); color: var(--on-accent); animation: breathe 1.6s ease-in-out infinite; }
 .segm.limit { background: var(--axis); color: var(--ink); }
 .segm.decision { background: var(--ink-2); top: 7px; height: 8px; }
+.segm.gate.running { animation: none; }
+.segm.gate { width: 12px !important; height: 12px; margin-left: -6px; transform: rotate(45deg); border-radius: 2px; top: 5px; border: 1.5px solid var(--surface); }
 @keyframes breathe { 50% { opacity: .55; } }
 
 /* ---------- plan ---------- */
@@ -342,6 +349,41 @@ tr.open .chev { transform: rotate(90deg); }
 .step .io { display: flex; flex-wrap: wrap; gap: 6px 16px; font-size: 12px; color: var(--muted); }
 .gatebox { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; font-size: 12.5px; padding: 6px 10px; border-radius: 8px; background: var(--surface-2); border: 1px dashed var(--axis); }
 .loopback { color: var(--ink-2); display: inline-flex; align-items: center; gap: 4px; }
+.swim { display: flex; align-items: flex-start; gap: 0; overflow-x: auto; padding: 4px 2px 12px; }
+.ph { flex: none; width: 212px; display: flex; flex-direction: column; gap: 8px; padding: 10px; border-radius: 12px; background: var(--wash); border: 1px solid var(--border); }
+.ph.now { border-color: color-mix(in srgb, var(--accent) 45%, var(--border)); background: var(--accent-wash); }
+.ph-h { display: flex; align-items: center; gap: 6px; font-size: 12px; color: var(--muted); }
+.ph-h b { color: var(--ink); font-size: 12.5px; }
+.ph-h .chip { margin-left: auto; }
+.lane-card { display: grid; gap: 6px; padding: 9px 10px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); min-width: 0; }
+.lane-card .top { display: flex; gap: 8px; align-items: center; min-width: 0; }
+.lane-card .top b { font-size: 13px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.lane-card .meta { display: flex; gap: 4px; flex-wrap: wrap; }
+.lane-card .meta .chip { white-space: normal; height: auto; min-height: 20px; padding-top: 1px; padding-bottom: 1px; }
+.lane-card.done { border-color: var(--good); }
+.lane-card.active { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-wash); }
+.lane-card.rework { border-color: var(--warning); }
+.lane-card.error, .lane-card.failed, .lane-card.blocked { border-color: var(--critical); }
+.lane-card.paused, .lane-card.limit { border-color: var(--warning); border-style: dashed; }
+.lane-card.skipped { opacity: .6; }
+.ph-arrow { flex: none; width: 22px; margin-top: 52px; height: 2px; background: var(--axis); position: relative; }
+.ph-arrow::after { content: ""; position: absolute; right: -1px; top: -4px; border: 5px solid transparent; border-left-color: var(--axis); border-right: 0; }
+.gate-col { width: 260px; align-items: stretch; }
+.diamond { width: 40px; height: 40px; margin: 6px auto 2px; transform: rotate(45deg); border-radius: 7px; border: 2px solid var(--axis); background: var(--surface); display: grid; place-items: center; flex: none; }
+.diamond > span { transform: rotate(-45deg); font-weight: 700; font-size: 11px; }
+.diamond.done { border-color: var(--good); background: color-mix(in srgb, var(--good) 14%, var(--surface)); }
+.diamond.rework, .diamond.failed { border-color: var(--warning); background: color-mix(in srgb, var(--warning) 18%, var(--surface)); }
+.diamond.active { border-color: var(--accent); background: var(--accent-wash); animation: ping 1.6s infinite; }
+.conds { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.conds li { display: grid; grid-template-columns: 16px minmax(0, 1fr) auto; gap: 6px; align-items: center; font-size: 12px; padding: 5px 7px; border-radius: 7px; background: var(--surface); border: 1px solid var(--border); }
+.conds .v { font-variant-numeric: tabular-nums; font-weight: 600; white-space: nowrap; }
+.conds li.fail { border-color: color-mix(in srgb, var(--critical) 45%, var(--border)); }
+.conds li.warnc { border-color: color-mix(in srgb, var(--warning) 60%, var(--border)); }
+.end-col { flex: none; margin-top: 34px; display: flex; align-items: center; gap: 8px; padding: 8px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); font-weight: 600; font-size: 13px; white-space: nowrap; }
+.end-col.done { border-color: var(--good); }
+.end-col.failed { border-color: var(--critical); }
+.phase-label { font-size: 12px; color: var(--muted); margin: 4px 0 8px; display: flex; gap: 8px; align-items: center; }
+.gate-tbl td, .gate-tbl th { padding: 6px 8px; }
 .hub { display: grid; grid-template-columns: 48px minmax(0, 1fr); gap: 14px; align-items: center; padding: 14px; border-radius: 12px; border: 1px solid color-mix(in srgb, var(--accent) 40%, var(--border)); background: var(--accent-wash); }
 .hub .mono-badge { width: 48px; height: 48px; font-size: 15px; }
 .catalog { display: grid; gap: 12px; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); }
@@ -369,6 +411,22 @@ tr.open .chev { transform: rotate(90deg); }
 .stage-ed .fields { display: grid; gap: 10px; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); min-width: 0; }
 .stage-ed .fields .full { grid-column: 1 / -1; }
 .stage-ed .ctrl { display: flex; flex-direction: column; gap: 4px; }
+.phase-ed { border: 1px dashed var(--axis); border-radius: 14px; padding: 12px; background: var(--wash); }
+.phase-ed + .phase-ed { margin-top: 12px; }
+.phase-ed-h { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; margin-bottom: 10px; }
+.phase-ed-h b { font-size: 13.5px; }
+.phase-ed-h .right { margin-left: auto; display: flex; gap: 4px; }
+.phase-ed .stage-ed + .stage-ed { margin-top: 8px; }
+.cond-ed { display: grid; grid-template-columns: minmax(200px, 2fr) minmax(130px, 1fr) 84px minmax(80px, 1fr) minmax(84px, 1fr) 28px; gap: 6px; align-items: center; }
+.cond-ed select { padding-left: 8px; padding-right: 24px; }
+.cond-ed + .cond-ed { margin-top: 6px; }
+.cond-head { font-size: 11.5px; color: var(--muted); margin-bottom: 4px; }
+@media (max-width: 640px) {
+  .cond-ed { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) 28px; grid-template-areas: "m m x" "c o o" "v s s"; padding-bottom: 6px; border-bottom: 1px solid var(--grid); }
+  .cond-ed > [data-f="metric"] { grid-area: m; } .cond-ed > :nth-child(2) { grid-area: c; } .cond-ed > [data-f="op"] { grid-area: o; }
+  .cond-ed > [data-f="value"] { grid-area: v; } .cond-ed > [data-f="severity"] { grid-area: s; } .cond-ed > button { grid-area: x; }
+  .cond-head { display: none; } .ph { width: 210px; }
+}
 .check { display: inline-flex; gap: 8px; align-items: center; font-size: 12.5px; cursor: pointer; height: 32px; }
 .check input { accent-color: var(--accent); width: 16px; height: 16px; }
 .savebar { position: sticky; bottom: 0; z-index: 15; margin-top: 4px; }
@@ -636,8 +694,11 @@ function modelName(id) {
   return id[0].toUpperCase() + id.slice(1);
 }
 const usd = (n) => "$" + (n || 0).toFixed(n >= 100 ? 0 : 2);
-const mono = (agent) => MONO[agent] || String(agent || "?").slice(0, 2).replace(/^./, (c) => c.toUpperCase());
-function agentInfo(name) { return ((ui.data && ui.data.agents) || []).find((a) => a.name === name) || { name, title: name }; }
+const mono = (agent) => (!agent ? "◆" : MONO[agent] || String(agent).slice(0, 2).replace(/^./, (c) => c.toUpperCase()));
+function agentInfo(name) {
+  if (!name) return { name: null, title: "Cortana", role: "measures gate steps itself, no LLM call" };
+  return ((ui.data && ui.data.agents) || []).find((a) => a.name === name) || { name, title: name };
+}
 function icon(name, size = 14) {
   const p = {
     check: '<path d="M3.5 8.5l3 3 6-7" fill="none" stroke="var(--good)" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>',
@@ -683,36 +744,71 @@ const tickFractions = () => (innerWidth < 640 ? [0, 0.5, 1] : [0, 0.25, 0.5, 0.7
 function toast(msg) { const t = $("toast"); t.textContent = msg; t.classList.add("show"); clearTimeout(toast.h); toast.h = setTimeout(() => t.classList.remove("show"), 3200); }
 
 /* ---------- derived data ---------- */
-const shown = (run) => (run.status === "running" && !run.current ? "waiting" : run.status);
+// The plan is a list of phases; the stages of a phase run at the same time. Old flat plans: one stage per phase.
+const phasesOf = (p) => (p || []).map((x) => (Array.isArray(x) ? x : [x])).filter((x) => x.length);
+const flat = (p) => phasesOf(p).flat();
+const isGate = (s) => !!s && s.kind === "gate";
+const gated = (s) => isGate(s) || !!(s && s.pass && s.pass.length);
+const passes = (s, verdict) => (isGate(s) ? verdict === "PASS" : !s || !s.pass || !s.pass.length || s.pass.includes(verdict));
+const cur = (run) => run.current || [];
+function stagePos(pipeline) {  // stage id → "5" or "5b" for parallel stages
+  const out = {};
+  phasesOf(pipeline).forEach((ph, i) => ph.forEach((s, k) => (out[s.id] = String(i + 1) + (ph.length > 1 ? "abcdefgh"[k] : ""))));
+  return out;
+}
+function nowStages(run) {  // the stages the run is on now: its phase, or the Orchestrator's last pick
+  if (run.mode === "auto") return run.next || [];
+  const ph = phasesOf(run.pipeline)[run.phase];
+  return ph ? ph.map((s) => s.id) : [];
+}
+const shown = (run) => (run.status === "running" && !cur(run).length ? "waiting" : run.status);
 function stageStates(run) {
-  const res = {};
-  (run.pipeline || []).forEach((s) => (res[s.id] = { state: "pending", runs: 0, last: null }));
+  const res = {}, stages = flat(run.pipeline);
+  stages.forEach((s) => (res[s.id] = { state: "pending", runs: 0, last: null }));
   for (const h of run.history || []) {
     const r = res[h.stage]; if (!r) continue;
-    const def = run.pipeline.find((s) => s.id === h.stage) || {};
+    const def = stages.find((s) => s.id === h.stage) || {};
     r.runs++; r.last = h;
     if (h.outcome === "limit") r.state = "limit";
     else if (h.outcome !== "ok") r.state = "error";
     else if (h.verdict === "BLOCKED") r.state = "blocked";
-    else if (def.pass && !def.pass.includes(h.verdict)) r.state = "rework";
+    else if (gated(def) && !passes(def, h.verdict)) r.state = "rework";
     else r.state = "done";
   }
-  const c = run.current;
-  if (c && c.stage && res[c.stage]) res[c.stage].state = "active";
-  else if (run.status === "paused" && run.stage && res[run.stage]) res[run.stage].state = "paused";
-  else if (run.status === "failed" && run.stage && res[run.stage] && res[run.stage].state === "pending") res[run.stage].state = "failed";
+  const waiting = nowStages(run).filter((id) => !(run.finished || []).includes(id) && res[id]);
+  if (run.status === "paused") waiting.forEach((id) => (res[id].state = "paused"));
+  else if (run.status === "failed") waiting.forEach((id) => { if (res[id].state === "pending") res[id].state = "failed"; });
+  cur(run).forEach((c) => { if (c.stage && res[c.stage]) res[c.stage].state = "active"; });
   if (["done", "failed", "blocked"].includes(run.status) && run.mode === "auto") for (const k in res) if (res[k].state === "pending") res[k].state = "skipped";
   return res;
 }
 function runTokens(run) {
   const t = Object.assign({}, run.totals.tokens);
-  if (run.current && run.current.live) for (const k in t) t[k] += run.current.live.tokens[k] || 0;
+  cur(run).forEach((c) => { for (const k in t) t[k] += c.live.tokens[k] || 0; });
   return t;
 }
+const liveSeconds = (run) => cur(run).filter((c) => c.kind !== "gate").reduce((a, c) => a + (c.live.elapsed || 0), 0);
 function lastUpdate(run) {
-  const h = run.history || [];
-  return (run.current && run.current.started) || (h.length && h[h.length - 1].finished) || run.created;
+  const h = run.history || [], c = cur(run);
+  return (c.length && c[c.length - 1].started) || (h.length && h[h.length - 1].finished) || run.created;
 }
+function latestGate(runs, gateId) {  // the newest measured result of a gate step in the given runs
+  for (const r of runs) {
+    const h = (r.history || []).filter((e) => e.stage === gateId && e.kind === "gate" && e.results).pop();
+    if (h) return { run: r, entry: h };
+  }
+  return null;
+}
+const metricsTable = () => (ui.data && ui.data.metrics) || (ui.cfg && ui.cfg.options.metrics) || {};
+function condText(c) {
+  const m = metricsTable()[c.metric] || { label: c.metric };
+  return `${m.label}${c.level ? ` (${c.level}+)` : ""} ${c.op} ${Number(c.threshold ?? c.value).toLocaleString()}${m.unit === "%" ? "%" : ""}`;
+}
+function measured(r) {
+  if (!r || r.value == null) return r && r.status === "stale" ? "stale" : "n/a";
+  return Number(r.value).toLocaleString() + (r.unit === "%" ? "%" : "");
+}
+const COND_ICON = { pass: "check", fail: "x", stale: "warn", unavailable: "info" };
 const loops = (run) => sum(run.loops);
 
 /* ---------- top bar + banners ---------- */
@@ -736,7 +832,7 @@ function renderTop(d) {
   const a = f.auth || {};
   $("authPill").innerHTML = `<span class="k">Auth</span>${a.subscription ? esc(a.subscription[0].toUpperCase() + a.subscription.slice(1)) + " subscription" : "unknown"}`;
   $("authPill").title = a.method ? "Login method: " + a.method + (f.cli ? "\nCLI: " + f.cli : "") : "";
-  $("navPlanCount").textContent = d.settings.pipeline.length;
+  $("navPlanCount").textContent = flat(d.settings.pipeline).length;
   renderNext();
   $("foot").innerHTML = `Refreshes every 5 s · project folder <span class="mono">${esc(d.home)}</span> · dollar figures are the API-equivalent list price; runs are billed to your subscription.`;
 }
@@ -770,21 +866,22 @@ function renderKpis(d) {
   const tokens = { input: 0, cache_write: 0, cache_read: 0, output: 0 };
   d.events.forEach((e) => { for (const k in tokens) tokens[k] += e.tokens[k] || 0; });
   const total = sum(tokens);
-  const live = d.runs.filter((r) => r.current);
-  const liveTok = live.reduce((a, r) => a + sum(r.current.live.tokens), 0);
+  const live = d.runs.flatMap((r) => cur(r).map((c) => ({ r, current: c })));
+  const liveAgents = live.filter((x) => x.current.kind !== "gate");
+  const liveTok = live.reduce((a, x) => a + sum(x.current.live.tokens), 0);
   const counts = {}; d.runs.forEach((r) => (counts[shown(r)] = (counts[shown(r)] || 0) + 1));
   const tasks = d.runs.reduce((a, r) => ({ total: a.total + r.tasks.total, done: a.done + r.tasks.done }), { total: 0, done: 0 });
   const ac = d.runs.reduce((a, r) => ({ total: a.total + r.acceptance.total, pass: a.pass + r.acceptance.pass }), { total: 0, pass: 0 });
   const calls = d.events.filter((e) => e.kind !== "live");
   const stages = calls.filter((e) => e.kind === "stage");
   const okRuns = stages.filter((e) => e.outcome === "ok").length;
-  const seconds = calls.reduce((a, e) => a + (e.seconds || 0), 0) + live.reduce((a, r) => a + (r.current.live.elapsed || 0), 0);
+  const seconds = calls.reduce((a, e) => a + (e.seconds || 0), 0) + liveAgents.reduce((a, x) => a + (x.current.live.elapsed || 0), 0);
   const cost = calls.reduce((a, e) => a + (e.cost_usd || 0), 0);
   const rework = d.runs.reduce((a, r) => a + loops(r), 0);
   const queued = d.queue.filter((q) => !q.draft).length;
   const toolMap = {};
   d.runs.forEach((r) => (r.history || []).forEach((h) => Object.entries(h.tools || {}).forEach(([k, v]) => (toolMap[k] = (toolMap[k] || 0) + v))));
-  live.forEach((r) => Object.entries(r.current.live.tools).forEach(([k, v]) => (toolMap[k] = (toolMap[k] || 0) + v)));
+  live.forEach((x) => Object.entries(x.current.live.tools).forEach(([k, v]) => (toolMap[k] = (toolMap[k] || 0) + v)));
   const topTools = Object.entries(toolMap).sort((a, b) => b[1] - a[1]).slice(0, 3);
   const pct = (a, b) => (b ? Math.round((a / b) * 100) : 0);
   $("kpis").innerHTML = `
@@ -796,19 +893,19 @@ function renderKpis(d) {
     ${sparkCols(d)}
     <div class="foot">API-equivalent value <b class="ink2">${usd(cost)}</b> · billed to subscription · output ${compact(tokens.output)} of ${compact(total)}</div>
   </div>
-  <div class="card tile"><div class="label">Active agents</div><div class="value">${live.length}<small> / ${d.agents.length} agents</small></div>
-    <div class="foot">${live.length ? live.map((r) => esc(agentInfo(r.current.agent).title)).join(", ") + " working" : "No agent running now"}</div></div>
+  <div class="card tile"><div class="label">Active agents</div><div class="value">${liveAgents.length}<small> / ${d.settings.max_parallel || 1} at once</small></div>
+    <div class="foot">${liveAgents.length ? liveAgents.map((x) => esc(agentInfo(x.current.agent).title)).join(", ") + " working" : live.length ? "Cortana is measuring a gate" : "No agent running now"}</div></div>
   <div class="card tile"><div class="label">Runs</div><div class="value">${d.runs.length}<small> total</small></div>
     <div class="statusline">${Object.keys(STATUS).filter((s) => counts[s]).map((s) => `<span>${icon(STATUS[s].icon, 12)}${counts[s]} ${STATUS[s].label.toLowerCase()}</span>`).join("") || "<span>none yet</span>"}</div></div>
   <div class="card tile"><div class="label">Planned · in queue</div><div class="value">${queued}<small> file${queued === 1 ? "" : "s"}</small></div>
-    <div class="foot">${d.queue.filter((q) => q.draft).length} draft${d.queue.filter((q) => q.draft).length === 1 ? "" : "s"} ignored · plan has ${d.settings.pipeline.length} stages</div></div>
+    <div class="foot">${d.queue.filter((q) => q.draft).length} draft${d.queue.filter((q) => q.draft).length === 1 ? "" : "s"} ignored · plan has ${flat(d.settings.pipeline).length} stages in ${phasesOf(d.settings.pipeline).length} phases</div></div>
   <div class="card tile"><div class="label">Tasks completed</div><div class="value">${tasks.done}<small> / ${tasks.total} planned</small></div>
     <div class="meter good" ${tipAttr(pct(tasks.done, tasks.total) + "% of planned implementation tasks ticked off")}><i style="width:${pct(tasks.done, tasks.total)}%"></i></div>
     <div class="foot">${pct(tasks.done, tasks.total)}% · from each run’s docs/tasks.md</div></div>
   <div class="card tile"><div class="label">Acceptance criteria passing</div><div class="value">${ac.pass}<small> / ${ac.total}</small></div>
     <div class="meter good" ${tipAttr(pct(ac.pass, ac.total) + "% of acceptance criteria have a passing test")}><i style="width:${pct(ac.pass, ac.total)}%"></i></div>
     <div class="foot">${pct(ac.pass, ac.total)}% · from the latest test reports</div></div>
-  <div class="card tile"><div class="label">Stage runs</div><div class="value">${stages.length + live.filter((r) => r.current.stage).length}</div>
+  <div class="card tile"><div class="label">Stage runs</div><div class="value">${stages.length + liveAgents.filter((x) => x.current.stage).length}</div>
     <div class="foot">${pct(okRuns, stages.length)}% finished cleanly · ${rework} rework loop${rework === 1 ? "" : "s"} · ${calls.length - stages.length} orchestrator decisions</div></div>
   <div class="card tile"><div class="label">Tool calls</div><div class="value">${full(sum(toolMap))}</div>
     <div class="foot">${topTools.length ? topTools.map(([k, v]) => esc(k) + " " + v).join(" · ") : "none yet"}</div></div>
@@ -901,27 +998,37 @@ function feedItems(events) {
     : `<li><span>${icon("info", 14)}</span><span class="what muted">Starting up…</span></li>`;
 }
 function renderLive(d) {
-  const live = d.runs.filter((r) => r.current);
-  $("liveSub").textContent = live.length ? `${live.length} working now · activity updates every 5 s` : "";
+  const live = d.runs.flatMap((r) => cur(r).map((c) => [r, c]));
+  const agents = live.filter(([, c]) => c.kind !== "gate").length;
+  $("liveSub").textContent = live.length ? `${agents} agent${agents === 1 ? "" : "s"} working${live.length > agents ? " · Cortana measuring a gate" : ""} · max ${d.settings.max_parallel || 1} at once · updates every 5 s` : "";
   if (!live.length) {
     const f = d.factory || {};
     $("live").innerHTML = `<div class="empty">${icon("info", 16)}<br>No agent is working right now.<br><span class="ink2">Drop a requirements .md file into <span class="mono">input/</span>; the next scan picks it up.</span>${f.tick_finished ? `<br><span class="muted">Last scan finished ${ago(f.tick_finished)}.</span>` : ""}</div>`;
     return;
   }
   const timeoutS = (d.settings.station_timeout_min || 60) * 60;
-  $("live").innerHTML = `<div class="agents-live">${live.map((r) => {
-    const c = r.current, L = c.live, info = agentInfo(c.agent);
+  $("live").innerHTML = `<div class="agents-live">${live.map(([r, c]) => {
+    const L = c.live, info = agentInfo(c.agent);
+    const startedMs = new Date(c.started).getTime();
+    const pos = c.stage ? stagePos(r.pipeline)[c.stage] : "";
+    const where = `${esc(c.title)}${pos ? ` · phase ${esc(pos)} of ${phasesOf(r.pipeline).length}` : ""} · ${esc(r.source)}${c.visit > 1 ? ` · run ${c.visit}` : ""}`;
+    const head = (badge, title) => `<div class="agent-h">
+        <div class="mono-badge" aria-hidden="true">${badge}</div>
+        <div class="t"><b>${title}</b><span title="${esc(r.id)}">${where}</span></div>
+        <div class="clock"><b data-since="${startedMs}">${clock(L.elapsed)}</b><span class="muted" style="font-size:11px">since ${time(c.started)}</span></div>
+      </div>`;
+    if (c.kind === "gate") {
+      const def = flat(r.pipeline).find((s) => s.id === c.stage) || { conditions: [] };
+      return `<article class="agent">${head("◆", "Cortana · " + esc(c.title))}
+        <div class="chips"><span class="chip accent">${icon("gate", 12)}Gate step · no LLM call</span><span class="chip">${(def.conditions || []).length} conditions</span></div>
+        <ul class="conds">${(def.conditions || []).map((x) => `<li><span>${icon("run", 12)}</span><span>${esc(condText(x))}</span><span class="v muted">measuring…</span></li>`).join("")}</ul>
+      </article>`;
+    }
     const toolEntries = Object.entries(L.tools).sort((a, b) => b[1] - a[1]);
     const maxTool = toolEntries.length ? toolEntries[0][1] : 1;
-    const startedMs = new Date(c.started).getTime();
-    const pos = c.stage ? r.pipeline.findIndex((s) => s.id === c.stage) + 1 : 0;
-    return `<article class="agent">
-      <div class="agent-h">
-        <div class="mono-badge" aria-hidden="true">${mono(c.agent)}</div>
-        <div class="t"><b>${esc(info.title)}</b><span title="${esc(r.id)}">${esc(c.title)}${pos ? ` · stage ${pos}/${r.pipeline.length}` : ""} · ${esc(r.source)}${c.visit > 1 ? ` · run ${c.visit}` : ""}</span></div>
-        <div class="clock"><b data-since="${startedMs}">${clock(L.elapsed)}</b><span class="muted" style="font-size:11px">since ${time(c.started)}</span></div>
-      </div>
-      <div class="chips"><span class="chip accent">${icon("run", 12)}${esc(modelName(L.model || c.model))}</span>${effortMeter(c.effort)}<span class="chip">${esc(L.model || c.model)}</span><span class="chip">${r.mode === "auto" ? "Full auto" : "Deterministic"}</span>${r.tasks.total ? `<span class="chip">${r.tasks.done}/${r.tasks.total} tasks</span>` : ""}</div>
+    const along = c.alongside || [];
+    return `<article class="agent">${head(mono(c.agent), esc(info.title))}
+      <div class="chips"><span class="chip accent">${icon("run", 12)}${esc(modelName(L.model || c.model))}</span>${effortMeter(c.effort)}<span class="chip">${esc(L.model || c.model)}</span><span class="chip">${r.mode === "auto" ? "Full auto" : "Deterministic"}</span>${along.length ? `<span class="chip" ${tipAttr("Running at the same time: " + along.join(", "))}>in parallel with ${esc(along.join(", "))}</span>` : ""}${c.worktree ? `<span class="chip">own worktree</span>` : ""}${r.tasks.total ? `<span class="chip">${r.tasks.done}/${r.tasks.total} tasks</span>` : ""}</div>
       <div class="agent-body"><div class="agent-col">
         <dl class="mini-stats">
           <div><dt>Turns</dt><dd>${L.messages}</dd></div>
@@ -934,7 +1041,7 @@ function renderLive(d) {
       </div>
       <div class="agent-col">
         <div class="muted" style="font-size:11.5px;margin-bottom:-6px">Latest activity</div>
-        <ul class="feed">${c.agent === "orchestrator" && !L.events.length ? `<li><span>${icon("run", 14)}</span><span class="what">Weighing ${r.pipeline.length} stages against ${r.history.length} results so far…</span></li>` : feedItems(L.events)}</ul>
+        <ul class="feed">${c.agent === "orchestrator" && !L.events.length ? `<li><span>${icon("run", 14)}</span><span class="what">Weighing ${flat(r.pipeline).length} stages against ${r.history.length} results so far…</span></li>` : feedItems(L.events)}</ul>
       </div></div>
     </article>`;
   }).join("")}</div>`;
@@ -942,18 +1049,20 @@ function renderLive(d) {
 
 /* ---------- roster ---------- */
 function renderRoster(d) {
-  const busy = new Set(d.runs.filter((r) => r.current).map((r) => r.current.agent));
+  const busy = {};
+  d.runs.forEach((r) => cur(r).forEach((c) => c.agent && (busy[c.agent] = (busy[c.agent] || 0) + 1)));
   const by = d.stats.by_agent || {};
-  const used = new Set(d.settings.pipeline.map((s) => s.agent));
+  const planStages = flat(d.settings.pipeline);
+  const used = new Set(planStages.map((s) => s.agent));
   $("roster").innerHTML = `<div class="roster">${d.agents.map((a) => {
     const s = by[a.name] || { stations: 0, seconds: 0, verdicts: {} };
     const tok = TOKEN_TYPES.reduce((x, t) => x + (s[t.key] || 0), 0);
     const verdicts = Object.entries(s.verdicts || {}).map(([v, n]) => `${n}× ${v.toLowerCase().replace("_", " ")}`).join(", ");
-    const note = a.name === "orchestrator" ? (d.settings.mode === "auto" ? "decides each next stage" : "used in full-auto mode only") : used.has(a.name) ? `${d.settings.pipeline.filter((p) => p.agent === a.name).length} stage${d.settings.pipeline.filter((p) => p.agent === a.name).length > 1 ? "s" : ""} in plan` : "not in plan";
-    return `<div class="role ${busy.has(a.name) ? "busy" : ""}">
+    const note = a.name === "orchestrator" ? (d.settings.mode === "auto" ? "decides each next stage" : "used in full-auto mode only") : used.has(a.name) ? `${planStages.filter((p) => p.agent === a.name).length} stage${planStages.filter((p) => p.agent === a.name).length > 1 ? "s" : ""} in plan · ${a.writes_code ? "changes code" : "report only"}` : "not in plan";
+    return `<div class="role ${busy[a.name] ? "busy" : ""}">
       <div class="mono-badge" aria-hidden="true">${mono(a.name)}</div>
       <div style="min-width:0">
-        <div class="top-line"><b>${esc(a.title)}</b>${busy.has(a.name) ? `<span class="chip"><span class="dot live"></span>working</span>` : ""}<span class="chip">${esc(modelName(a.model))}</span>${effortMeter(a.effort)}</div>
+        <div class="top-line"><b>${esc(a.title)}</b>${busy[a.name] ? `<span class="chip"><span class="dot live"></span>working${busy[a.name] > 1 ? ` ×${busy[a.name]}` : ""}</span>` : ""}<span class="chip">${esc(modelName(a.model))}</span>${effortMeter(a.effort)}</div>
         <div class="meta"><span>${esc(note)}</span><span>${s.stations} call${s.stations === 1 ? "" : "s"}</span><span>avg ${dur(s.stations ? s.seconds / s.stations : 0)}</span><span>${compact(tok)} tokens</span>${verdicts ? `<span>${esc(verdicts)}</span>` : ""}</div>
         <details><summary>${esc(a.role || "")} · ${a.tools.length} tools</summary><div class="tools">${a.tools.map((t) => `<span class="chip mono">${esc(t)}</span>`).join("") || '<span class="muted">no tools</span>'}</div></details>
       </div>
@@ -964,13 +1073,17 @@ function renderRoster(d) {
 /* ---------- runs ---------- */
 const STATE_LABEL = { pending: "not started", done: "passed", rework: "sent back", active: "working now", paused: "paused (usage limit)", limit: "hit usage limit", error: "errored", failed: "failed", blocked: "blocked", skipped: "skipped by orchestrator" };
 function track(run) {
-  const st = stageStates(run);
-  return `<div class="trackN">${run.pipeline.map((s, i) => {
+  const st = stageStates(run), pos = stagePos(run.pipeline);
+  const node = (s) => {
     const x = st[s.id], h = x.last;
-    const tip = `${i + 1}. ${s.title} (${agentInfo(s.agent).title})\n${STATE_LABEL[x.state]}${x.runs ? ` · ${x.runs} run${x.runs > 1 ? "s" : ""}` : ""}${h && h.verdict ? `\nLast verdict: ${h.verdict}` : ""}${h ? `\n${modelName(h.resolved_model || h.model)} · ${h.effort} effort · ${dur(h.seconds)}` : ""}`;
-    const prev = i ? st[run.pipeline[i - 1].id].state : "";
-    return (i ? `<span class="link ${prev === "done" || prev === "rework" ? "done" : ""}"></span>` : "") +
-      `<span class="node ${x.state}" ${tipAttr(tip)}>${mono(s.agent)}${x.runs > 1 ? `<sup>×${x.runs}</sup>` : ""}</span>`;
+    const tip = `${pos[s.id]}. ${s.title} (${isGate(s) ? "gate step, measured by Cortana" : agentInfo(s.agent).title})\n${STATE_LABEL[x.state]}${x.runs ? ` · ${x.runs} run${x.runs > 1 ? "s" : ""}` : ""}${h && h.verdict ? `\nLast verdict: ${h.verdict}` : ""}${h && !isGate(s) ? `\n${modelName(h.resolved_model || h.model)} · ${h.effort} effort · ${dur(h.seconds)}` : ""}${h && h.results ? "\n" + h.results.map((r) => `${r.status === "pass" ? "✓" : r.status === "fail" ? "✗" : "·"} ${condText(r)}: ${measured(r)}`).join("\n") : ""}`;
+    if (isGate(s)) return `<span class="gwrap" ${tipAttr(tip)}><span class="node gate ${x.state}"><span>G</span></span>${x.runs > 1 ? `<sup>×${x.runs}</sup>` : ""}</span>`;
+    return `<span class="node ${x.state}" ${tipAttr(tip)}><span>${mono(s.agent)}</span>${x.runs > 1 ? `<sup>×${x.runs}</sup>` : ""}</span>`;
+  };
+  const phases = phasesOf(run.pipeline);
+  return `<div class="trackN">${phases.map((ph, i) => {
+    const prevDone = i && phases[i - 1].every((s) => ["done", "rework"].includes(st[s.id].state));
+    return (i ? `<span class="link ${prevDone ? "done" : ""}"></span>` : "") + (ph.length > 1 ? `<span class="par" ${tipAttr(`Phase ${i + 1}: ${ph.length} stages run at the same time`)}>${ph.map(node).join("")}</span>` : node(ph[0]));
   }).join("")}</div>`;
 }
 function renderRuns(d) {
@@ -998,7 +1111,7 @@ function renderRuns(d) {
         <td style="min-width:100px">${r.tasks.total ? `<div class="num" style="font-size:12px">${r.tasks.done}/${r.tasks.total}</div><div class="meter good"><i style="width:${tp}%"></i></div>` : `<span class="muted">—</span>`}</td>
         <td style="min-width:100px">${r.acceptance.total ? `<div class="num" style="font-size:12px">${r.acceptance.pass}/${r.acceptance.total} pass</div><div class="meter good"><i style="width:${ap}%"></i></div>` : `<span class="muted">—</span>`}</td>
         <td class="n" ${tipAttr(TOKEN_TYPES.map((x) => x.label + ": " + full(tok[x.key])).join("\n"))}>${compact(sum(tok))}</td>
-        <td class="n">${dur(r.totals.seconds + (r.current ? r.current.live.elapsed : 0))}</td>
+        <td class="n">${dur(r.totals.seconds + liveSeconds(r))}</td>
         <td class="n">${dateTime(r.created)}</td>
         <td class="n">${ago(lastUpdate(r))}</td>
       </tr>${open ? `<tr><td class="detail" colspan="12">${runDetail(r)}</td></tr>` : ""}`;
@@ -1007,9 +1120,11 @@ function renderRuns(d) {
 function runDetail(r) {
   const tabs = [["stages", `Stage runs (${r.history.length})`]];
   if (r.mode === "auto") tabs.push(["decisions", `Orchestrator decisions (${r.decisions.length})`]);
+  const gateRuns = r.history.filter((h) => h.kind === "gate");
+  if (gateRuns.length || flat(r.pipeline).some(isGate)) tabs.push(["gates", `Gates (${gateRuns.filter((h) => h.verdict === "PASS").length}/${gateRuns.length} passed)`]);
   tabs.push(["tasks", `Tasks (${r.tasks.done}/${r.tasks.total})`], ["acceptance", `Acceptance (${r.acceptance.pass}/${r.acceptance.total})`], ["docs", `Documents (${r.docs.length + r.reports.length})`]);
-  if (r.current) tabs.unshift(["live", "Live activity"]);
-  let tab = ui.runTab[r.id] || (r.current ? "live" : "stages");
+  if (cur(r).length) tabs.unshift(["live", "Live activity"]);
+  let tab = ui.runTab[r.id] || (cur(r).length ? "live" : "stages");
   if (!tabs.some(([k]) => k === tab)) tab = tabs[0][0];
   const tok = runTokens(r);
   const toolTotals = {};
@@ -1019,11 +1134,11 @@ function runDetail(r) {
     body = r.history.length ? `<div class="tbl-wrap"><table>
       <thead><tr><th>#</th><th>Stage</th><th>Agent</th><th class="n">Run</th><th>Model</th><th>Effort</th><th>Outcome</th><th>Verdict</th><th class="n">Turns</th><th class="n">Tools</th><th class="n">Input</th><th class="n">Cache write</th><th class="n">Cache read</th><th class="n">Output</th><th class="n">Duration</th><th class="n">API-equiv.</th><th class="n">Finished</th></tr></thead>
       <tbody>${r.history.map((h, i) => {
-        const t = h.tokens || {}, def = r.pipeline.find((s) => s.id === h.stage) || {};
-        const sent = def.pass && h.outcome === "ok" && !def.pass.includes(h.verdict);
+        const t = h.tokens || {}, def = flat(r.pipeline).find((s) => s.id === h.stage) || {};
+        const sent = gated(def) && h.outcome === "ok" && !passes(def, h.verdict);
         const oc = h.outcome === "ok" ? (sent || h.verdict === "BLOCKED" ? "warn" : "check") : h.outcome === "limit" ? "pause" : "x";
-        return `<tr><td class="muted num">${i + 1}</td><td>${esc(h.title)}</td><td>${esc(agentInfo(h.agent).title)}</td><td class="n">${h.visit}</td>
-          <td title="${esc((h.models || []).join(", "))}">${esc(modelName(h.resolved_model || h.model))}</td><td>${effortMeter(h.effort)}</td>
+        return `<tr><td class="muted num">${i + 1}</td><td>${esc(h.title)} <span class="muted num" style="font-size:11.5px">${esc(stagePos(r.pipeline)[h.stage] || "")}</span>${(h.alongside || []).length ? ` <span class="chip" ${tipAttr("Ran at the same time as " + h.alongside.join(", "))}>parallel</span>` : ""}</td><td>${esc(agentInfo(h.agent).title)}</td><td class="n">${h.visit}</td>
+          <td title="${esc((h.models || []).join(", "))}">${esc(modelName(h.resolved_model || h.model))}</td><td>${h.effort ? effortMeter(h.effort) : `<span class="muted">—</span>`}</td>
           <td><span class="badge">${icon(oc, 12)}${esc(sent ? "sent back" : h.outcome)}</span>${h.error ? `<div class="muted" style="font-size:11.5px;max-width:260px" title="${esc(h.error)}">${esc(h.error.slice(0, 90))}</div>` : ""}</td>
           <td>${h.verdict ? `<span class="chip">${esc(h.verdict)}</span>` : "—"}</td>
           <td class="n">${h.turns ?? "—"}</td><td class="n" ${tipAttr(Object.entries(h.tools || {}).map(([k, v]) => k + ": " + v).join("\n") || "no tools")}>${sum(h.tools)}${h.denials ? ` <span class="muted">(${h.denials} denied)</span>` : ""}</td>
@@ -1032,11 +1147,20 @@ function runDetail(r) {
       }).join("")}</tbody></table></div>` : `<div class="empty">No stage has finished yet.</div>`;
   } else if (tab === "decisions") {
     body = r.decisions.length ? `<ol class="decisions">${r.decisions.map((x, i) => {
-      const target = r.pipeline.find((s) => s.id === x.chosen);
-      return `<li><span class="n">${i + 1}</span><div style="min-width:0"><b>${x.chosen === "done" ? "Done" : target ? esc(target.title) : esc(x.outcome)}</b> <span class="muted">${x.chosen && x.chosen !== "done" ? "· " + esc(agentInfo(target && target.agent).title) : ""}</span>
+      const picks = [].concat(x.chosen || []), targets = picks.map((id) => flat(r.pipeline).find((s) => s.id === id)).filter(Boolean);
+      return `<li><span class="n">${i + 1}</span><div style="min-width:0"><b>${picks[0] === "done" ? "Done" : targets.length ? targets.map((t) => esc(t.title)).join(" + ") : esc(x.outcome)}</b> <span class="muted">${targets.length ? "· " + targets.map((t) => esc(isGate(t) ? "Cortana" : agentInfo(t.agent).title)).join(", ") : ""}</span>
         <div class="ink2" style="font-size:12.5px">${esc(x.reason || x.error || "")}</div>${x.override ? `<div style="font-size:12px;margin-top:2px">${icon("warn", 12)} ${esc(x.override)}</div>` : ""}</div>
         <div class="muted num" style="font-size:12px;text-align:right">${time(x.at)}<br>${compact(sum(x.tokens))} tok · ${dur(x.seconds)}</div></li>`;
     }).join("")}</ol>` : `<div class="empty">The Orchestrator hasn’t decided anything yet.</div>`;
+  } else if (tab === "gates") {
+    body = gateRuns.length ? gateRuns.slice().reverse().map((h) => `<div style="margin-bottom:14px">
+      <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:6px"><b>${esc(h.title)}</b><span class="muted">run ${h.visit} · ${dateTime(h.finished)} · ${dur(h.seconds)}</span>
+        <span class="badge">${icon(h.outcome !== "ok" ? "x" : h.verdict === "PASS" ? "check" : "warn", 12)}${esc(h.outcome !== "ok" ? "error" : h.verdict === "PASS" ? "passed" : "failed · sent back")}</span>
+        ${h.tests && h.tests.command ? `<span class="chip mono" ${tipAttr(h.tests.command)}>${esc(h.tests.command.length > 48 ? h.tests.command.slice(0, 48) + "…" : h.tests.command)}</span>` : ""}
+        <button class="btn" data-report="${esc(r.id)}" data-name="${esc(h.stage)}-run${h.visit}.md">Gate report</button></div>
+      ${h.error ? `<div class="muted">${esc(h.error)}</div>` : `<div class="tbl-wrap"><table class="gate-tbl"><thead><tr><th>Condition</th><th class="n">Measured</th><th>Result</th><th>Severity</th><th>Detail</th></tr></thead><tbody>${(h.results || []).map((c) =>
+        `<tr><td>${esc(condText(c))}</td><td class="n"><b>${esc(measured(c))}</b></td><td><span class="badge">${icon(COND_ICON[c.status] || "info", 12)}${esc(c.status)}</span></td><td><span class="chip">${esc(c.severity)}</span></td><td class="ink2" style="font-size:12.5px">${esc(c.detail)}${c.sources && c.sources.length ? ` <span class="muted">· from ${esc(c.sources.join(", "))}</span>` : ""}</td></tr>`).join("")}</tbody></table></div>`}
+    </div>`).join("") : `<div class="empty">No gate has been measured yet.</div>`;
   } else if (tab === "tasks") {
     body = r.tasks.total ? `<ul class="checklist">${r.tasks.items.map((t) => `<li><span class="box ${t.done ? "on" : ""}" aria-label="${t.done ? "done" : "to do"}">${t.done ? '<svg width="10" height="10" viewBox="0 0 16 16"><path d="M3 8.5l3 3 7-7" fill="none" stroke="#fff" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></svg>' : ""}</span><span class="mono muted">${esc(t.id)}</span><span class="${t.done ? "done-t" : ""}">${esc(t.text)}</span></li>`).join("")}</ul>`
       : `<div class="empty">The Architect hasn’t written <span class="mono">docs/tasks.md</span> yet.</div>`;
@@ -1047,15 +1171,21 @@ function runDetail(r) {
   } else if (tab === "docs") {
     body = `<div class="muted" style="font-size:12px;margin-bottom:6px">Current documents in the workspace</div><div class="reports">${r.docs.map((n) => `<button class="btn" data-report="${esc(r.id)}" data-name="${esc(n)}">${esc(n.replace("docs/", ""))}</button>`).join("")}<button class="btn" data-report="${esc(r.id)}" data-name="SUMMARY.md">SUMMARY.md</button></div>
       ${r.reports.length ? `<div class="muted" style="font-size:12px;margin:12px 0 6px">Archived output of every stage run</div><div class="reports">${r.reports.map((n) => `<button class="btn" data-report="${esc(r.id)}" data-name="${esc(n)}">${esc(n.replace(".md", ""))}</button>`).join("")}</div>` : ""}`;
-  } else if (tab === "live" && r.current) {
-    body = `<ul class="feed" style="max-height:340px">${feedItems(r.current.live.events)}</ul>`;
+  } else if (tab === "live" && cur(r).length) {
+    body = cur(r).map((c) => `<div class="muted" style="font-size:12px;margin:4px 0">${esc(c.kind === "gate" ? "Cortana" : agentInfo(c.agent).title)} · ${esc(c.title)}</div>
+      <ul class="feed" style="max-height:240px">${c.kind === "gate" ? `<li><span>${icon("run", 14)}</span><span class="what">Measuring gate conditions…</span></li>` : feedItems(c.live.events)}</ul>`).join("");
   }
   return `<div class="detail-in">
     <dl class="facts">
       <div style="grid-column: span 2"><dt>Run ID</dt><dd class="mono">${esc(r.id)}</dd></div>
       <div><dt>Status</dt><dd>${statusBadge(shown(r))}${r.reason ? `<div class="muted" style="font-size:12px">${esc(r.reason)}</div>` : ""}</dd></div>
       <div><dt>Mode</dt><dd>${r.mode === "auto" ? "Full auto" : "Deterministic"}</dd></div>
-      <div><dt>Current stage</dt><dd>${r.stage ? esc((r.pipeline.find((s) => s.id === r.stage) || {}).title || r.stage) : r.current ? "Orchestrator deciding" : "—"}</dd></div>
+      <div style="grid-column: span 2"><dt>${r.mode === "auto" ? "Running now" : "Current phase"}</dt><dd>${(() => {
+        const ids = nowStages(r), titles = ids.map((id) => (flat(r.pipeline).find((s) => s.id === id) || {}).title || id);
+        if (r.status === "done") return "—";
+        if (r.mode === "auto") return titles.length ? esc(titles.join(" + ")) : cur(r).length ? "Orchestrator deciding" : "—";
+        return r.phase != null ? `${r.phase + 1} of ${phasesOf(r.pipeline).length}: ${esc(titles.join(" + "))}` : "—";
+      })()}</dd></div>
       <div><dt>Retry attempts</dt><dd>${r.attempts || 0}</dd></div>
       <div><dt>Tokens</dt><dd ${tipAttr(TOKEN_TYPES.map((x) => x.label + ": " + full(tok[x.key])).join("\n"))}>${full(sum(tok))}</dd></div>
       <div><dt>API-equivalent</dt><dd>${usd(r.totals.cost_usd)}</dd></div>
@@ -1122,18 +1252,21 @@ function renderMix(d) {
 /* ---------- timeline ---------- */
 function segClass(e, run) {
   if (e.kind === "decision") return ["decision", "orchestrator decision"];
+  if (e.kind === "gate") return [e.outcome === "running" ? "running gate" : e.outcome !== "ok" ? "critical gate" : e.verdict === "PASS" ? "good gate" : "warning gate", e.outcome === "running" ? "measuring" : e.verdict === "PASS" ? "gate passed" : "gate failed"];
   if (e.outcome === "running") return ["running", "running"];
   if (e.outcome === "limit") return ["limit", "usage limit"];
   if (e.outcome !== "ok") return ["critical", "error"];
   if (e.verdict === "BLOCKED") return ["serious", "blocked"];
-  const def = run && run.pipeline.find((s) => s.id === e.stage);
-  if (def && def.pass && !def.pass.includes(e.verdict)) return ["warning", "sent back"];
+  const def = run && flat(run.pipeline).find((s) => s.id === e.stage);
+  if (def && gated(def) && !passes(def, e.verdict)) return ["warning", "sent back"];
   return ["good", "passed"];
 }
 function renderTimeline(d) {
   $("tlLegend").innerHTML = [["var(--good)", "Passed"], ["var(--warning)", "Sent back"], ["var(--critical)", "Error"], ["var(--axis)", "Usage limit"], ["var(--accent)", "Running"], ["var(--ink-2)", "Orchestrator"]]
-    .map(([c, l]) => `<span><i class="sw" style="background:${c}"></i>${l}</span>`).join("");
-  const items = d.events;
+    .map(([c, l]) => `<span><i class="sw" style="background:${c}"></i>${l}</span>`).join("") + `<span><i class="sw" style="background:var(--ink-2);transform:rotate(45deg) scale(.8)"></i>Gate</span>`;
+  const gateEv = d.runs.flatMap((r) => (r.history || []).filter((h) => h.kind === "gate").map((h) => ({ run: r.id, kind: "gate", stage: h.stage, title: h.title, visit: h.visit, started: h.started, finished: h.finished, outcome: h.outcome, verdict: h.verdict, tokens: {}, results: h.results }))
+    .concat(cur(r).filter((c) => c.kind === "gate").map((c) => ({ run: r.id, kind: "gate", stage: c.stage, title: c.title, visit: c.visit, started: c.started, finished: null, outcome: "running", tokens: {} }))));
+  const items = d.events.concat(gateEv);
   if (!items.length) { $("timeline").innerHTML = `<div class="empty">The timeline fills in as stages run.</div>`; return; }
   const now = Date.now(), byRun = {};
   items.forEach((t) => (byRun[t.run] = byRun[t.run] || []).push(t));
@@ -1145,11 +1278,26 @@ function renderTimeline(d) {
   const multiDay = new Date(t0).toDateString() !== new Date(t1).toDateString();
   const fmt = (ms) => new Date(ms).toLocaleString([], multiDay ? { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit", ...H23 } : { hour: "2-digit", minute: "2-digit", second: span < 600000 ? "2-digit" : undefined, ...H23 });
   const runsById = Object.fromEntries(d.runs.map((r) => [r.id, r]));
-  $("timeline").innerHTML = `<div class="tl">${runIds.map((id) => `<div class="tl-row"><span class="name" title="${esc(id)}">${esc(runsById[id].source.replace(/\.md$/, ""))}</span><div class="lane">${byRun[id].map((t) => {
+  // Stages of one phase overlap in time, so each run gets as many sub-lanes as it has stages running at once.
+  const lanes = (list) => {
+    const ends = [], placed = list.slice().sort((a, b) => new Date(a.started) - new Date(b.started)).map((t) => {
       const s = new Date(t.started).getTime(), e = t.finished ? new Date(t.finished).getTime() : now;
+      let row = t.kind === "gate" ? 0 : ends.findIndex((x) => x <= s + 250);
+      if (row < 0) row = ends.length;
+      if (t.kind !== "gate") ends[row] = e;
+      return { t, s, e, row };
+    });
+    return { placed, rows: Math.max(1, ends.length) };
+  };
+  $("timeline").innerHTML = `<div class="tl">${runIds.map((id) => {
+    const { placed, rows } = lanes(byRun[id]);
+    return `<div class="tl-row"><span class="name" title="${esc(id)}">${esc(runsById[id].source.replace(/\.md$/, ""))}</span><div class="lane" style="height:${rows * 20 + 2}px">${placed.map(({ t, s, e, row }) => {
       const [cls, word] = segClass(t, runsById[id]);
-      return `<span class="segm ${cls}" style="left:${((s - t0) / span) * 100}%;width:${((e - s) / span) * 100}%" ${tipAttr(`${t.title || t.stage}${t.visit > 1 ? " · run " + t.visit : ""}\n${agentInfo(t.agent).title} · ${word}${t.verdict ? " (" + t.verdict + ")" : ""}\n${modelName(t.model)} · ${t.effort} effort\n${dur((e - s) / 1000)} · ${compact(sum(t.tokens))} tokens\n${dateTime(t.started)}`)}>${t.kind === "decision" ? "" : mono(t.agent)}</span>`;
-    }).join("")}</div></div>`).join("")}
+      const tip = t.kind === "gate" ? `${t.title}${t.visit > 1 ? " · run " + t.visit : ""}\nCortana · ${word}${t.results ? "\n" + t.results.map((r) => `${condText(r)}: ${measured(r)} (${r.status})`).join("\n") : ""}\n${dateTime(t.started)}`
+        : `${t.title || t.stage}${t.visit > 1 ? " · run " + t.visit : ""}\n${agentInfo(t.agent).title} · ${word}${t.verdict ? " (" + t.verdict + ")" : ""}\n${modelName(t.model)} · ${t.effort} effort\n${dur((e - s) / 1000)} · ${compact(sum(t.tokens))} tokens\n${dateTime(t.started)}`;
+      return `<span class="segm ${cls}" style="left:${((s - t0) / span) * 100}%;width:${((e - s) / span) * 100}%;top:${row * 20 + 3 + (t.kind === "gate" ? 2 : 0)}px" ${tipAttr(tip)}>${t.kind === "decision" || t.kind === "gate" ? "" : mono(t.agent)}</span>`;
+    }).join("")}</div></div>`;
+  }).join("")}
     <div class="tl-axis"><span></span><div class="axis">${tickFractions().map((f) => `<span style="left:${f * 100}%">${fmt(t0 + f * span)}</span>`).join("")}</div></div></div>`;
 }
 
@@ -1158,9 +1306,9 @@ function renderQueue(d) {
   const q = d.queue;
   $("queueSub").textContent = q.length ? `${q.filter((x) => !x.draft).length} waiting in input/` : "input/ is empty";
   const lines = [];
-  d.runs.filter((r) => r.status === "paused" || (r.status === "running" && !r.current)).forEach((r) => {
-    const st = r.pipeline.find((s) => s.id === r.stage);
-    lines.push(`<li>${icon(r.status === "paused" ? "pause" : "clock")}<span class="fn">${esc(r.source)}</span><span class="r"><span class="chip">${r.history.length ? "resumes at" : "waiting · starts at"} ${esc(st ? st.title : "Orchestrator")}</span></span></li>`);
+  d.runs.filter((r) => r.status === "paused" || (r.status === "running" && !cur(r).length)).forEach((r) => {
+    const left = nowStages(r).filter((id) => !(r.finished || []).includes(id)).map((id) => (flat(r.pipeline).find((s) => s.id === id) || {}).title || id);
+    lines.push(`<li>${icon(r.status === "paused" ? "pause" : "clock")}<span class="fn">${esc(r.source)}</span><span class="r"><span class="chip">${r.history.length ? "resumes at" : "waiting · starts at"} ${esc(left.length ? left.join(" + ") : "Orchestrator")}</span></span></li>`);
   });
   q.forEach((f) => lines.push(`<li>${icon(f.draft ? "text" : f.settling ? "pause" : "info")}<span class="fn" title="${esc(f.name)}">${esc(f.name)}</span><span class="r"><span class="muted num" style="font-size:12px">${f.bytes < 1024 ? f.bytes + " B" : (f.bytes / 1024).toFixed(1) + " KB"}</span>${f.draft ? `<span class="chip">draft · ignored</span>` : f.settling ? `<span class="chip">being written</span>` : `<span class="chip">next scan</span>`}</span></li>`));
   $("queue").innerHTML = lines.length ? `<ul class="qlist">${lines.join("")}</ul><p class="muted" style="font-size:12px;margin:10px 0 0">Files are picked up once they’ve been unchanged for 60 s. Names starting with <span class="mono">_</span> are drafts.</p>`
@@ -1181,57 +1329,105 @@ function renderLog(d) {
 }
 
 /* ---------- plan ---------- */
+function gateConds(g, result) {  // a gate's conditions, with the measured values of its latest run
+  const results = (result && result.entry.results) || [];
+  return `<ul class="conds">${(g.conditions || []).map((c, k) => {
+    const r = results[k] && results[k].metric === c.metric ? results[k] : null;
+    const cls = !r ? "" : r.status === "fail" || r.status === "stale" ? (r.outcome === "warn" ? "warnc" : "fail") : r.status === "unavailable" ? "warnc" : "";
+    return `<li class="${cls}" ${tipAttr(`${condText(c)} · ${c.severity === "block" ? "blocks" : "warns"} on fail${r ? `\nMeasured: ${measured(r)} (${r.status})\n${r.detail}` : "\nNot measured yet"}`)}><span>${r ? icon(COND_ICON[r.status] || "info", 12) : icon("gate", 12)}</span><span>${esc(condText(c))}${c.severity === "warn" ? ` <span class="muted">· warn</span>` : ""}</span><span class="v ${r ? "" : "muted"}">${r ? esc(measured(r)) : "—"}</span></li>`;
+  }).join("")}</ul>`;
+}
 function renderPlan(d) {
   const sel = $("planRun");
-  const active = d.runs.find((r) => r.current) || d.runs.find((r) => r.status === "running");
+  const active = d.runs.find((r) => cur(r).length) || d.runs.find((r) => r.status === "running");
   if (ui.planRun && ui.planRun !== "none" && !d.runs.some((r) => r.id === ui.planRun)) ui.planRun = "";
   const chosen = ui.planRun === "none" ? null : ui.planRun ? d.runs.find((r) => r.id === ui.planRun) : active || null;
   sel.innerHTML = `<option value="none" ${!chosen ? "selected" : ""}>Current plan (settings)</option>` + d.runs.map((r) =>
     `<option value="${esc(r.id)}" ${chosen && chosen.id === r.id ? "selected" : ""}>${esc(r.source.replace(/\.md$/, ""))} · ${STATUS[shown(r)] ? STATUS[shown(r)].label : r.status}</option>`).join("");
-  const pipeline = chosen ? chosen.pipeline : d.settings.pipeline;
+  const phases = phasesOf(chosen ? chosen.pipeline : d.settings.pipeline);
+  const stages = flat(phases), pos = stagePos(phases);
   const mode = chosen ? chosen.mode : d.settings.mode;
   const st = chosen ? stageStates(chosen) : {};
   const conf = Object.fromEntries(d.agents.map((a) => [a.name, a]));
-  const ids = pipeline.map((s) => s.id);
+  const title = (id) => (stages.find((s) => s.id === id) || {}).title || id;
+  const backOf = (s) => s.on_fail || (() => {  // the default loop-back target: nearest earlier build stage
+    const i = stages.indexOf(s), b = stages.slice(0, i).reverse().find((o) => o.agent === "developer");
+    return b ? b.id : i > 0 ? stages[i - 1].id : null;
+  })();
+  const nowPhase = chosen && chosen.mode === "deterministic" && ["running", "paused"].includes(chosen.status) ? chosen.phase : -1;
+  const source = chosen ? [chosen] : d.runs;
   $("planSub").textContent = chosen ? `progress of ${chosen.source} · its plan was frozen when it started` : "what new runs will follow";
 
   const [mName, mDesc] = MODE_TEXT[mode] || [mode, ""];
   const router = conf.orchestrator;
-  const flow = `<div class="flow" aria-label="Stage sequence">${pipeline.map((s, i) => {
-    const x = st[s.id] || { state: "pending", runs: 0 };
-    return (i ? `<span class="arrow" aria-hidden="true"></span>` : "") + `<div class="fs ${x.state}" ${tipAttr(`${s.title}\n${STATE_LABEL[x.state]}${x.runs ? " · " + x.runs + " runs" : ""}`)}><span class="n">${i + 1}</span><span class="mono-badge" style="width:24px;height:24px;font-size:10px;border-radius:6px">${mono(s.agent)}</span><b style="font-size:13px">${esc(s.title)}</b>${s.pass ? icon("gate", 13) : ""}</div>`;
-  }).join("")}${mode === "deterministic" ? `<span class="arrow" aria-hidden="true"></span><div class="fs ${chosen ? ({ done: "done", failed: "failed", blocked: "failed" }[chosen.status] || "") : ""}"><span class="n">${chosen && ["failed", "blocked"].includes(chosen.status) ? icon(chosen.status === "blocked" ? "warn" : "x", 12) : "✓"}</span><b style="font-size:13px">${chosen && ["failed", "blocked"].includes(chosen.status) ? STATUS[chosen.status].label : "Done"}</b></div>` : ""}</div>`;
+  const card = (s) => {
+    const a = conf[s.agent] || { title: s.agent }, x = st[s.id] || { state: "pending", runs: 0 };
+    return `<div class="lane-card ${x.state}" ${tipAttr(`${pos[s.id]}. ${s.title}\n${s.task}\n${STATE_LABEL[x.state]}${x.runs ? " · " + x.runs + " runs" : ""}`)}>
+      <div class="top"><span class="mono-badge" style="width:26px;height:26px;font-size:10.5px;border-radius:7px" aria-hidden="true">${mono(s.agent)}</span><div style="min-width:0"><b style="display:block">${esc(s.title)}</b><span class="muted" style="font-size:11.5px">${esc(a.title)} · ${esc(modelName(a.model))}</span></div></div>
+      <div class="meta">${a.writes_code ? `<span class="chip">changes code</span>` : `<span class="chip">report only</span>`}${s.pass ? `<span class="chip">${icon("gate", 11)}${esc(s.pass.join("/"))} → else ${esc(title(backOf(s)))}</span>` : ""}${chosen && x.state !== "pending" ? `<span class="chip">${esc(STATE_LABEL[x.state])}${x.runs > 1 ? ` ×${x.runs}` : ""}</span>` : ""}</div>
+    </div>`;
+  };
+  const gateCard = (g) => {
+    const x = st[g.id] || { state: "pending", runs: 0 }, m = latestGate(source, g.id);
+    return `<div class="diamond ${x.state}" aria-hidden="true"><span>${m ? (m.entry.verdict === "PASS" ? "✓" : "✗") : "◆"}</span></div>
+      <div style="text-align:center"><b style="font-size:13px">${esc(g.title)}</b><div class="muted" style="font-size:11.5px">measured by Cortana · no LLM call</div></div>
+      ${gateConds(g, m)}
+      <div class="muted" style="font-size:11.5px;display:grid;gap:2px">${mode === "deterministic" || g.on_fail ? `<span class="loopback">${icon("loop", 12)} on fail → ${esc(title(backOf(g)))} with ${esc(g.output)}</span>` : ""}
+        ${g.required ? `<span>${icon("check", 11)} required before done</span>` : ""}
+        ${m ? `<span>measured ${ago(m.entry.finished)}${chosen ? ` · run ${m.entry.visit}` : ` in ${esc(m.run.source.replace(/\.md$/, ""))}`}</span>` : `<span>not measured yet</span>`}</div>`;
+  };
+  const swim = `<div class="swim" aria-label="Plan phases">${phases.map((ph, i) => (i ? `<span class="ph-arrow" aria-hidden="true"></span>` : "") +
+    (ph.every(isGate) ? `<div class="ph gate-col ${i === nowPhase ? "now" : ""}"><div class="ph-h"><b>Phase ${i + 1}</b><span class="chip">gate</span></div>${ph.map(gateCard).join('<hr style="border:0;border-top:1px solid var(--grid);width:100%">')}</div>`
+      : `<div class="ph ${i === nowPhase ? "now" : ""}"><div class="ph-h"><b>Phase ${i + 1}</b>${ph.length > 1 ? `<span class="chip">${ph.length} in parallel</span>` : ""}</div>${ph.map(card).join("")}</div>`)).join("")}
+    ${mode === "deterministic" ? `<span class="ph-arrow" aria-hidden="true"></span><div class="end-col ${chosen ? ({ done: "done", failed: "failed", blocked: "failed" }[chosen.status] || "") : ""}">${chosen && ["failed", "blocked"].includes(chosen.status) ? icon(chosen.status === "blocked" ? "warn" : "x", 13) + STATUS[chosen.status].label : icon("check", 13) + "Done"}</div>` : ""}</div>`;
+  const keep = document.querySelector("#planHead .swim"), scrolled = keep ? keep.scrollLeft : 0;  // survive the 5 s refresh
   $("planHead").innerHTML = `
-    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px"><span class="badge">${icon(mode === "auto" ? "run" : "loop", 13)}${esc(mName)}</span><span class="ink2" style="font-size:13px">${esc(mDesc)}</span></div>
+    <div style="display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px"><span class="badge">${icon(mode === "auto" ? "run" : "loop", 13)}${esc(mName)}</span><span class="ink2" style="font-size:13px">${esc(mDesc)}</span><span class="chip">up to ${d.settings.max_parallel || 1} stages at once</span></div>
     ${mode === "auto" ? `<div class="hub" style="margin-bottom:14px"><div class="mono-badge" aria-hidden="true">Or</div><div><b>Orchestrator agent</b> <span class="chip">${esc(modelName(router && router.model))}</span> ${effortMeter(router && router.effort)}
-      <div class="ink2" style="font-size:13px;margin-top:4px">Before every stage it reads the history and the documents, then picks the next stage from the catalogue below, or <b>done</b>. Cortana refuses <b>done</b> until every required gate has passed after the latest build, and stops a run after ${d.settings.max_stations} stages.</div></div></div>` : ""}
-    <div class="muted" style="font-size:12px;margin-bottom:4px">${mode === "auto" ? "Stage catalogue (the order is a hint, not a rule)" : "Sequence"}</div>${flow}
-    ${chosen ? `<div class="statusline" style="margin-top:8px">${statusBadge(shown(chosen))}<span>${chosen.history.length} stage runs</span><span>${loops(chosen)} rework loops</span><span>${compact(sum(runTokens(chosen)))} tokens</span>${chosen.reason ? `<span>${esc(chosen.reason)}</span>` : ""}</div>` : ""}`;
+      <div class="ink2" style="font-size:13px;margin-top:4px">Before every step it reads the history and the documents, then picks the next stage or stages from the catalogue below (several at once, if at most one changes code), or <b>done</b>. Cortana refuses <b>done</b> until every required gate has passed after the latest build, and stops a run after ${d.settings.max_stations} stages.</div></div></div>` : ""}
+    <div class="muted" style="font-size:12px;margin-bottom:4px">${mode === "auto" ? "Stage catalogue (the phases are a hint, not a rule)" : "Phases run left to right; the stages in a phase run at the same time"}</div>${swim}
+    ${chosen ? `<div class="statusline" style="margin-top:8px">${statusBadge(shown(chosen))}<span>${chosen.history.length} steps run</span><span>${loops(chosen)} rework loops</span><span>${compact(sum(runTokens(chosen)))} tokens</span>${chosen.reason ? `<span>${esc(chosen.reason)}</span>` : ""}</div>` : ""}`;
+  if (scrolled) document.querySelector("#planHead .swim").scrollLeft = scrolled;
 
-  $("stepsSub").textContent = `${pipeline.length} stages · ${pipeline.filter((s) => s.pass).length} gates`;
-  const steps = pipeline.map((s, i) => {
-    const a = conf[s.agent] || { title: s.agent }, x = st[s.id] || { state: "pending", runs: 0 }, h = x.last;
-    const back = s.pass ? (s.on_fail ? ids.indexOf(s.on_fail) : -1) : -1;
-    const backDef = back >= 0 ? pipeline[back] : null;
+  $("stepsSub").textContent = `${stages.length} stages in ${phases.length} phases · ${stages.filter(gated).length} gates`;
+  const step = (s) => {
+    const x = st[s.id] || { state: "pending", runs: 0 };
     const runsHere = chosen ? chosen.history.filter((e) => e.stage === s.id) : [];
+    const runLine = runsHere.length ? `<div class="statusline">${runsHere.map((e) => `<span ${tipAttr(`${dateTime(e.started)}${e.kind === "gate" ? "" : `\n${modelName(e.resolved_model || e.model)} · ${e.effort}`}\n${dur(e.seconds)}${e.kind === "gate" ? "" : ` · ${compact(sum(e.tokens))} tokens`}`)}>${icon(e.outcome !== "ok" ? "x" : gated(s) && !passes(s, e.verdict) ? "warn" : "check", 12)}run ${e.visit}: ${esc(e.verdict || e.outcome)}</span>`).join("")}</div>` : "";
+    if (isGate(s)) {
+      const m = latestGate(source, s.id);
+      return `<li class="step ${x.state}">
+        <div class="rail"><span class="num">${x.state === "done" ? "✓" : esc(pos[s.id])}</span><span class="line"></span></div>
+        <div class="body"><div class="sc">
+          <div class="sc-h"><span class="mono-badge" aria-hidden="true">◆</span><div style="min-width:0"><b>${esc(s.title)}</b><div class="muted" style="font-size:12px">Gate step · measured by Cortana · <span class="mono">${esc(s.id)}</span></div></div>
+            <div class="right"><span class="chip">no LLM call</span>${chosen ? `<span class="chip">${esc(STATE_LABEL[x.state])}</span>` : ""}</div></div>
+          ${gateConds(s, m)}
+          <div class="gatebox">${icon("gate", 14)}<b>Gate</b> passes when every blocking condition holds
+            <span class="loopback">${icon("loop", 13)} on fail → ${esc(pos[backOf(s)] || "")}. ${esc(title(backOf(s)))}, which gets <span class="mono">${esc(s.output)}</span> (max ${d.settings.max_iterations}×)</span>
+            ${s.required ? `<span class="chip accent">required before done</span>` : mode === "auto" ? `<span class="chip">optional</span>` : ""}</div>
+          ${runLine}
+        </div></div></li>`;
+    }
+    const a = conf[s.agent] || { title: s.agent };
     return `<li class="step ${x.state}">
-      <div class="rail"><span class="num">${x.state === "done" ? "✓" : i + 1}</span><span class="line"></span></div>
+      <div class="rail"><span class="num">${x.state === "done" ? "✓" : esc(pos[s.id])}</span><span class="line"></span></div>
       <div class="body"><div class="sc">
         <div class="sc-h"><span class="mono-badge" aria-hidden="true">${mono(s.agent)}</span><div style="min-width:0"><b>${esc(s.title)}</b><div class="muted" style="font-size:12px">${esc(a.title)} · <span class="mono">${esc(s.id)}</span></div></div>
-          <div class="right"><span class="chip">${esc(modelName(a.model))}</span>${effortMeter(a.effort)}${chosen ? `<span class="chip">${esc(STATE_LABEL[x.state])}</span>` : ""}</div></div>
+          <div class="right"><span class="chip">${esc(modelName(a.model))}</span>${effortMeter(a.effort)}<span class="chip">${a.writes_code ? "changes code" : "report only"}</span>${chosen ? `<span class="chip">${esc(STATE_LABEL[x.state])}</span>` : ""}</div></div>
         <div class="task">${esc(s.task)}</div>
         <div class="io"><span>Writes <button class="btn ghost mono" style="height:auto;padding:0;font-size:12px" ${chosen ? `data-report="${esc(chosen.id)}" data-name="${esc(s.output)}"` : "disabled"}>${esc(s.output)}</button></span>${a.role ? `<span>${esc(a.role)}</span>` : ""}</div>
         ${s.pass ? `<div class="gatebox">${icon("gate", 14)}<b>Gate</b> passes on ${s.pass.map((v) => `<span class="chip">${esc(v)}</span>`).join(" ")}
-          ${mode === "deterministic" ? `<span class="loopback">${icon("loop", 13)} on fail → ${backDef ? `${back + 1}. ${esc(backDef.title)}` : "nearest build stage"} (max ${d.settings.max_iterations}×)</span>` : ""}
+          ${mode === "deterministic" ? `<span class="loopback">${icon("loop", 13)} on fail → ${esc(pos[backOf(s)] || "")}. ${esc(title(backOf(s)))} (max ${d.settings.max_iterations}×)</span>` : ""}
           ${s.required ? `<span class="chip accent">required before done</span>` : mode === "auto" ? `<span class="chip">optional</span>` : ""}</div>` : ""}
-        ${runsHere.length ? `<div class="statusline">${runsHere.map((e) => `<span ${tipAttr(`${dateTime(e.started)}\n${modelName(e.resolved_model || e.model)} · ${e.effort}\n${dur(e.seconds)} · ${compact(sum(e.tokens))} tokens`)}>${icon(e.outcome !== "ok" ? "x" : s.pass && !s.pass.includes(e.verdict) ? "warn" : "check", 12)}run ${e.visit}: ${esc(e.verdict || e.outcome)}</span>`).join("")}</div>` : ""}
+        ${runLine}
       </div></div>
     </li>`;
-  }).join("");
-  $("planSteps").innerHTML = `<ol class="steps">${steps}</ol>` + (chosen && chosen.mode === "auto" && chosen.decisions.length ? `<div style="margin-top:6px"><div class="muted" style="font-size:12px;margin-bottom:6px">Path the Orchestrator took</div><div class="flow">${chosen.decisions.map((x, i) => {
-    const t = chosen.pipeline.find((s) => s.id === x.chosen);
-    return (i ? `<span class="arrow" aria-hidden="true"></span>` : "") + `<div class="fs" ${tipAttr(x.reason + (x.override ? "\n" + x.override : ""))}><span class="n">${i + 1}</span><b style="font-size:13px">${x.chosen === "done" ? "Done" : esc(t ? t.title : x.outcome)}</b>${x.override ? icon("warn", 12) : ""}</div>`;
-  }).join("")}</div></div>` : "");
+  };
+  $("planSteps").innerHTML = phases.map((ph, i) => `<div class="phase-label"><b class="ink2">Phase ${i + 1}</b>${ph.length > 1 ? `<span class="chip">${ph.length} stages at the same time</span>` : ""}${ph.every(isGate) ? `<span class="chip">gate step</span>` : ""}</div><ol class="steps">${ph.map(step).join("")}</ol>`).join("") +
+    (chosen && chosen.mode === "auto" && chosen.decisions.length ? `<div style="margin-top:6px"><div class="muted" style="font-size:12px;margin-bottom:6px">Path the Orchestrator took</div><div class="flow">${chosen.decisions.map((x, i) => {
+      const picks = [].concat(x.chosen || []);
+      return (i ? `<span class="arrow" aria-hidden="true"></span>` : "") + `<div class="fs" ${tipAttr((x.reason || "") + (x.override ? "\n" + x.override : ""))}><span class="n">${i + 1}</span><b style="font-size:13px">${picks[0] === "done" ? "Done" : picks.length ? picks.map((id) => esc(title(id))).join(" + ") : esc(x.outcome)}</b>${x.override ? icon("warn", 12) : ""}</div>`;
+    }).join("")}</div></div>` : "");
 }
 
 /* ---------- settings ---------- */
@@ -1239,6 +1435,8 @@ async function loadSettings() {
   try {
     const res = await fetch("/api/settings", { cache: "no-store" });
     ui.cfg = await res.json();
+    ui.cfg.settings.pipeline = phasesOf(ui.cfg.settings.pipeline);
+    ui.cfg.defaults.pipeline = phasesOf(ui.cfg.defaults.pipeline);
     ui.draft = clone(ui.cfg.settings);
     ui.errors = [];
     renderSettings();
@@ -1292,7 +1490,7 @@ function renderSettings() {
     <div class="tbl-wrap"><table class="agents-tbl"><thead><tr><th>Agent</th><th>Model</th><th>Effort</th><th>Used in</th></tr></thead><tbody>
     ${agentNames.map((n) => {
       const a = c.catalog[n], v = s.agents[n] || { model: a.model, effort: a.effort };
-      const used = n === c.options.router ? "Full-auto mode" : s.pipeline.filter((p) => p.agent === n).map((p) => p.title).join(", ") || "—";
+      const used = n === c.options.router ? "Full-auto mode" : flat(s.pipeline).filter((p) => p.agent === n).map((p) => p.title).join(", ") || "—";
       return `<tr><td><div style="display:flex;gap:10px;align-items:center"><span class="mono-badge" aria-hidden="true">${mono(n)}</span><div><b>${esc(a.title)}</b><div class="muted" style="font-size:12px;max-width:320px">${esc(a.role || "")}</div></div></div></td>
         <td><select data-agent="${n}" data-f="model" aria-label="${esc(a.title)} model">${opt(c.options.models, v.model, cap)}</select></td>
         <td><div class="effort-pick" role="group" aria-label="${esc(a.title)} effort">${c.options.efforts.map((e) => `<button type="button" data-agent="${n}" data-f="effort" data-v="${e}" aria-pressed="${v.effort === e}">${e}</button>`).join("")}</div></td>
@@ -1301,29 +1499,41 @@ function renderSettings() {
     <p class="sec-desc">Model names are aliases for the latest model of each family. Higher effort thinks longer: better results, more of your usage.</p>
   </div></section>
 
-  <section class="card"><div class="card-h"><h2>Plan</h2><span class="sub">the stages each run goes through${s.mode === "auto" ? ", used as the Orchestrator’s catalogue" : ""}</span>
+  <section class="card"><div class="card-h"><h2>Parallel stages &amp; quality gates</h2><span class="sub">how phases run, and how Cortana measures gate steps</span></div><div class="card-b">
+    <div class="row-fields">
+      <label class="field"><span>Max stages at once</span><input type="number" min="1" max="8" data-k="max_parallel" value="${esc(s.max_parallel)}"><small>Stages of one phase run in parallel up to this many. Each one draws on your subscription’s usage window.</small></label>
+      <label class="field"><span>When a gate tool is missing</span><select data-g="when_unavailable">${opt(c.options.unavailable, s.gates.when_unavailable, (x) => ({ warn: "Warn, don’t block", block: "Fail the condition", ignore: "Ignore it" }[x]))}</select><small>For example coverage.py not installed, or no test command.</small></label>
+      <label class="field"><span>Security findings come from</span><select data-g="security_source" title="Tools: bandit, semgrep and pip-audit, when installed. Report: the Security Engineer’s findings table.">${opt(c.options.security_sources, s.gates.security_source, (x) => ({ auto: "Tools, else the report", tools: "Tools only", report: "Audit report only", both: "Tools and report" }[x]))}</select></label>
+      <label class="field"><span>Gate time limit (minutes)</span><input type="number" min="1" max="120" data-g="timeout_min" value="${esc(s.gates.timeout_min)}"></label>
+    </div>
+    <div class="row-fields" style="margin-top:14px;grid-template-columns:repeat(auto-fill,minmax(300px,1fr))">
+      <label class="field"><span>Test command</span><input type="text" class="mono" data-g="test_command" value="${esc(s.gates.test_command)}" placeholder="auto: pytest, or unittest, or node --test" spellcheck="false" autocomplete="off"><small>Runs in the workspace. It must write JUnit XML to <span class="mono">{junit}</span>. Leave empty to detect.</small></label>
+      <label class="field"><span>Coverage command</span><input type="text" class="mono" data-g="coverage_command" value="${esc(s.gates.coverage_command)}" placeholder="auto: coverage.py when installed" spellcheck="false" autocomplete="off"><small>Runs after the tests. It must write coverage.py JSON, an istanbul summary or lcov to <span class="mono">{coverage}</span>.</small></label>
+    </div>
+    <label class="check" style="margin-top:8px"><input type="checkbox" data-k="worktrees" ${s.worktrees ? "checked" : ""}> Give each report-only stage in a parallel phase its own git worktree</label>
+    <p class="sec-desc">Off by default: report-only stages just read the shared workspace while the phase’s one code-writing stage changes it. On, each of them reads a snapshot taken when the phase starts (committed code plus uncommitted changes), and Cortana copies its report back.</p>
+  </div></section>
+
+  <section class="card"><div class="card-h"><h2>Plan</h2><span class="sub">phases run in order; the stages in a phase run at the same time${s.mode === "auto" ? ". In full auto this is the Orchestrator’s catalogue" : ""}</span>
     <div class="right"><a class="btn" href="#plan">View diagram</a><button class="btn" data-act="reset-plan">Reset to default</button></div></div><div class="card-b">
-    ${s.pipeline.map((p, i) => `<div class="stage-ed">
-      <span class="num">${i + 1}</span>
-      <div class="fields">
-        <label class="field"><span>Title</span><input type="text" data-stage="${i}" data-f="title" value="${esc(p.title)}" maxlength="60"></label>
-        <label class="field"><span>Agent</span><select data-stage="${i}" data-f="agent">${opt(stageAgents, p.agent, (n) => c.catalog[n].title)}</select></label>
-        <label class="field"><span>Stage id</span><input type="text" data-stage="${i}" data-f="id" value="${esc(p.id)}" spellcheck="false" class="mono"></label>
-        <label class="field"><span>Output document</span><input type="text" data-stage="${i}" data-f="output" value="${esc(p.output)}" spellcheck="false" class="mono"></label>
-        <label class="field full"><span>Task</span><textarea data-stage="${i}" data-f="task" rows="2">${esc(p.task)}</textarea></label>
-        <label class="field"><span>Gate: passes on</span><input type="text" data-stage="${i}" data-f="pass" value="${esc((p.pass || []).join(", "))}" placeholder="no gate" spellcheck="false"><small>Verdicts, e.g. APPROVE or PASS</small></label>
-        <label class="field"><span>On fail, go back to</span><select data-stage="${i}" data-f="on_fail" ${p.pass && p.pass.length ? "" : "disabled"}><option value="">Nearest build stage</option>${s.pipeline.filter((_, j) => j !== i).map((o) => `<option value="${esc(o.id)}" ${p.on_fail === o.id ? "selected" : ""}>${s.pipeline.indexOf(o) + 1}. ${esc(o.title)}</option>`).join("")}</select></label>
-        <label class="check"><input type="checkbox" data-stage="${i}" data-f="required" ${p.required ? "checked" : ""} ${p.pass && p.pass.length ? "" : "disabled"}> Required before done (full auto)</label>
-      </div>
-      <div class="ctrl">
-        <button class="btn icon" data-act="up" data-i="${i}" ${i === 0 ? "disabled" : ""} title="Move up" aria-label="Move stage ${i + 1} up">${icon("up")}</button>
-        <button class="btn icon" data-act="down" data-i="${i}" ${i === s.pipeline.length - 1 ? "disabled" : ""} title="Move down" aria-label="Move stage ${i + 1} down">${icon("down")}</button>
-        <button class="btn icon" data-act="remove" data-i="${i}" ${s.pipeline.length === 1 ? "disabled" : ""} title="Remove" aria-label="Remove stage ${i + 1}">${icon("trash")}</button>
-      </div>
-    </div>`).join("")}
+    ${s.pipeline.map((ph, i) => {
+      const coders = ph.filter((p) => !isGate(p) && c.catalog[p.agent] && c.catalog[p.agent].writes_code);
+      return `<div class="phase-ed">
+      <div class="phase-ed-h"><b>Phase ${i + 1}</b>${ph.length > 1 ? `<span class="chip">${ph.length} in parallel</span>` : ""}${ph.every(isGate) ? `<span class="chip">gate</span>` : ""}
+        ${coders.length > 1 ? `<span class="chip" style="border-color:var(--critical)">${icon("warn", 12)} ${coders.length} stages change code; only one may</span>` : ""}
+        <div class="right">
+          <button class="btn icon" data-act="phase-up" data-p="${i}" ${i === 0 ? "disabled" : ""} title="Move phase up" aria-label="Move phase ${i + 1} earlier">${icon("up")}</button>
+          <button class="btn icon" data-act="phase-down" data-p="${i}" ${i === s.pipeline.length - 1 ? "disabled" : ""} title="Move phase down" aria-label="Move phase ${i + 1} later">${icon("down")}</button>
+          <button class="btn icon" data-act="phase-remove" data-p="${i}" ${s.pipeline.length === 1 ? "disabled" : ""} title="Remove phase and its stages" aria-label="Remove phase ${i + 1}">${icon("trash")}</button>
+        </div></div>
+      ${ph.map((p, k) => stageEditor(p, i, k)).join("")}
+      ${ph.every(isGate) ? "" : `<button class="btn ghost" style="margin-top:8px" data-act="add-to" data-p="${i}">+ Add a parallel stage here</button>`}
+    </div>`;
+    }).join("")}
     <div style="display:flex;gap:8px;margin-top:12px;flex-wrap:wrap;align-items:center">
-      <select id="addAgent" style="width:200px" aria-label="Agent for the new stage">${opt(stageAgents, "security", (n) => c.catalog[n].title)}</select>
-      <button class="btn" data-act="add">+ Add stage</button>
+      <select id="addAgent" style="width:200px" aria-label="Agent for the new stage">${opt(stageAgents, ui.addAgent || "security", (n) => c.catalog[n].title)}</select>
+      <button class="btn" data-act="add">+ New phase with this agent</button>
+      <button class="btn" data-act="add-gate">+ New quality gate</button>
     </div>
   </div></section>
 
@@ -1334,17 +1544,91 @@ function renderSettings() {
   </div></div>`;
   updateSaveBar();
 }
+function stageEditor(p, i, k) {
+  const c = ui.cfg, s = ui.draft, key = `${i}.${k}`, ph = s.pipeline[i];
+  const opt = (list, v, fmt) => list.map((x) => `<option value="${esc(x)}" ${x === v ? "selected" : ""}>${esc(fmt ? fmt(x) : x)}</option>`).join("");
+  const pos = stagePos(s.pipeline);
+  const others = flat(s.pipeline).filter((o) => o !== p);
+  const onFail = (disabled) => `<label class="field"><span>On fail, go back to</span><select data-stage="${key}" data-f="on_fail" ${disabled ? "disabled" : ""}><option value="">Nearest build stage</option>${others.map((o) => `<option value="${esc(o.id)}" ${p.on_fail === o.id ? "selected" : ""}>${esc(pos[o.id])}. ${esc(o.title)}</option>`).join("")}</select></label>`;
+  const move = `<label class="field"><span>Phase</span><select data-stage="${key}" data-f="phase" aria-label="Move ${esc(p.title)} to another phase">${s.pipeline.map((_, j) => `<option value="${j}" ${j === i ? "selected" : ""}>Phase ${j + 1}${j === i ? "" : " (run in parallel)"}</option>`).join("")}<option value="new">Own phase, right after</option></select></label>`;
+  const ctrl = `<div class="ctrl">
+      <button class="btn icon" data-act="up" data-s="${key}" ${k === 0 ? "disabled" : ""} title="Move up in phase" aria-label="Move ${esc(p.title)} up">${icon("up")}</button>
+      <button class="btn icon" data-act="down" data-s="${key}" ${k === ph.length - 1 ? "disabled" : ""} title="Move down in phase" aria-label="Move ${esc(p.title)} down">${icon("down")}</button>
+      <button class="btn icon" data-act="remove" data-s="${key}" ${flat(s.pipeline).length === 1 ? "disabled" : ""} title="Remove" aria-label="Remove ${esc(p.title)}">${icon("trash")}</button>
+    </div>`;
+  if (isGate(p)) {
+    const M = c.options.metrics;
+    return `<div class="stage-ed">
+      <span class="num">◆</span>
+      <div class="fields">
+        <label class="field"><span>Gate title</span><input type="text" data-stage="${key}" data-f="title" value="${esc(p.title)}" maxlength="60"></label>
+        <label class="field"><span>Stage id</span><input type="text" data-stage="${key}" data-f="id" value="${esc(p.id)}" spellcheck="false" class="mono"></label>
+        <label class="field"><span>Report for the Developer</span><input type="text" data-stage="${key}" data-f="output" value="${esc(p.output)}" spellcheck="false" class="mono"></label>
+        ${onFail(false)}
+        <label class="check"><input type="checkbox" data-stage="${key}" data-f="required" ${p.required ? "checked" : ""}> Required before done (full auto)</label>
+        <div class="full"><div class="cond-head cond-ed"><span>Metric</span><span>Counts</span><span>Is</span><span>Threshold</span><span>On fail</span><span></span></div>
+          ${(p.conditions || []).map((x, n) => `<div class="cond-ed">
+            <select data-cond="${key}.${n}" data-f="metric" aria-label="Condition ${n + 1} metric">${opt(Object.keys(M), x.metric, (m) => M[m].label)}</select>
+            ${M[x.metric] && M[x.metric].level ? `<select data-cond="${key}.${n}" data-f="level" aria-label="Condition ${n + 1} severity counted">${opt(c.options.levels, x.level, (l) => l + "+")}</select>` : `<span class="muted" style="font-size:12px">${esc((M[x.metric] || {}).unit === "%" ? "percent" : (M[x.metric] || {}).unit || "count")}</span>`}
+            <select data-cond="${key}.${n}" data-f="op" aria-label="Condition ${n + 1} comparison">${opt(c.options.ops, x.op)}</select>
+            <input type="number" min="0" step="any" data-cond="${key}.${n}" data-f="value" value="${esc(x.value)}" aria-label="Condition ${n + 1} threshold">
+            <select data-cond="${key}.${n}" data-f="severity" aria-label="Condition ${n + 1} severity">${opt(c.options.severities, x.severity, (v) => (v === "block" ? "Block" : "Warn"))}</select>
+            <button class="btn icon" data-act="cond-remove" data-cond="${key}.${n}" title="Remove condition" aria-label="Remove condition ${n + 1}">${icon("trash")}</button>
+          </div>`).join("")}
+          <button class="btn ghost" style="margin-top:6px" data-act="cond-add" data-s="${key}">+ Add condition</button>
+          <small class="muted" style="display:block;margin-top:4px">Cortana measures these itself after the phases before it. Block conditions that fail send the work back with the merged report; warn conditions are only reported.</small></div>
+      </div>${ctrl}</div>`;
+  }
+  const stageAgents = Object.keys(c.catalog).filter((n) => n !== c.options.router);
+  return `<div class="stage-ed">
+      <span class="num">${esc(pos[p.id] || "")}</span>
+      <div class="fields">
+        <label class="field"><span>Title</span><input type="text" data-stage="${key}" data-f="title" value="${esc(p.title)}" maxlength="60"></label>
+        <label class="field"><span>Agent${c.catalog[p.agent] && c.catalog[p.agent].writes_code ? " · changes code" : ""}</span><select data-stage="${key}" data-f="agent">${opt(stageAgents, p.agent, (n) => c.catalog[n].title)}</select></label>
+        <label class="field"><span>Stage id</span><input type="text" data-stage="${key}" data-f="id" value="${esc(p.id)}" spellcheck="false" class="mono"></label>
+        <label class="field"><span>Output document</span><input type="text" data-stage="${key}" data-f="output" value="${esc(p.output)}" spellcheck="false" class="mono"></label>
+        <label class="field full"><span>Task</span><textarea data-stage="${key}" data-f="task" rows="2">${esc(p.task)}</textarea></label>
+        <label class="field"><span>Gate: passes on</span><input type="text" data-stage="${key}" data-f="pass" value="${esc((p.pass || []).join(", "))}" placeholder="no gate" spellcheck="false"><small>Verdicts, e.g. APPROVE or PASS</small></label>
+        ${onFail(!(p.pass && p.pass.length))}
+        ${move}
+        <label class="check"><input type="checkbox" data-stage="${key}" data-f="required" ${p.required ? "checked" : ""} ${p.pass && p.pass.length ? "" : "disabled"}> Required before done (full auto)</label>
+      </div>${ctrl}</div>`;
+}
+const stageAt = (key) => { const [i, k] = key.split(".").map(Number); return { i, k, p: ui.draft.pipeline[i][k] }; };
+function uniqueId(base) {
+  const ids = flat(ui.draft.pipeline).map((o) => o.id);
+  let id = base, n = 2; while (ids.includes(id)) id = `${base}-${n++}`;
+  return id;
+}
+function dropEmptyPhases() { ui.draft.pipeline = ui.draft.pipeline.filter((ph) => ph.length); }
+function defaultCondition(metric) {
+  const m = ui.cfg.options.metrics[metric];
+  return Object.assign({ metric, op: m.op, value: m.value, severity: metric === "run_tokens" ? "warn" : "block" }, m.level ? { level: m.level } : {});
+}
 function onSettingsInput(e) {
   const t = e.target, s = ui.draft;
   if (!s || !t.closest("#view-settings")) return;
   if (t.dataset.k) {
     const k = t.dataset.k;
-    s[k] = t.type === "number" ? (t.value === "" ? "" : Number(t.value)) : t.value;
+    s[k] = t.type === "checkbox" ? t.checked : t.type === "number" ? (t.value === "" ? "" : Number(t.value)) : t.value;
     if (k === "mode") { renderSettings(); return; }
+  } else if (t.dataset.g) {
+    s.gates = Object.assign({}, s.gates, { [t.dataset.g]: t.type === "number" ? (t.value === "" ? "" : Number(t.value)) : t.value });
   } else if (t.dataset.agent && t.dataset.f === "model") {
     s.agents[t.dataset.agent] = Object.assign({}, s.agents[t.dataset.agent], { model: t.value });
+  } else if (t.dataset.cond) {
+    const parts = t.dataset.cond.split("."), n = Number(parts[2]), { p } = stageAt(parts.slice(0, 2).join("."));
+    if (t.dataset.f === "metric") { if (e.type !== "change") return; p.conditions[n] = defaultCondition(t.value); renderSettings(); return; }
+    p.conditions[n][t.dataset.f] = t.dataset.f === "value" ? (t.value === "" ? "" : Number(t.value)) : t.value;
   } else if (t.dataset.stage) {
-    const p = s.pipeline[Number(t.dataset.stage)], f = t.dataset.f;
+    const { i, k, p } = stageAt(t.dataset.stage), f = t.dataset.f;
+    if (f === "phase") {
+      if (e.type !== "change") return;
+      s.pipeline[i].splice(k, 1);
+      if (t.value === "new") s.pipeline.splice(i + 1, 0, [p]);
+      else s.pipeline[Number(t.value)].push(p);
+      dropEmptyPhases(); renderSettings(); return;
+    }
     if (f === "pass") {
       const list = t.value.split(",").map((v) => v.trim().toUpperCase()).filter(Boolean);
       if (list.length) { p.pass = list; p.on_fail = p.on_fail || null; p.required = !!p.required; }
@@ -1354,10 +1638,10 @@ function onSettingsInput(e) {
     else if (f === "on_fail") p.on_fail = t.value || null;
     else if (f === "id") {
       const old = p.id; p.id = t.value.trim();
-      s.pipeline.forEach((o) => { if (o.on_fail === old) o.on_fail = p.id; });
+      flat(s.pipeline).forEach((o) => { if (o.on_fail === old) o.on_fail = p.id; });
     } else p[f] = t.value;
     if (f === "agent" && e.type === "change") { renderSettings(); return; }
-  }
+  } else if (t.id === "addAgent") ui.addAgent = t.value;
   ui.errors = [];
   updateSaveBar();
 }
@@ -1369,13 +1653,38 @@ async function onSettingsClick(t) {
     updateSaveBar(); return true;
   }
   if (!act) return false;
-  const i = Number(t.dataset.i);
-  if (act === "up" || act === "down") { const j = act === "up" ? i - 1 : i + 1; [s.pipeline[i], s.pipeline[j]] = [s.pipeline[j], s.pipeline[i]]; }
-  else if (act === "remove") { const gone = s.pipeline.splice(i, 1)[0]; s.pipeline.forEach((o) => { if (o.on_fail === gone.id) o.on_fail = null; }); }
-  else if (act === "add") {
-    const agent = $("addAgent").value, base = agent.replace(/[^a-z0-9]+/g, "-");
-    let id = base, n = 2; while (s.pipeline.some((o) => o.id === id)) id = `${base}-${n++}`;
-    s.pipeline.push({ id, title: c.catalog[agent].title, agent, output: `docs/${id}.md`, task: c.catalog[agent].role || "" });
+  const P = s.pipeline, pi = Number(t.dataset.p);
+  const newStage = () => {
+    const agent = $("addAgent").value, id = uniqueId(agent.replace(/[^a-z0-9]+/g, "-"));
+    return { id, title: c.catalog[agent].title, agent, output: `docs/${id}.md`, task: c.catalog[agent].role || "" };
+  };
+  if (act === "up" || act === "down") {
+    const { i, k } = stageAt(t.dataset.s), j = act === "up" ? k - 1 : k + 1;
+    [P[i][k], P[i][j]] = [P[i][j], P[i][k]];
+  } else if (act === "remove") {
+    const { i, k } = stageAt(t.dataset.s), gone = P[i].splice(k, 1)[0];
+    flat(P).forEach((o) => { if (o.on_fail === gone.id) o.on_fail = null; });
+    dropEmptyPhases();
+  } else if (act === "phase-up" || act === "phase-down") {
+    const j = act === "phase-up" ? pi - 1 : pi + 1;
+    [P[pi], P[j]] = [P[j], P[pi]];
+  } else if (act === "phase-remove") {
+    const gone = P.splice(pi, 1)[0].map((o) => o.id);
+    flat(P).forEach((o) => { if (gone.includes(o.on_fail)) o.on_fail = null; });
+  } else if (act === "add") P.push([newStage()]);
+  else if (act === "add-to") P[pi].push(newStage());
+  else if (act === "add-gate") {
+    const id = uniqueId("quality-gate"), base = flat(c.defaults.pipeline).find(isGate);
+    const build = flat(P).filter((o) => o.agent === "developer").pop();
+    P.push([{ id, title: "Quality gate", kind: "gate", output: id === "quality-gate" ? "docs/gate-report.md" : `docs/${id}.md`,
+      on_fail: build ? build.id : null, required: true, conditions: base ? clone(base.conditions) : [defaultCondition("test_pass_rate")] }]);
+  } else if (act === "cond-add") {
+    const { p } = stageAt(t.dataset.s), used = (p.conditions || []).map((x) => x.metric);
+    const metric = Object.keys(c.options.metrics).find((m) => !used.includes(m)) || "test_pass_rate";
+    (p.conditions = p.conditions || []).push(defaultCondition(metric));
+  } else if (act === "cond-remove") {
+    const parts = t.dataset.cond.split("."), { p } = stageAt(parts.slice(0, 2).join("."));
+    p.conditions.splice(Number(parts[2]), 1);
   }
   else if (act === "reset-plan") s.pipeline = clone(c.defaults.pipeline);
   else if (act === "reset-agents") s.agents = clone(c.defaults.agents);
@@ -1392,7 +1701,8 @@ async function saveSettings() {
     const out = await res.json();
     if (!out.ok) { ui.errors = out.errors || ["Couldn’t save."]; }
     else {
-      ui.cfg = out; ui.draft = clone(out.settings); ui.errors = [];
+      ui.cfg = out; ui.cfg.settings.pipeline = phasesOf(out.settings.pipeline); ui.cfg.defaults.pipeline = phasesOf(out.defaults.pipeline);
+      ui.draft = clone(ui.cfg.settings); ui.errors = [];
       toast("Settings saved. The plan and mode apply to new runs; models and effort apply from the next stage.");
       renderSettings(); fetchState();
     }

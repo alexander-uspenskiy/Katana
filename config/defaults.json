@@ -5,6 +5,15 @@
   "max_iterations": 3,
   "max_stations": 20,
   "station_timeout_min": 60,
+  "max_parallel": 2,
+  "worktrees": false,
+  "gates": {
+    "test_command": "",
+    "coverage_command": "",
+    "when_unavailable": "warn",
+    "security_source": "auto",
+    "timeout_min": 10
+  },
   "agents": {
     "orchestrator": {"model": "sonnet", "effort": "low"},
     "ba": {"model": "opus", "effort": "high"},
@@ -15,23 +24,28 @@
     "reviewer": {"model": "opus", "effort": "high"}
   },
   "pipeline": [
-    {"id": "tdd", "title": "Write TDD", "agent": "ba", "output": "docs/tdd.md",
-     "task": "Write the business part of the TDD in docs/tdd.md from docs/00-requirements.md."},
-    {"id": "tdd-refine", "title": "Refine TDD", "agent": "architect", "output": "docs/tdd.md",
-     "task": "Refine docs/tdd.md: complete the technical design and write docs/tasks.md."},
-    {"id": "tdd-security", "title": "Validate TDD security", "agent": "security", "output": "docs/security-tdd.md",
-     "task": "Validate the design in docs/tdd.md before any code is written.",
-     "pass": ["APPROVE"], "on_fail": "tdd-refine", "required": true},
-    {"id": "build", "title": "Build", "agent": "developer", "output": "docs/dev-notes.md",
-     "task": "Implement the tasks in docs/tasks.md as docs/tdd.md describes."},
-    {"id": "test", "title": "Test", "agent": "tester", "output": "docs/test-report.md",
-     "task": "Test every acceptance criterion in docs/tdd.md.",
-     "pass": ["PASS"], "on_fail": "build", "required": true},
-    {"id": "review", "title": "Code review", "agent": "reviewer", "output": "docs/review.md",
-     "task": "Review the code against docs/tdd.md.",
-     "pass": ["APPROVE"], "on_fail": "build", "required": true},
-    {"id": "security-audit", "title": "Security audit", "agent": "security", "output": "docs/security-audit.md",
-     "task": "Audit the code for security issues and check every control promised in docs/tdd.md.",
-     "pass": ["APPROVE"], "on_fail": "build", "required": true}
+    [{"id": "tdd", "title": "Write TDD", "agent": "ba", "output": "docs/tdd.md",
+      "task": "Write the business part of the TDD in docs/tdd.md from docs/00-requirements.md."}],
+    [{"id": "tdd-refine", "title": "Refine TDD", "agent": "architect", "output": "docs/tdd.md",
+      "task": "Refine docs/tdd.md: complete the technical design and write docs/tasks.md."}],
+    [{"id": "tdd-security", "title": "Validate TDD security", "agent": "security", "output": "docs/security-tdd.md",
+      "task": "Validate the design in docs/tdd.md before any code is written.",
+      "pass": ["APPROVE"], "on_fail": "tdd-refine", "required": true}],
+    [{"id": "build", "title": "Build", "agent": "developer", "output": "docs/dev-notes.md",
+      "task": "Implement the tasks in docs/tasks.md as docs/tdd.md describes."}],
+    [{"id": "test", "title": "Test", "agent": "tester", "output": "docs/test-report.md",
+      "task": "Test every acceptance criterion in docs/tdd.md."},
+     {"id": "security-audit", "title": "Security audit", "agent": "security", "output": "docs/security-audit.md",
+      "task": "Audit the code for security issues and check every control promised in docs/tdd.md."},
+     {"id": "review", "title": "Code review", "agent": "reviewer", "output": "docs/review.md",
+      "task": "Review the code against docs/tdd.md."}],
+    [{"id": "quality-gate", "title": "Quality gate", "kind": "gate", "output": "docs/gate-report.md",
+      "on_fail": "build", "required": true,
+      "conditions": [
+        {"metric": "test_pass_rate", "op": ">=", "value": 100, "severity": "block"},
+        {"metric": "coverage", "op": ">=", "value": 80, "severity": "block"},
+        {"metric": "security_findings", "level": "high", "op": "<=", "value": 0, "severity": "block"},
+        {"metric": "review_must_fix", "op": "<=", "value": 0, "severity": "block"}
+      ]}]
   ]
 }

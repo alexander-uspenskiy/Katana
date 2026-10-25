@@ -19,6 +19,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 from urllib.parse import parse_qs, urlparse
 
+import gates
 import settings
 import streamlog
 
@@ -26,7 +27,6 @@ HERE = Path(__file__).resolve().parent
 PAGE = HERE / "dashboard" / "index.html"
 LABEL = "com.cortana.orchestrator"
 TASK_LINE = re.compile(r"^\s*[-*]\s+\[([ xX])\]\s+(?:(T\d+)[:.)]?\s*)?(.+)$", re.M)
-AC_ROW = re.compile(r"^\|\s*\**(AC-\d+(?:\.\d+)?)\**\s*\|(.+)$", re.M)
 TOKEN_KEYS = ("input", "cache_write", "cache_read", "output")
 _service_cache = {"at": 0.0, "value": None}
 
@@ -63,7 +63,8 @@ def agents_view(conf: dict) -> list:
         if name not in catalog:
             continue
         a = settings.effective_agent(conf, catalog, name)
-        out.append({k: a.get(k) for k in ("name", "title", "role", "model", "effort", "tools")})
+        out.append(dict({k: a.get(k) for k in ("name", "title", "role", "model", "effort", "tools")},
+                        writes_code=settings.writes_code(catalog, {"agent": name})))
     return out
 
 
@@ -79,18 +80,9 @@ def parse_tasks(workspace: Path) -> dict:
 
 def parse_acceptance(workspace: Path) -> dict:
     try:
-        text = (workspace / "docs/test-report.md").read_text()
+        return gates.parse_acceptance((workspace / "docs/test-report.md").read_text())
     except OSError:
         return {"total": 0, "pass": 0, "items": []}
-    items = {}
-    for m in AC_ROW.finditer(text):
-        cells = [c.strip(" *`") for c in m.group(2).split("|")]
-        result = next((c.upper() for c in cells if c.upper() in ("PASS", "FAIL")), None)
-        test = next((c for c in cells if c and c.upper() not in ("PASS", "FAIL")), "")
-        if result:
-            items[m.group(1)] = {"id": m.group(1), "test": test, "result": result}
-    items = list(items.values())
-    return {"total": len(items), "pass": sum(i["result"] == "PASS" for i in items), "items": items}
 
 
 def run_view(run: dict, run_dir: Path) -> dict:
@@ -102,23 +94,34 @@ def run_view(run: dict, run_dir: Path) -> dict:
             totals[k] += (h.get("tokens") or {}).get(k, 0)
         cost += h.get("cost_usd") or 0
         seconds += h.get("seconds") or 0
-    current = run.get("current")
-    if current:
-        live = streamlog.summarize(run_dir / current["log"])
-        if not live["messages"] and current["log"].endswith(".json"):  # orchestrator call: one JSON line
-            live["model"] = live["model"] or current["model"]
-        started = datetime.fromisoformat(current["started"])
-        current = dict(current, live={
+    current = run.get("current") or []
+    current = [current] if isinstance(current, dict) else current  # runs from before parallel stages
+    live_list = []
+    for c in current:  # one entry per stage running now
+        elapsed = round((datetime.now() - datetime.fromisoformat(c["started"])).total_seconds())
+        if c.get("kind") == "gate":
+            live_list.append(dict(c, live={"model": None, "messages": 0, "tokens": dict.fromkeys(TOKEN_KEYS, 0),
+                                           "tools": {}, "events": [], "elapsed": elapsed}))
+            continue
+        live = streamlog.summarize(run_dir / c["log"])
+        if not live["messages"] and c["log"].endswith(".json"):  # orchestrator call: one JSON line
+            live["model"] = live["model"] or c["model"]
+        live_list.append(dict(c, live={
             "model": live["model"], "messages": live["messages"], "tokens": live["tokens"],
-            "tools": live["tools"], "events": live["events"],
-            "elapsed": round((datetime.now() - started).total_seconds())})
+            "tools": live["tools"], "events": live["events"], "elapsed": elapsed}))
+    pipeline = settings.phases(run.get("pipeline"))
+    phase = run.get("phase")
+    if "phase" not in run and run.get("stage"):  # runs from before phases
+        phase = next((i for i, ph in enumerate(pipeline) if any(s["id"] == run["stage"] for s in ph)), None)
     reports = sorted(p.name for p in (run_dir / "reports").glob("*.md"))
     docs = sorted(str(p.relative_to(workspace)) for p in (workspace / "docs").glob("*.md")) \
         if (workspace / "docs").is_dir() else []
-    return dict(run, current=current, tasks=parse_tasks(workspace), acceptance=parse_acceptance(workspace),
+    return dict(run, current=live_list, pipeline=pipeline, phase=phase, next=run.get("next") or
+                ([run["stage"]] if run.get("stage") and run.get("mode") == "auto" else []),
+                finished=run.get("finished") or [], tasks=parse_tasks(workspace), acceptance=parse_acceptance(workspace),
                 reports=reports, docs=docs,
                 totals={"tokens": totals, "cost_usd": round(cost, 4), "seconds": seconds,
-                        "stations": len(run.get("history", []))})
+                        "stations": sum(h.get("kind") != "gate" for h in run.get("history", []))})
 
 
 def queue_view(root: Path) -> list:
@@ -148,7 +151,7 @@ def spend_events(runs: list) -> list:
     for run in runs:
         base = {"run": run["id"], "project": run["source"].replace(".md", "")}
         for h in run.get("history", []):
-            if h.get("started"):
+            if h.get("started") and h.get("kind") != "gate":  # gate steps make no CLI call
                 events.append(dict(base, kind="stage", stage=h["stage"], title=h.get("title"), agent=h.get("agent"),
                                    visit=h.get("visit"), started=h["started"], finished=h.get("finished"),
                                    seconds=h.get("seconds"), outcome=h.get("outcome"), verdict=h.get("verdict"),
@@ -160,8 +163,9 @@ def spend_events(runs: list) -> list:
                                seconds=d.get("seconds"), outcome=d.get("outcome"), verdict=d.get("chosen"),
                                model=d["resolved_model"], effort=d.get("effort"), tokens=d.get("tokens") or {},
                                cost_usd=d.get("cost_usd")))
-        c = run.get("current")
-        if c:
+        for c in run.get("current") or []:
+            if c.get("kind") == "gate":
+                continue
             events.append(dict(base, kind="live", stage=c.get("stage") or "orchestrator", title=c.get("title"),
                                agent=c.get("agent"), visit=c.get("visit"), started=c["started"], finished=None,
                                outcome="running", model=c["live"]["model"] or c["model"], effort=c["effort"],
@@ -214,8 +218,9 @@ def state() -> dict:
         log_tail = []
     return {"generated": datetime.now().isoformat(), "project": conf.get("project", "Cortana"), "home": str(root),
             "factory": beat, "service": service_status(), "agents": agents_view(conf),
-            "settings": {k: conf[k] for k in ("mode", "pipeline", "max_iterations", "max_stations",
-                                              "station_timeout_min")},
+            "settings": {k: conf.get(k) for k in ("mode", "pipeline", "max_iterations", "max_stations",
+                                                  "station_timeout_min", "max_parallel", "worktrees", "gates")},
+            "metrics": gates.METRICS,
             "queue": queue_view(root), "runs": runs, "events": events, "stats": aggregate(events), "log": log_tail}
 
 
@@ -224,8 +229,11 @@ def settings_payload() -> dict:
     catalog = settings.agent_catalog()
     return {"settings": conf, "defaults": settings.defaults(),
             "options": {"models": settings.MODELS, "efforts": settings.EFFORTS, "modes": settings.MODES,
-                        "router": settings.ROUTER},
-            "catalog": {n: {k: a.get(k) for k in ("title", "role", "model", "effort", "tools")}
+                        "router": settings.ROUTER, "metrics": gates.METRICS, "ops": list(gates.OPS),
+                        "severities": gates.SEVERITIES, "levels": gates.LEVELS,
+                        "unavailable": gates.UNAVAILABLE, "security_sources": gates.SECURITY_SOURCES},
+            "catalog": {n: dict({k: a.get(k) for k in ("title", "role", "model", "effort", "tools")},
+                                writes_code=settings.writes_code(catalog, {"agent": n}))
                         for n, a in catalog.items()},
             "home": home_status(settings.home(conf)),
             "env_override": bool(os.environ.get("CORTANA_HOME"))}
