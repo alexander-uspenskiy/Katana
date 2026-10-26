@@ -1317,7 +1317,7 @@ function renderRoster(d) {
     return `<div class="role ${busy[a.name] ? "busy" : ""} ${a.enabled === false ? "off" : ""}">
       <div class="mono-badge" aria-hidden="true">${mono(a.name)}</div>
       <div style="min-width:0">
-        <div class="top-line"><b>${esc(a.title)}</b>${a.enabled === false ? `<span class="chip">disabled</span>` : ""}${a.prompt_override ? `<span class="chip accent">custom prompt</span>` : ""}${busy[a.name] ? `<span class="chip"><span class="dot live"></span>working${busy[a.name] > 1 ? ` ×${busy[a.name]}` : ""}</span>` : ""}<span class="chip">${esc(modelName(a.model))}</span>${effortMeter(a.effort)}</div>
+        <div class="top-line"><b>${esc(a.title)}</b>${a.enabled === false ? `<span class="chip">disabled</span>` : ""}${a.prompt_override ? `<span class="chip accent">custom prompt</span>` : ""}${busy[a.name] ? `<span class="chip"><span class="dot live"></span>working${busy[a.name] > 1 ? ` ×${busy[a.name]}` : ""}</span>` : ""}<span class="chip">${esc(modelName(a.model))}</span>${effortMeter(a.effort)}${a.name === "orchestrator" ? "" : `<button class="btn" style="height:22px;padding:0 8px;font-size:11.5px;margin-left:auto" data-roster-edit="${esc(a.name)}" aria-label="Edit ${esc(a.title)}">Edit</button>`}</div>
         <div class="meta"><span>${esc(note)}</span><span>${s.stations} call${s.stations === 1 ? "" : "s"}</span><span>avg ${dur(s.stations ? s.seconds / s.stations : 0)}</span><span>${compact(tok)} tokens</span>${verdicts ? `<span>${esc(verdicts)}</span>` : ""}</div>
         <details><summary>${esc(a.role || "")} · ${a.tools.length} tools</summary><div class="tools">${a.tools.map((t) => `<span class="chip mono">${esc(t)}</span>`).join("") || '<span class="muted">no tools</span>'}</div></details>
       </div>
@@ -2638,6 +2638,7 @@ function route() {
   window.scrollTo(0, 0);
 }
 window.addEventListener("hashchange", route);
+$("roster").addEventListener("click", (e) => { const b = e.target.closest("[data-roster-edit]"); if (b) pgEditFromRoster(b.dataset.rosterEdit); });
 window.addEventListener("beforeunload", (e) => { if (dirty()) { e.preventDefault(); e.returnValue = ""; } });
 
 document.addEventListener("click", async (e) => {

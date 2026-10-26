@@ -671,16 +671,22 @@ function pgOnClick(e) {
       pgPaint();
     }
   } else if (act === "agent-prompt") openPrompt(b.dataset.id);
-  else if (act === "agent-edit" && !pg.draft.custom_agents[b.dataset.id]) {
-    const n = b.dataset.id, a = pgAgents()[n], c = pg.draft.agents[n] || {};
-    pg.form = { kind: "agent", edit: n, errors: [], data: { std: true, title: a.title, name: n, role: a.role || "", model: c.model || a.model, effort: c.effort || a.effort, writes_code: !!a.writes_code, enabled: c.enabled !== false, tools: (c.tools || a.tools).join(", "), prompt: "" } }; pgPaint(["side"]);
-  } else if (act === "agent-edit") {
-    const a = pg.draft.custom_agents[b.dataset.id], c = pg.draft.agents[b.dataset.id] || {};
-    pg.form = { kind: "agent", edit: b.dataset.id, errors: [], data: { title: a.title, name: b.dataset.id, role: a.role, model: c.model || "sonnet", effort: c.effort || "medium", writes_code: !!a.writes_code, tools: a.tools.join(", "), prompt: a.prompt } }; pgPaint(["side"]);
+  else if (act === "agent-edit") { pgEditAgent(b.dataset.id); pgPaint(["side"]);
   } else if (act === "agent-delete") {
     if (confirm("Delete this agent?")) { pgCommit((d) => { delete d.custom_agents[b.dataset.id]; delete d.agents[b.dataset.id]; }); pgPaint(["side", "canvas"]); }
   } else if (act === "form-save") pgSaveForm();
   else if (act === "form-cancel") { const then = pg.form && pg.form.then; pg.form = null; if (then) pg.tab = "step"; pgPaint(["side"]); }
+}
+function pgEditAgent(n) {  // opens the edit form of an agent: a standard one (model, effort, tools, enabled) or one of the project's own
+  const pg = ui.pg, mine = pg.draft.custom_agents[n], c = pg.draft.agents[n] || {};
+  if (mine) pg.form = { kind: "agent", edit: n, errors: [], data: { title: mine.title, name: n, role: mine.role, model: c.model || "sonnet", effort: c.effort || "medium", writes_code: !!mine.writes_code, tools: mine.tools.join(", "), prompt: mine.prompt } };
+  else { const a = pgAgents()[n]; pg.form = { kind: "agent", edit: n, errors: [], data: { std: true, title: a.title, name: n, role: a.role || "", model: c.model || a.model, effort: c.effort || a.effort, writes_code: !!a.writes_code, enabled: c.enabled !== false, tools: (c.tools || a.tools).join(", "), prompt: "" } }; }
+}
+function pgEditFromRoster(n) {  // the Edit button on the Overview roster: open the plan editor on this agent's form
+  if (!ui.pg) pgOpen();
+  if (!ui.pg) return;
+  ui.pg.tab = "agents"; pgEditAgent(n);
+  if (location.hash === "#plan") render(); else location.hash = "#plan";
 }
 function pgNewForm(kind) {
   ui.pg.form = kind === "artifact" ? { kind, edit: null, errors: [], data: { title: "", id: "", path: "docs/", description: "", auto: true } } : { kind, edit: null, errors: [], data: { title: "", name: "", role: "", model: "sonnet", effort: "medium", writes_code: false, tools: ui.cfg.options.default_tools.join(", "), prompt: PG_PROMPT("…", ""), auto: true, promptAuto: true } };
