@@ -47,13 +47,13 @@ PRESETS = {
     "fast": {"title": "Fast", "desc": "Sonnet and Haiku at low effort. Cheapest and quickest; fine for small changes.",
              "agents": {"orchestrator": ("haiku", "low"), "ba": ("sonnet", "low"), "architect": ("sonnet", "low"),
                         "security": ("sonnet", "low"), "developer": ("sonnet", "low"), "tester": ("haiku", "low"),
-                        "reviewer": ("sonnet", "low")}},
+                        "reviewer": ("sonnet", "low"), "general": ("sonnet", "low")}},
     "balanced": {"title": "Balanced", "desc": "Opus for design and review, Sonnet for building and testing.",
                  "agents": None},  # filled from defaults.json
     "max": {"title": "Max quality", "desc": "Opus everywhere at high or xhigh effort. Best results, most usage.",
             "agents": {"orchestrator": ("opus", "high"), "ba": ("opus", "xhigh"), "architect": ("opus", "xhigh"),
                        "security": ("opus", "xhigh"), "developer": ("opus", "high"), "tester": ("opus", "high"),
-                       "reviewer": ("opus", "xhigh")}},
+                       "reviewer": ("opus", "xhigh"), "general": ("opus", "high")}},
 }
 
 # Tool allowlist entries an agent may get: built-in tools, or Bash limited to one named command.

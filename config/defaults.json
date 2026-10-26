@@ -29,7 +29,8 @@
     "security": {"model": "opus", "effort": "high"},
     "developer": {"model": "sonnet", "effort": "medium"},
     "tester": {"model": "sonnet", "effort": "medium"},
-    "reviewer": {"model": "opus", "effort": "high"}
+    "reviewer": {"model": "opus", "effort": "high"},
+    "general": {"model": "sonnet", "effort": "medium"}
   },
   "artifacts": [
     {"id": "tdd", "title": "Technical design (TDD)", "path": "docs/tdd.md",

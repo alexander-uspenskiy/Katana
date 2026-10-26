@@ -5,7 +5,7 @@
    (pipeline, artifacts, custom agents) with one POST to /api/settings; /api/validate checks every change. */
 
 const PG = { W: 216, H: 142, GH: 142, GX: 88, GY: 18, PAD: 18, TOP: 16, SW: 118, SH: 52, EW: 92, ADD: 26, STEP: 28 };
-const VERDICT_HINT = { reviewer: "APPROVE", security: "APPROVE", tester: "PASS", architect: "READY", ba: "READY", developer: "DONE" };
+const VERDICT_HINT = { reviewer: "APPROVE", security: "APPROVE", tester: "PASS", architect: "READY", ba: "READY", developer: "DONE", general: "DONE" };
 const pgTab = { step: "Step", artifacts: "Artifacts", agents: "Agents" };
 /* ---------- role icons, and the model + effort every step shows ---------- */
 const PG_ROLES = {  // agent → [icon paths (16×16, stroked), colour]
@@ -16,6 +16,7 @@ const PG_ROLES = {  // agent → [icon paths (16×16, stroked), colour]
   tester: ['<path d="M6 2h4M6.8 2v4.2L3 12.6a1 1 0 0 0 .9 1.4h8.2a1 1 0 0 0 .9-1.4L9.2 6.2V2"/><path d="M4.8 10h6.4"/>', "#1baf7a"],
   reviewer: ['<circle cx="7" cy="7" r="4.2"/><path d="M10.2 10.2L14 14M5.2 7l1.4 1.4L9 5.8"/>', "#d98a00"],
   orchestrator: ['<circle cx="8" cy="8" r="1.8"/><circle cx="3" cy="3.5" r="1.3"/><circle cx="13" cy="3.5" r="1.3"/><circle cx="8" cy="13.2" r="1.3"/><path d="M6.7 6.9L4 4.6M9.3 6.9L12 4.6M8 9.8v2.1"/>', "#8a5cd6"],
+  general: ['<path d="M2.5 6h11v7.5h-11z"/><path d="M5.8 6V4.3c0-.5.4-.8.8-.8h2.8c.4 0 .8.3.8.8V6M2.5 9.2h11M7.2 9.2v1.4h1.6V9.2"/>', "#c2562d"],
   custom: ['<path d="M8 2l1.4 4.6L14 8l-4.6 1.4L8 14l-1.4-4.6L2 8l4.6-1.4z"/>', "#e0568a"],
   gate: ['<rect x="2.5" y="2.5" width="11" height="11" rx="2"/><path d="M5.5 8.2l1.7 1.7 3.3-3.6"/>', "var(--ink-2)"],
 };
@@ -44,7 +45,7 @@ function pgAgents() {
     const c = d.agents[n] || {};
     out[n] = { name: n, title: a.title, role: a.role, prompt: a.prompt, tools: a.tools, writes_code: !!a.writes_code, custom: true, model: c.model || "sonnet", effort: c.effort || "medium" };
   });
-  Object.entries(d.agents).forEach(([n, c]) => { if (out[n] && !out[n].custom) out[n] = Object.assign({}, out[n], { model: c.model || out[n].model, effort: c.effort || out[n].effort }); });
+  Object.entries(d.agents).forEach(([n, c]) => { if (out[n] && !out[n].custom) out[n] = Object.assign({}, out[n], { model: c.model || out[n].model, effort: c.effort || out[n].effort, tools: c.tools || out[n].tools, enabled: c.enabled }); });
   return out;
 }
 function pgTable() {
@@ -417,12 +418,12 @@ function pgAgentsPane() {
   const row = (a) => {
     const used = stages.filter((s) => s.agent === a.name).map((s) => s.title);
     return `<div class="pg-item"><div class="h">${pgBadge(a.name, 24)}<b>${esc(a.title)}</b>${a.custom ? `<span class="chip accent">custom</span>` : ""}
-      ${a.custom ? `<button class="btn" data-pg="agent-edit" data-id="${esc(a.name)}">Edit</button><button class="btn" data-pg="agent-delete" data-id="${esc(a.name)}" ${used.length ? `disabled title="Used by ${esc(used.join(", "))}"` : ""}>Delete</button>` : ""}</div>
+      ${a.enabled === false ? `<span class="chip">disabled</span>` : ""}<button class="btn" data-pg="agent-edit" data-id="${esc(a.name)}">Edit</button>${a.custom ? `<button class="btn" data-pg="agent-delete" data-id="${esc(a.name)}" ${used.length ? `disabled title="Used by ${esc(used.join(", "))}"` : ""}>Delete</button>` : ""}</div>
       <span class="muted">${esc(a.role || "")}</span><span class="muted">${esc(pgModel(a.model))} · ${esc(a.effort)} · ${a.writes_code ? "changes code" : "report only"}</span>
       <span class="muted">${used.length ? "Used in " + esc(used.join(", ")) : "Not in the plan"}</span></div>`;
   };
   return `<div class="acts"><h3 style="margin-right:auto;align-self:center">Agents</h3>${form ? "" : `<button class="btn" data-pg="agent-new">+ New agent</button>`}</div>
-    <small class="muted">Standard agents come with Katana; model, effort and prompts are in Settings → Agents. Agents you create here belong to this project.</small>
+    <small class="muted">Edit any agent’s model, effort and tools here; standard agents keep their title, role and what they do, and their prompt opens in its own editor. Agents you create here belong to this project.</small>
     ${form ? pgAgentForm(form) : ""}<div class="pg-list">${Object.values(agents).filter((a) => a.name !== ui.cfg.options.router).map(row).join("")}</div>`;
 }
 const PG_PROMPT = (title, role) => `You are the ${title} of an autonomous software team. ${role || ""}`.trim() + `
@@ -432,16 +433,18 @@ Be specific: cite file paths and section names. Do not change any file except yo
 
 End your output file with exactly one verdict line: \`VERDICT: READY\`, or \`VERDICT: APPROVE\` / \`VERDICT: CHANGES_REQUESTED\` when your step is a gate.`;
 function pgAgentForm(f) {
-  const o = ui.cfg.options, d = f.data;
-  return `<div class="pg-form"><b>${f.edit ? "Edit agent" : "New agent"}</b>
-    <div class="row2"><label class="field"><span>Title</span><input type="text" data-pgform="title" value="${esc(d.title)}" maxlength="40" placeholder="Product Owner"></label>
+  const o = ui.cfg.options, d = f.data, std = !!d.std;  // a standard agent keeps its title, role and kind; the rest is editable
+  return `<div class="pg-form"><b>${std ? `Edit ${esc(d.title)}` : f.edit ? "Edit agent" : "New agent"}</b>
+    <div class="row2"><label class="field"><span>Title</span><input type="text" data-pgform="title" value="${esc(d.title)}" maxlength="40" placeholder="Product Owner" ${std ? "disabled" : ""}></label>
       <label class="field"><span>Name</span><input type="text" class="mono" data-pgform="name" value="${esc(d.name)}" ${f.edit ? "disabled" : ""} spellcheck="false"></label></div>
-    <label class="field"><span>Role (one line)</span><input type="text" data-pgform="role" value="${esc(d.role)}" maxlength="200" placeholder="Prioritises the backlog and writes user stories"></label>
+    <label class="field"><span>Role (one line)</span><input type="text" data-pgform="role" value="${esc(d.role)}" maxlength="200" placeholder="Prioritises the backlog and writes user stories" ${std ? "disabled" : ""}></label>
     <div class="row2"><label class="field"><span>Model</span><select data-pgform="model">${o.models.map((m) => `<option value="${m}" ${m === d.model ? "selected" : ""}>${cap1(m)}</option>`).join("")}</select></label>
       <label class="field"><span>Effort</span><select data-pgform="effort">${o.efforts.map((e) => `<option ${e === d.effort ? "selected" : ""}>${e}</option>`).join("")}</select></label></div>
-    <label class="check"><input type="checkbox" data-pgform="writes_code" ${d.writes_code ? "checked" : ""}> Changes code (at most one such step per phase)</label>
-    <label class="field"><span>Tool allowlist</span><textarea data-pgform="tools" rows="2" class="mono" spellcheck="false">${esc(d.tools)}</textarea><small>Comma-separated, like the standard agents. Shells, network and system commands are refused.</small></label>
-    <label class="field"><span>Prompt</span><textarea data-pgform="prompt" rows="9" spellcheck="false">${esc(d.prompt)}</textarea></label>
+    <label class="check"><input type="checkbox" data-pgform="writes_code" ${d.writes_code ? "checked" : ""} ${std ? "disabled" : ""}> Changes code (at most one such step per phase)</label>
+    ${std ? `<label class="check"><input type="checkbox" data-pgform="enabled" ${d.enabled ? "checked" : ""}> Enabled (a disabled agent can’t run, so it can’t be in the plan)</label>` : ""}
+    <label class="field"><span>Tool allowlist</span><textarea data-pgform="tools" rows="${std ? 4 : 2}" class="mono" spellcheck="false">${esc(d.tools)}</textarea><small>Comma-separated. Shells, network and system commands are refused.</small></label>
+    ${std ? `<div class="acts"><button class="btn" data-pg="agent-prompt" data-id="${esc(d.name)}">${icon("text", 13)} Edit prompt…</button><small class="muted">Saved at once, for all projects.</small></div>`
+      : `<label class="field"><span>Prompt</span><textarea data-pgform="prompt" rows="9" spellcheck="false">${esc(d.prompt)}</textarea></label>`}
     ${f.errors.length ? `<ul class="errors">${f.errors.map((e) => `<li>${esc(e)}</li>`).join("")}</ul>` : ""}
     <div class="acts"><button class="btn primary" data-pg="form-save">${f.edit ? "Save agent" : f.then ? "Add agent and step" : "Add agent"}</button><button class="btn" data-pg="form-cancel">Cancel</button></div></div>`;
 }
@@ -552,6 +555,17 @@ function pgSaveForm() {
       const rec = { id: d.id, title: d.title.trim(), path: d.path, description: d.description.trim() }, i = dr.artifacts.findIndex((a) => a.id === f.edit);
       if (i >= 0) dr.artifacts[i] = rec; else dr.artifacts.push(rec);
     });
+  } else if (d.std) {  // a standard agent: model, effort, tools and the enabled switch go in the plan's agent settings
+    const tools = [...new Set(d.tools.split(/[,\n]/).map((x) => x.trim()).filter(Boolean))];
+    f.errors.push(...toolProblems(tools));
+    if (!d.enabled && flat(pg.draft.pipeline).some((s) => s.agent === d.name)) f.errors.push(`${d.title} is in the plan, so it can’t be disabled.`);
+    if (f.errors.length) { pgPaint(["side"]); return; }
+    pgCommit((dr) => {
+      const c = Object.assign({}, dr.agents[d.name], { model: d.model, effort: d.effort });
+      if (d.enabled) delete c.enabled; else c.enabled = false;
+      if (tools.join(",") === ui.cfg.catalog[d.name].tools.join(",")) delete c.tools; else c.tools = tools;
+      dr.agents[d.name] = c;
+    });
   } else {
     if (!d.title.trim()) f.errors.push("Give the agent a title.");
     if (!/^[a-z][a-z0-9-]{1,29}$/.test(d.name)) f.errors.push("The name is lowercase letters, digits and dashes, starting with a letter.");
@@ -656,6 +670,10 @@ function pgOnClick(e) {
       if (pg.flow === id) pg.flow = null;
       pgPaint();
     }
+  } else if (act === "agent-prompt") openPrompt(b.dataset.id);
+  else if (act === "agent-edit" && !pg.draft.custom_agents[b.dataset.id]) {
+    const n = b.dataset.id, a = pgAgents()[n], c = pg.draft.agents[n] || {};
+    pg.form = { kind: "agent", edit: n, errors: [], data: { std: true, title: a.title, name: n, role: a.role || "", model: c.model || a.model, effort: c.effort || a.effort, writes_code: !!a.writes_code, enabled: c.enabled !== false, tools: (c.tools || a.tools).join(", "), prompt: "" } }; pgPaint(["side"]);
   } else if (act === "agent-edit") {
     const a = pg.draft.custom_agents[b.dataset.id], c = pg.draft.agents[b.dataset.id] || {};
     pg.form = { kind: "agent", edit: b.dataset.id, errors: [], data: { title: a.title, name: b.dataset.id, role: a.role, model: c.model || "sonnet", effort: c.effort || "medium", writes_code: !!a.writes_code, tools: a.tools.join(", "), prompt: a.prompt } }; pgPaint(["side"]);
