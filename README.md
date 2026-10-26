@@ -8,8 +8,10 @@ and security-audited project out. Phase 0 runs on your Mac with your Claude subs
 ## How it works
 
 Katana works on **projects**. A project is a folder holding `input/` (requirement files),
-`katana.config.json` (that project's settings, JSON, safe to commit) and `.katana/` (everything Katana
-generates: `runs/` and `logs/`; keep it out of git). Each requirement `.md` file in `input/` becomes a
+`katana.config.json` (that project's settings, JSON, safe to commit) and `.katana/runs/` (everything a run
+generates; keep it out of git). Its logs and a small usage record per run are kept at user level in
+`~/.katana/projects/<key>/`, so the token spend of every project can be totalled in one place (the **Usage**
+page). Each requirement `.md` file in `input/` becomes a
 run that follows the project's **plan**: a list of **phases**, each holding one or more stages
 that run at the same time. What starts a run is the project's **trigger**:
 
@@ -68,9 +70,28 @@ With `git.mode` **auto** (the default), a project folder that is already a git r
 commit (or the folder named in `git.repo`) is the starting point of every run: the workspace is a local clone of it
 on the branch `katana/<run-id>`. The clone has no `origin`, so nothing in the workspace can touch your repository.
 When the run ends (done, failed or blocked), Katana commits what the agents left uncommitted and fetches the
-branch into your repository. Your checkout, current branch and uncommitted files are not touched, and Katana never
-pushes: review the branch and merge it yourself. The run sees committed code only; Katana warns in the log when the
-repository has uncommitted changes. `.katana/` is added to the repository's local `.git/info/exclude`.
+branch into your repository. Your checkout, current branch and uncommitted files are not touched. The run sees
+committed code only; Katana warns in the log when the repository has uncommitted changes. `.katana/` is added to
+the repository's local `.git/info/exclude`.
+
+Katana then publishes the branch itself, in your repository and with your own git and gh credentials (agents
+never can: the clone has no `origin`). `git.publish` chooses how:
+
+| `git.publish` | What happens to `katana/<run-id>` |
+|---|---|
+| **pr** (default) | Pushed to `origin`, and a pull request is opened with `gh pr create` (against the host of your `origin`, so GitHub Enterprise works once `gh auth login` is done). Without `gh` the branch is pushed and you open the pull request. |
+| **push** | Pushed to `origin`; you open the pull request. |
+| **merge** | Merged into the base branch on `origin` (a fast-forward, or a merge commit made in a throwaway worktree) and pushed; your checkout is not touched. Only a run that ends `done` is merged. If the push is refused or there is a conflict, a pull request is opened instead. |
+| **local** | Nothing leaves your machine; review the branch and merge it yourself. |
+
+The base branch is your current branch when `origin` has it, else origin's default branch. A run that ends
+`failed` or `blocked` gets a draft pull request at most. If the repository has no `origin`, the branch stays
+local. The choice is frozen when the run starts, and the result is in the run's summary and log.
+
+`git.publish` can be set for the user (Settings → Git → *My default for all projects*, kept in
+`~/.katana/settings.json`) and for a project (`git.publish` in `katana.config.json`). A project's own value always
+wins; an empty one ("Use my default") follows the user's, and with neither the default is **pr**. The project's
+choice is selectable once the project is a git repository with an `origin`.
 Without a repository, or with `git.mode` **off**, a run starts from an empty repository as before.
 
 ### Gateways
@@ -152,6 +173,9 @@ tokens. Each condition has a metric, an operator, a threshold and a severity (`b
 | `~/.katana/auth.json` | How agents sign in: `subscription` or `api_key`. The keys themselves are in the keychain, not in any file |
 | `~/.katana/agents/<name>.md` | Your edited agent prompts, written by Settings → Agents → Prompt. Shared by all projects |
 | `<project>/.katana/runs/<id>/` | Per run: `workspace/` (the generated project, its own git repo), `reports/`, `logs/`, `gates/`, `state.json`, `SUMMARY.md` |
+| `~/.katana/projects/<key>/logs/` | That project's `factory.log` and `worker.log` (`<key>` is the project folder's name plus a short hash of its path) |
+| `~/.katana/projects/<key>/usage/<run id>.json` | The usage ledger: a compact copy of each run's status and per-call tokens, cost, model and agent, rewritten whenever the run is saved. The Usage page is built from it, so it survives a removed or deleted project; it can be rebuilt from `state.json`, and Katana never reads it back |
+| `~/.katana/projects/<key>/project.json` | Which folder the key belongs to, so the Usage page can name a project that was since removed from the list |
 
 **User-level state** lives in `~/.katana/` (set `KATANA_USER_DIR` to move it). The first time Katana starts, it
 moves `config/projects.json`, `config/auth.json` and `config/agents/` there from the repository.
@@ -161,8 +185,10 @@ to `<project>/katana.config.json` for the project folder it named (or this repos
 project, and renames the old file to `settings.json.migrated`.
 
 Projects from before `katana.config.json` are upgraded the first time Katana opens them: `.katana/settings.json`
-becomes `katana.config.json`, and the `runs/` and `logs/` folders Katana wrote move into `.katana/`. A project's
-own `runs/` or `logs/` folder is left alone, and nothing moves while a scan holds the project's lock.
+becomes `katana.config.json`, the `runs/` folder Katana wrote moves into `.katana/`, and the logs (from `logs/` or
+`.katana/logs/`) move into `~/.katana/projects/<key>/logs/`. A project's own `runs/` or `logs/` folder is left
+alone, and nothing moves while a scan holds the project's lock. Runs from before the usage ledger are added to it
+the next time the dashboard or a scan starts.
 
 **Authentication:** Settings → Authentication shows whether the agents can sign in, and how. By default they
 use your Claude subscription: before every scan the orchestrator checks `claude auth status` for a subscription
@@ -237,6 +263,11 @@ The project's tabs refresh every 5 seconds:
   - The activity timeline, with a sub-lane per concurrent stage, tokens by model and by agent, models and
     effort, the queue and the log.
   - Run details include a **Gates** tab: every gate run with each condition's measured value and result.
+- **Usage:** the token spend of your whole account, across every project, including projects since removed from
+  the list. Totals (tokens by type, today, API-equivalent value) always cover all projects. The **Projects** table
+  has a checkbox per project (and **Only** to look at one alone); the chart, the by-model and by-agent
+  breakdowns, and the run list below it follow that selection, with the same model, effort and time-range
+  filters as the Overview. The selection is remembered in the browser. Reachable without an open project.
 - **Plan:** the plan as a graph: one column per phase, stages stacked when they run together, gateways as
   diamonds, and every **feedback loop** drawn as a line back to the stage it returns to, labelled with its type
   and limit (`used/max` for a run). Each stage shows the artifacts it reads (↓) and writes (↑); click one to

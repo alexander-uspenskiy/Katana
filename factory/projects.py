@@ -1,17 +1,22 @@
 """Katana project registry: ~/.katana/projects.json lists the project folders Katana knows and the active one.
 
 User-level state lives in ~/.katana/ (KATANA_USER_DIR overrides it): projects.json, auth.json, agents/ (edited
-prompts) and logs/launchd.log. It is shared by every project and never in git.
+prompts), logs/launchd.log and projects/<key>/ with each project's logs/ (factory.log, worker.log) and usage/ (a
+small record per run, see ledger.py). It is shared by every project and never in git, so the dashboard can total
+the token spend of the whole account, including projects that were since removed from the list.
 
-A project folder holds input/ (requirements), katana.config.json (that project's settings) and .katana/, where
-Katana keeps everything it generates: .katana/runs/ and .katana/logs/.
+A project folder holds input/ (requirements), katana.config.json (that project's settings) and .katana/runs/,
+where Katana keeps what each run generates.
 The dashboard shows the active project; the service processes every registered project.
 """
 from __future__ import annotations
 
 import fcntl
+import hashlib
 import json
 import os
+import re
+import shutil
 from datetime import datetime
 from pathlib import Path
 
@@ -20,8 +25,8 @@ USER_DIR = Path(os.environ.get("KATANA_USER_DIR") or Path.home() / ".katana").ex
 REGISTRY_PATH = USER_DIR / "projects.json"
 LEGACY_SETTINGS = REPO / "config" / "settings.json"  # before projects, settings lived here
 CONFIG_NAME = "katana.config.json"
-STATE_DIR = ".katana"
-SUBDIRS = ("input", f"{STATE_DIR}/runs", f"{STATE_DIR}/logs")
+PROJECTS_DIR = USER_DIR / "projects"  # one folder per project folder: logs/, usage/ and project.json
+LOCAL_DIR = ".katana"  # inside the project folder: runs/ (and, before logs moved to the user level, logs/)
 MAX_RECENT = 20
 
 
@@ -44,16 +49,33 @@ def config_path(project) -> Path:
     return Path(project) / CONFIG_NAME
 
 
+def project_key(project) -> str:
+    """The name of the project's folder under ~/.katana/projects/: its own name plus a hash of its full path."""
+    path = _norm(project)
+    slug = re.sub(r"[^a-z0-9]+", "-", Path(path).name.lower()).strip("-")[:40] or "project"
+    return f"{slug}-{hashlib.sha1(path.encode()).hexdigest()[:8]}"
+
+
 def state_dir(project) -> Path:
-    return Path(project) / STATE_DIR
+    """The project's folder under ~/.katana/projects/, for its logs and usage statistics."""
+    return PROJECTS_DIR / project_key(project)
+
+
+def local_dir(project) -> Path:
+    return Path(project) / LOCAL_DIR
 
 
 def runs_dir(project) -> Path:
-    return state_dir(project) / "runs"
+    return local_dir(project) / "runs"
 
 
 def logs_dir(project) -> Path:
     return state_dir(project) / "logs"
+
+
+def usage_dir(project) -> Path:
+    """One small JSON record per run (see ledger.py): what the account-wide totals are built from."""
+    return state_dir(project) / "usage"
 
 
 def _norm(path) -> str:
@@ -91,8 +113,41 @@ def registered() -> list:
 
 def ensure_structure(path: Path) -> None:
     upgrade_layout(path)
-    for d in SUBDIRS:
-        (path / d).mkdir(parents=True, exist_ok=True)
+    (path / "input").mkdir(parents=True, exist_ok=True)
+    for d in (runs_dir(path), logs_dir(path)):
+        d.mkdir(parents=True, exist_ok=True)
+    write_meta(path)
+
+
+def write_meta(path) -> None:
+    """Records which folder a state directory belongs to, so the account totals can name it later."""
+    meta = {"path": _norm(path), "name": Path(_norm(path)).name}
+    target = state_dir(path) / "project.json"
+    try:
+        if read_meta(target.parent) != meta:
+            target.parent.mkdir(parents=True, exist_ok=True)
+            target.write_text(json.dumps(meta, indent=2) + "\n")
+    except OSError:
+        pass
+
+
+def read_meta(directory: Path) -> dict:
+    try:
+        meta = json.loads((Path(directory) / "project.json").read_text())
+    except (OSError, json.JSONDecodeError):
+        return {}
+    return meta if isinstance(meta, dict) else {}
+
+
+def known_state() -> list:
+    """Every project that has state under ~/.katana/projects/, registered or not:
+    [{"key", "dir", "path", "name"}]. A project taken off the list keeps its history here."""
+    out = []
+    for d in sorted(PROJECTS_DIR.glob("*")) if PROJECTS_DIR.is_dir() else []:
+        if d.is_dir():
+            meta = read_meta(d)
+            out.append({"key": d.name, "dir": d, "path": meta.get("path"), "name": meta.get("name") or d.name})
+    return out
 
 
 def locked(lock_path: Path) -> bool:
@@ -108,28 +163,65 @@ def locked(lock_path: Path) -> bool:
     return False
 
 
+def _move_into(old: Path, new: Path) -> None:
+    """Moves what is in `old` into `new`, leaving anything `new` already has. Removes `old` once empty."""
+    new.mkdir(parents=True, exist_ok=True)
+    for child in old.iterdir():
+        target = new / child.name
+        if not target.exists():
+            try:
+                shutil.move(str(child), str(target))
+            except (OSError, shutil.Error):
+                pass  # another process moved it first
+    try:
+        old.rmdir()
+    except OSError:
+        pass
+
+
 def upgrade_layout(path) -> None:
-    """Moves a project from the old layout (runs/ and logs/ in the project root, settings in
-    .katana/settings.json) to the current one. Safe to repeat; a scan in progress keeps its runs/ where it is
-    until the next call."""
+    """Moves a project from an older layout to the current one: settings from .katana/settings.json to
+    katana.config.json, runs/ from the project root into .katana/, and the logs (from the project root or from
+    .katana/logs) into ~/.katana/projects/<key>/logs/. Safe to repeat; a scan in progress keeps its files where
+    they are until the next call."""
     path = Path(path)
-    state = state_dir(path)
-    old_conf = state / "settings.json"
+    local = path / LOCAL_DIR
+    old_conf = local / "settings.json"
     if old_conf.is_file() and not config_path(path).exists():
         old_conf.replace(config_path(path))
-    if locked(path / "runs" / ".lock"):
+    if locked(path / "runs" / ".lock") or locked(local / "runs" / ".lock"):
         return
     # Only what Katana itself wrote: a project may have its own runs/ or logs/ folder.
     ours = {"runs": lambda d: (d / ".factory.json").exists() or any(d.glob("*/state.json")),
             "logs": lambda d: (d / "factory.log").exists() or (d / "worker.log").exists()}
-    for name, is_ours in ours.items():
-        old, new = path / name, state / name
-        if old.is_dir() and not new.exists() and is_ours(old):
-            state.mkdir(exist_ok=True)
-            try:
-                old.rename(new)
-            except OSError:
-                pass  # another process moved it first
+    old_runs = path / "runs"
+    if old_runs.is_dir() and not runs_dir(path).exists() and ours["runs"](old_runs):
+        local.mkdir(exist_ok=True)
+        try:
+            old_runs.rename(runs_dir(path))
+        except OSError:
+            pass  # another process moved it first
+    old_logs = [d for d in (path / "logs", local / "logs") if d.is_dir() and (d != path / "logs" or ours["logs"](d))]
+    if old_logs:
+        USER_DIR.mkdir(parents=True, exist_ok=True)
+        with open(USER_DIR / ".migrate.lock", "a") as lock:
+            fcntl.flock(lock, fcntl.LOCK_EX)
+            for old in old_logs:
+                if old.is_dir():
+                    _move_into(old, logs_dir(path))
+    try:
+        local.rmdir()  # nothing left in it
+    except OSError:
+        pass
+    if state_dir(path).is_dir():
+        write_meta(path)
+
+
+def upgrade_all() -> None:
+    """upgrade_layout for every registered project, so the dashboard sees their runs at once."""
+    for folder in registered():
+        if folder.is_dir():
+            upgrade_layout(folder)
 
 
 def check_folder(path: str, must_exist: bool) -> str | None:

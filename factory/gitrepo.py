@@ -6,16 +6,24 @@ Katana fetches that branch into the repository as a ref. Nothing in the reposito
 branch: its working tree, HEAD and other branches are left alone. Otherwise (mode off, no repository, or no
 commits yet) the run starts from a fresh `git init`, as before.
 
-The clone has no `origin`, so nothing an agent runs in the workspace can reach the real repository. Katana does
-no pushing; handing the branch back is a local fetch.
+The clone has no `origin`, so nothing an agent runs in the workspace can reach the real repository. Handing the
+branch back is a local fetch. Publishing it is a separate step that Katana itself runs, in the real repository,
+after the run ends (see `publish` and `git.publish`): push the branch and open a pull request (the default),
+only push it, merge it into the base branch, or leave it local.
 """
 from __future__ import annotations
 
 import os
+import shutil
 import subprocess
+import tempfile
 from pathlib import Path
 
 MODES = ["auto", "off"]
+# What happens to the branch once it is handed back. A run that did not finish "done" is never merged:
+# merge falls back to a draft pull request.
+PUBLISH = ["pr", "push", "merge", "local"]
+DEFAULT_PUBLISH = "pr"
 EXCLUDE = "/.katana/"  # Katana's own folder, kept out of the project repository's `git status`
 ENV = dict(os.environ, GIT_TERMINAL_PROMPT="0", GIT_OPTIONAL_LOCKS="0")
 
@@ -93,3 +101,84 @@ def hand_back(info: dict, workspace: Path) -> None:
             info["handed_back"] = True
     except (RuntimeError, OSError, ValueError) as e:
         info["error"] = str(e)[:300]
+
+
+def remote(repo: Path) -> str | None:
+    """The URL of the repository's `origin`, or None when it has none (nothing can be published then)."""
+    return git(Path(repo), "remote", "get-url", "origin", check=False) or None
+
+
+def base_branch(repo: Path) -> str:
+    """The branch a pull request or merge targets: the repository's current branch when origin has it, else
+    origin's default branch."""
+    repo = Path(repo)
+    current = git(repo, "symbolic-ref", "-q", "--short", "HEAD", check=False)
+    if current and git(repo, "ls-remote", "--heads", "origin", current, check=False):
+        return current
+    default = git(repo, "symbolic-ref", "-q", "--short", "refs/remotes/origin/HEAD", check=False)
+    if default.startswith("origin/"):
+        return default[len("origin/"):]
+    raise RuntimeError(f"cannot tell which branch of origin to target (the current branch {current or 'is detached'} is not on origin)")
+
+
+def _merge(repo: Path, branch: str, base: str) -> None:
+    """Merges `branch` into origin's `base` and pushes it, without touching the checkout: a fast-forward is a plain
+    push, anything else is merged in a throwaway worktree."""
+    git(repo, "fetch", "-q", "--no-tags", "origin", f"+refs/heads/{base}:refs/remotes/origin/{base}")
+    tip = f"refs/remotes/origin/{base}"
+    if subprocess.run(["git", "merge-base", "--is-ancestor", tip, f"refs/heads/{branch}"], cwd=repo, env=ENV).returncode == 0:
+        git(repo, "push", "-q", "origin", f"refs/heads/{branch}:refs/heads/{base}")
+        return
+    tmp = Path(tempfile.mkdtemp(prefix="katana-merge-"))
+    tree = tmp / "tree"
+    try:
+        git(repo, "worktree", "add", "-q", "--detach", str(tree), tip)
+        ident = ["-c", "user.name=Katana", "-c", "user.email=katana@localhost"]
+        git(tree, *ident, "merge", "-q", "--no-ff", "-m", f"Merge {branch}", f"refs/heads/{branch}")
+        git(tree, "push", "-q", "origin", f"HEAD:refs/heads/{base}")
+    finally:
+        git(repo, "worktree", "remove", "--force", str(tree), check=False)
+        shutil.rmtree(tmp, ignore_errors=True)
+
+
+def publish(info: dict, status: str, title: str, body: str) -> None:
+    """Publishes the branch that hand_back put in the repository, as `info['publish']` says, and records
+    `info['published']`: {mode, result: local | pushed | pr | merged, url, base, note, error}. Runs in the real
+    repository with the user's own git and gh credentials; never prompts. A run that is not "done" is
+    published as a draft pull request at most."""
+    mode = info.get("publish") if info.get("publish") in PUBLISH else "local"
+    out = info["published"] = {"mode": mode, "result": "local"}
+    if mode == "local":
+        return
+    repo, branch = Path(info["repo"]), info["branch"]
+    try:
+        if not remote(repo):
+            out["note"] = "the repository has no origin remote, so the branch stays local"
+            return
+        base = out["base"] = base_branch(repo)
+        if mode == "merge" and status != "done":
+            mode, out["note"] = "pr", f"the run ended {status}, so it is not merged; a draft pull request instead"
+        if mode == "merge":
+            try:
+                _merge(repo, branch, base)
+                out["result"] = "merged"
+                return
+            except RuntimeError as e:
+                mode, out["note"] = "pr", f"could not merge into {base} ({str(e)[:200]}); a pull request instead"
+        git(repo, "push", "-q", "origin", f"refs/heads/{branch}:refs/heads/{branch}")
+        out["result"] = "pushed"
+        if mode != "pr":
+            return
+        if not shutil.which("gh"):
+            out["note"] = (out.get("note", "") + "; " if out.get("note") else "") + "gh is not installed: open the pull request from the pushed branch"
+            return
+        cmd = ["gh", "pr", "create", "--head", branch, "--base", base, "--title", title, "--body", body]
+        if status != "done":
+            cmd.append("--draft")
+        p = subprocess.run(cmd, cwd=repo, capture_output=True, text=True, env=ENV)
+        if p.returncode:
+            raise RuntimeError(f"gh pr create: {(p.stderr or p.stdout).strip()}")
+        out["url"] = (p.stdout.strip().splitlines() or [""])[-1]
+        out["result"] = "pr"
+    except (RuntimeError, OSError) as e:
+        out["error"] = str(e)[:300]

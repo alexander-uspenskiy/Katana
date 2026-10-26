@@ -659,6 +659,7 @@ footer { max-width: 1560px; margin: 0 auto; padding: 0 24px 32px; color: var(--m
     </div>
     <nav class="nav" aria-label="Sections">
       <a href="#overview" data-nav="overview">Overview</a>
+      <a href="#usage" data-nav="usage">Usage</a>
       <a href="#plan" data-nav="plan">Plan <span class="count" id="navPlanCount"></span></a>
       <a href="#settings" data-nav="settings">Settings <span class="count" id="navDirty" hidden>unsaved</span></a>
     </nav>
@@ -675,6 +676,7 @@ footer { max-width: 1560px; margin: 0 auto; padding: 0 24px 32px; color: var(--m
       <div><h1>Choose a project</h1><p>Each project is a folder with its own requirements, runs and settings. The dashboard shows one at a time; the service runs them all.</p></div>
     </div>
     <div id="startNote"></div>
+    <p class="muted" style="margin:0 0 12px"><a href="#usage">Token usage across all projects →</a></p>
     <section class="card" aria-labelledby="h-recent">
       <div class="card-h"><h2 id="h-recent">Recent projects</h2><span class="sub" id="recentSub"></span></div>
       <div class="card-b" id="recent"></div>
@@ -688,7 +690,7 @@ footer { max-width: 1560px; margin: 0 auto; padding: 0 24px 32px; color: var(--m
         <div class="actions">
           <button class="btn primary" id="openBtn">Open project</button>
           <button class="btn" id="createBtn">Create new project</button>
-          <span class="muted" style="font-size:12.5px">Create makes the folder, with <span class="mono">input/</span> and <span class="mono">.katana/</span> (runs and logs) inside, and its settings in <span class="mono">katana.config.json</span>.</span>
+          <span class="muted" style="font-size:12.5px">Create makes the folder, with <span class="mono">input/</span> and <span class="mono">.katana/</span> (runs) inside, and its settings in <span class="mono">katana.config.json</span>. Logs and usage statistics are kept in <span class="mono">~/.katana/projects/</span>.</span>
         </div>
         <ul class="errors" id="startErr"></ul>
       </div>
@@ -773,6 +775,45 @@ footer { max-width: 1560px; margin: 0 auto; padding: 0 24px 32px; color: var(--m
 </main>
 
 <!-- ================= PLAN ================= -->
+<!-- ================= USAGE (all projects) ================= -->
+<main id="view-usage" hidden>
+  <section class="kpis" id="uKpis" aria-label="Account totals"></section>
+  <section class="card" aria-labelledby="h-uproj">
+    <div class="card-h"><h2 id="h-uproj">Projects</h2><span class="sub" id="uProjSub"></span>
+      <div class="right"><button class="btn" data-usage-all>Select all</button> <button class="btn" data-usage-none>Select none</button></div>
+    </div>
+    <div class="card-b" id="uProjects"></div>
+  </section>
+  <section class="card" aria-labelledby="h-uspend">
+    <div class="card-h">
+      <h2 id="h-uspend">Spent tokens in the selected projects</h2><span class="sub" id="uspendSub"></span>
+      <div class="right"><div class="seg" data-view="uspend"><button aria-pressed="true" data-v="chart">Chart</button><button aria-pressed="false" data-v="table">Table</button></div></div>
+    </div>
+    <div class="card-b">
+      <div class="filters" id="uspendFilters" role="group" aria-label="Filter spent tokens"></div>
+      <div id="uspend"></div>
+    </div>
+  </section>
+  <div class="grid-even">
+    <section class="card" aria-labelledby="h-ubymodel">
+      <div class="card-h"><h2 id="h-ubymodel">Tokens by model</h2><span class="sub" id="ubymodelSub"></span>
+        <div class="right"><div class="seg" data-view="ubymodel"><button aria-pressed="true" data-v="chart">Chart</button><button aria-pressed="false" data-v="table">Table</button></div></div>
+      </div>
+      <div class="card-b" id="ubymodel"></div>
+    </section>
+    <section class="card" aria-labelledby="h-ubyagent">
+      <div class="card-h"><h2 id="h-ubyagent">Tokens by agent</h2><span class="sub" id="ubyagentSub"></span>
+        <div class="right"><div class="seg" data-view="ubyagent"><button aria-pressed="true" data-v="chart">Chart</button><button aria-pressed="false" data-v="table">Table</button></div></div>
+      </div>
+      <div class="card-b" id="ubyagent"></div>
+    </section>
+  </div>
+  <section class="card" aria-labelledby="h-uruns">
+    <div class="card-h"><h2 id="h-uruns">Runs in the selected projects</h2><span class="sub" id="uRunsSub"></span></div>
+    <div class="card-b" id="uRuns"></div>
+  </section>
+</main>
+
 <main id="view-plan" hidden>
   <section class="card" aria-labelledby="h-plan">
     <div class="card-h">
@@ -873,14 +914,18 @@ const triggerShort = (t) => !t ? "—" : t.type === "folder-interval" ? `Every $
 const ui = {
   data: null, tab: "overview", paused: false, lastOk: 0, lastFetch: 0, failing: false,
   open: new Set(), runTab: {}, filter: "all", planRun: "", theme: "auto",
-  views: { bymodel: "chart", byagent: "chart", log: "all", spend: "chart" },
+  views: { bymodel: "chart", byagent: "chart", log: "all", spend: "chart", uspend: "chart", ubymodel: "chart", ubyagent: "chart" },
   spend: { model: "all", effort: "all", project: "all", stack: "type", range: "all" },
+  uspend: { model: "all", effort: "all", project: "all", stack: "type", range: "all" },
+  usage: null, usageSel: null,
   cfg: null, draft: null, errors: [], saving: false,
 };
 try { ui.theme = localStorage.getItem("katana-theme") || "auto"; } catch (e) {}
 try { const v = JSON.parse(localStorage.getItem("katana-views") || "null"); if (v) Object.assign(ui.views, v); } catch (e) {}
 try { const v = JSON.parse(localStorage.getItem("katana-spend") || "null"); if (v) Object.assign(ui.spend, v); } catch (e) {}
-const remember = () => { try { localStorage.setItem("katana-views", JSON.stringify(ui.views)); localStorage.setItem("katana-spend", JSON.stringify(ui.spend)); } catch (e) {} };
+try { const v = JSON.parse(localStorage.getItem("katana-uspend") || "null"); if (v) Object.assign(ui.uspend, v); } catch (e) {}
+try { const v = JSON.parse(localStorage.getItem("katana-usage-projects") || "null"); if (Array.isArray(v)) ui.usageSel = v; } catch (e) {}
+const remember = () => { try { localStorage.setItem("katana-views", JSON.stringify(ui.views)); localStorage.setItem("katana-spend", JSON.stringify(ui.spend)); localStorage.setItem("katana-uspend", JSON.stringify(ui.uspend)); localStorage.setItem("katana-usage-projects", JSON.stringify(ui.usageSel)); } catch (e) {} };
 
 /* ---------- helpers ---------- */
 const $ = (id) => document.getElementById(id);
@@ -1179,17 +1224,18 @@ function sparkCols(d) {
 
 /* ---------- spent tokens chart ---------- */
 const RANGES = { all: ["All time", Infinity], "1h": ["Last hour", 3600e3], "24h": ["Last 24 hours", 86400e3], "7d": ["Last 7 days", 7 * 86400e3] };
-function renderSpend(d) {
-  const f = ui.spend, all = d.events;
+function renderSpend(d) { spendPanel(d.events, { key: "spend", state: ui.spend, filters: "spendFilters", sub: "spendSub", body: "spend", project: "Project" }); }
+function spendPanel(all, c) {
+  const f = c.state;
   const opts = (key) => [...new Set(all.map((e) => e[key]).filter(Boolean))].sort();
   const models = opts("model"), efforts = EFFORTS.filter((x) => all.some((e) => e.effort === x)), projects = opts("project");
   for (const [k, list] of [["model", models], ["effort", efforts], ["project", projects]]) if (f[k] !== "all" && !list.includes(f[k])) f[k] = "all";
-  const sel = (key, label, list, fmt, wide) => `<label class="field ${wide ? "wide" : ""}"><span>${label}</span><select data-spend="${key}"><option value="all">All ${label.toLowerCase()}s</option>${list.map((v) => `<option value="${esc(v)}" ${f[key] === v ? "selected" : ""}>${esc(fmt ? fmt(v) : v)}</option>`).join("")}</select></label>`;
-  $("spendFilters").innerHTML = sel("model", "Model", models, modelName) + sel("effort", "Effort", efforts) + sel("project", "Project", projects, null, true) +
-    `<label class="field"><span>Time range</span><select data-spend="range">${Object.entries(RANGES).map(([k, [l]]) => `<option value="${k}" ${f.range === k ? "selected" : ""}>${l}</option>`).join("")}</select></label>
-     <div class="field"><span>Stack by</span><div class="seg" data-spend-stack><button data-v="type" aria-pressed="${f.stack === "type"}">Token type</button><button data-v="model" aria-pressed="${f.stack === "model"}">Model</button></div></div>
-     ${["model", "effort", "project", "range"].some((k) => f[k] !== "all") ? `<button class="btn ghost" data-spend-reset style="align-self:end">Clear filters</button>` : ""}`;
-  setSeg("spend", ui.views.spend);
+  const sel = (key, label, list, fmt, wide) => `<label class="field ${wide ? "wide" : ""}"><span>${label}</span><select data-${c.key}="${key}"><option value="all">All ${label.toLowerCase()}s</option>${list.map((v) => `<option value="${esc(v)}" ${f[key] === v ? "selected" : ""}>${esc(fmt ? fmt(v) : v)}</option>`).join("")}</select></label>`;
+  $(c.filters).innerHTML = sel("model", "Model", models, modelName) + sel("effort", "Effort", efforts) + sel("project", c.project, projects, null, true) +
+    `<label class="field"><span>Time range</span><select data-${c.key}="range">${Object.entries(RANGES).map(([k, [l]]) => `<option value="${k}" ${f.range === k ? "selected" : ""}>${l}</option>`).join("")}</select></label>
+     <div class="field"><span>Stack by</span><div class="seg" data-${c.key}-stack><button data-v="type" aria-pressed="${f.stack === "type"}">Token type</button><button data-v="model" aria-pressed="${f.stack === "model"}">Model</button></div></div>
+     ${["model", "effort", "project", "range"].some((k) => f[k] !== "all") ? `<button class="btn ghost" data-${c.key}-reset style="align-self:end">Clear filters</button>` : ""}`;
+  setSeg(c.key, ui.views[c.key]);
 
   const now = Date.now(), cutoff = now - RANGES[f.range][1];
   const end = (e) => (e.finished ? new Date(e.finished).getTime() : now);
@@ -1198,8 +1244,8 @@ function renderSpend(d) {
   const totals = { input: 0, cache_write: 0, cache_read: 0, output: 0 };
   ev.forEach((e) => { for (const k in totals) totals[k] += e.tokens[k] || 0; });
   const cost = ev.reduce((a, e) => a + (e.cost_usd || 0), 0);
-  $("spendSub").textContent = `${ev.length} of ${all.length} CLI calls`;
-  if (!ev.length) { $("spend").innerHTML = `<div class="empty">No token spend matches these filters.</div>`; return; }
+  $(c.sub).textContent = `${ev.length} of ${all.length} CLI calls`;
+  if (!ev.length) { $(c.body).innerHTML = `<div class="empty">No token spend matches these filters.</div>`; return; }
 
   const t0 = Math.min(...ev.map(end)), t1 = Math.max(...ev.map(end));
   const span = Math.max(t1 - t0, 60e3);
@@ -1226,14 +1272,14 @@ function renderSpend(d) {
     <div><dt>API-equivalent</dt><dd>${usd(cost)}</dd></div>
   </dl>`;
   const legend = `<div class="legend" style="margin-bottom:12px">${series.map((s) => `<span><i class="sw ${s.cls}"></i>${s.label} <b class="num" style="color:var(--ink)">${compact(buckets.reduce((a, b) => a + b.vals[s.key], 0))}</b></span>`).join("")}<span class="muted">· bars are ${sizeLabel} each</span></div>`;
-  if (ui.views.spend === "table") {
-    $("spend").innerHTML = summary + `<div class="tbl-wrap"><table><thead><tr><th>From</th>${series.map((s) => `<th class="n">${s.label}</th>`).join("")}<th class="n">Total</th><th class="n">Calls</th><th class="n">API-equiv.</th></tr></thead><tbody>${buckets.filter((b) => b.calls).map((b) =>
+  if (ui.views[c.key] === "table") {
+    $(c.body).innerHTML = summary + `<div class="tbl-wrap"><table><thead><tr><th>From</th>${series.map((s) => `<th class="n">${s.label}</th>`).join("")}<th class="n">Total</th><th class="n">Calls</th><th class="n">API-equiv.</th></tr></thead><tbody>${buckets.filter((b) => b.calls).map((b) =>
       `<tr><td class="num">${esc(dateTime(new Date(b.from).toISOString()))}</td>${series.map((s) => `<td class="n">${full(b.vals[s.key])}</td>`).join("")}<td class="n"><b>${full(sum(b.vals))}</b></td><td class="n">${b.calls}</td><td class="n">${usd(b.cost)}</td></tr>`).join("")}</tbody></table></div>`;
     return;
   }
   const ticks = [0.25, 0.5, 0.75, 1];
   const xIdx = n === 1 ? [0] : innerWidth < 640 ? [0, n - 1] : [0, Math.floor((n - 1) / 2), n - 1];
-  $("spend").innerHTML = summary + legend + `<div class="plot">
+  $(c.body).innerHTML = summary + legend + `<div class="plot">
       <div class="yaxis">${[0, ...ticks].map((t) => `<span style="bottom:${t * 100}%">${compact(t * maxB)}</span>`).join("")}</div>
       <div class="canvas">${ticks.map((t) => `<div class="gridline" style="bottom:${t * 100}%"></div>`).join("")}
         <div class="bars">${buckets.map((b) => {
@@ -1283,7 +1329,7 @@ function renderLive(d) {
     const maxTool = toolEntries.length ? toolEntries[0][1] : 1;
     const along = c.alongside || [];
     return `<article class="agent">${head(mono(c.agent), esc(info.title))}
-      <div class="chips"><span class="chip accent">${icon("run", 12)}${esc(modelName(L.model || c.model))}</span>${effortMeter(c.effort)}<span class="chip">${esc(L.model || c.model)}</span><span class="chip">${r.mode === "auto" ? "Full auto" : "Deterministic"}</span>${along.length ? `<span class="chip" ${tipAttr("Running at the same time: " + along.join(", "))}>in parallel with ${esc(along.join(", "))}</span>` : ""}${c.worktree ? `<span class="chip">own worktree</span>` : ""}${r.git && r.git.branch ? `<span class="chip mono" ${tipAttr(`Branch in ${r.git.repo}${r.git.handed_back ? "\nHanded back: " + r.git.commits + " commits" : r.git.error ? "\nNot handed back: " + r.git.error : "\nHanded back when the run ends"}`)}>${esc(r.git.branch)}</span>` : ""}${r.tasks.total ? `<span class="chip">${r.tasks.done}/${r.tasks.total} tasks</span>` : ""}</div>
+      <div class="chips"><span class="chip accent">${icon("run", 12)}${esc(modelName(L.model || c.model))}</span>${effortMeter(c.effort)}<span class="chip">${esc(L.model || c.model)}</span><span class="chip">${r.mode === "auto" ? "Full auto" : "Deterministic"}</span>${along.length ? `<span class="chip" ${tipAttr("Running at the same time: " + along.join(", "))}>in parallel with ${esc(along.join(", "))}</span>` : ""}${c.worktree ? `<span class="chip">own worktree</span>` : ""}${r.git && r.git.branch ? `<span class="chip mono" ${tipAttr(`Branch in ${r.git.repo}${r.git.handed_back ? "\nHanded back: " + r.git.commits + " commits" + (r.git.published ? "\n" + (r.git.published.error ? "Not published: " + r.git.published.error : { local: "Kept local", pushed: "Pushed to origin", pr: "Pull request: " + r.git.published.url, merged: "Merged into " + r.git.published.base }[r.git.published.result]) : "") : r.git.error ? "\nNot handed back: " + r.git.error : "\nHanded back when the run ends"}`)}>${esc(r.git.branch)}</span>` : ""}${r.tasks.total ? `<span class="chip">${r.tasks.done}/${r.tasks.total} tasks</span>` : ""}</div>
       <div class="agent-body"><div class="agent-col">
         <dl class="mini-stats">
           <div><dt>Turns</dt><dd>${L.messages}</dd></div>
@@ -1884,9 +1930,12 @@ function onSettingsInput(e) {
     const k = t.dataset.k;
     s[k] = t.type === "checkbox" ? t.checked : t.type === "number" ? (t.value === "" ? "" : Number(t.value)) : t.value;
     if (k === "mode") { renderSettings(); return; }
+  } else if (t.dataset.userPublish !== undefined) {
+    s.user_publish = t.value;
+    renderSettings();
   } else if (t.dataset.git) {
     s.git = Object.assign({}, s.git, { [t.dataset.git]: t.value });
-    if (t.dataset.git === "mode") renderSettings();
+    if (t.dataset.git === "mode" || t.dataset.git === "publish") renderSettings();
   } else if (t.dataset.g) {
     s.gates = Object.assign({}, s.gates, { [t.dataset.g]: t.type === "number" ? (t.value === "" ? "" : Number(t.value)) : t.value });
   } else if (t.dataset.agent && t.dataset.f === "model") {
@@ -2146,18 +2195,33 @@ function draftWarnings(s) {
 }
 
 function gitSection(c, s) {
-  const g = Object.assign({ mode: "auto", repo: "" }, s.git), found = c.git || {}, on = g.mode !== "off";
+  const g = Object.assign({ mode: "auto", repo: "", publish: "" }, s.git), found = c.git || {}, on = g.mode !== "off";
   const opt = (list, v, fmt) => list.map((x) => `<option value="${esc(x)}" ${x === v ? "selected" : ""}>${esc(fmt(x))}</option>`).join("");
   const status = !on ? "Git is off: every run starts from an empty repository."
     : found.repo ? `Detected <span class="mono">${esc(found.repo)}</span>. New runs start from a clone of it.`
     : `No repository used (${esc(found.why || "none found")}). Runs start from an empty repository.`;
+  const pubName = { pr: "Push and open a pull request", push: "Push the branch", merge: "Merge into the base branch and push", local: "Keep it local" };
+  const pubList = found.publish || ["pr", "push", "merge", "local"];
+  const userPub = s.user_publish || found.default_publish || "pr";
+  // The choices need a git repository that already has an origin; without one the branch stays local.
+  const ready = on && !!found.repo && !!found.remote;
+  const effective = g.publish || userPub;
+  const pubNote = !on || !found.repo ? "Publishing needs a git repository: set one up (or point Katana at it) to choose how branches are published."
+    : !found.remote ? "This repository has no origin remote, so branches stay local. Add one with git remote add origin <url> to choose how they are published."
+    : `Branches go to <span class="mono">${esc(found.remote)}</span>.` + (effective === "pr" && !found.gh ? " The GitHub CLI (gh) is not installed, so the branch is pushed and you open the pull request yourself." : "")
+      + (effective === "merge" ? " Only a run that ends done is merged; any other is a draft pull request. If the merge cannot be pushed (a protected branch, a conflict), a pull request is opened instead." : "");
   return `<section class="card"><div class="card-h"><h2>Git</h2><span class="sub">start runs from your project’s repository</span></div><div class="card-b">
     <div class="row-fields">
       <label class="field"><span>Git repository</span><select data-git="mode" aria-label="Git mode">${opt(["auto", "off"], g.mode, (x) => ({ auto: "Auto", off: "Off" }[x]))}</select></label>
       <label class="field"><span>Repository folder (optional)</span><input type="text" class="mono" data-git="repo" value="${esc(g.repo)}" placeholder="the project folder" spellcheck="false" autocomplete="off" ${on ? "" : "disabled"}><small>Leave empty to use the project folder. Set it when the code lives somewhere else.</small></label>
     </div>
     <p class="sec-desc">${status}</p>
-    <p class="sec-desc">A run works in a clone, on the branch <span class="mono">katana/&lt;run-id&gt;</span>, with no link back to your repository. When the run ends, Katana fetches that branch into your repository. Your checkout, current branch and uncommitted files are not touched, and nothing is pushed. Review the branch and merge it yourself. The run sees committed code only.</p>
+    <div class="row-fields">
+      <label class="field"><span>When a run ends, for this project</span><select data-git="publish" aria-label="Publish for this project" ${ready ? "" : "disabled"}><option value="" ${g.publish ? "" : "selected"}>Use my default (${esc(pubName[userPub])})</option>${opt(pubList, g.publish, (x) => pubName[x])}</select><small>This project’s choice always overrides your default.</small></label>
+      <label class="field"><span>My default for all projects</span><select data-user-publish aria-label="My default publish">${opt(pubList, userPub, (x) => pubName[x])}</select><small>Used by every project that has not chosen its own.</small></label>
+    </div>
+    <p class="sec-desc">${pubNote}</p>
+    <p class="sec-desc">A run works in a clone, on the branch <span class="mono">katana/&lt;run-id&gt;</span>, with no link back to your repository, so agents cannot push anything. When the run ends, Katana fetches that branch into your repository (your checkout, current branch and uncommitted files are not touched) and then publishes it itself, with your own git and gh credentials, as chosen above. The run sees committed code only.</p>
   </div></section>`;
 }
 function agentsSection(c, s) {
@@ -2590,18 +2654,92 @@ function budgetTile(d) {
     <div class="foot">${b.paused_until ? `Paused until ${dateTime(b.paused_until)}` : b.daily_cap ? "Resets at midnight" : "No daily cap"} · ${b.run_cap ? `run cap ${compact(b.run_cap)}${active.length ? `, largest active run ${compact(biggest)}` : ""}` : "no run cap"}</div></div>`;
 }
 
+/* ---------- usage across all projects ---------- */
+const usageKeys = () => (ui.usage ? ui.usage.projects.map((p) => p.key) : []);
+const usageSelected = () => { const all = usageKeys(); return ui.usageSel === null ? all : ui.usageSel.filter((k) => all.includes(k)); };
+async function fetchUsage() {
+  const q = ui.usageSel === null ? "" : "?projects=" + encodeURIComponent(ui.usageSel.join(","));
+  try {
+    const res = await fetch("/api/usage" + q, { cache: "no-store" });
+    if (!res.ok) throw new Error(res.status);
+    ui.usage = await res.json();
+  } catch (e) { ui.failing = true; }
+}
+async function setUsageSel(sel) {
+  const all = usageKeys();
+  ui.usageSel = sel !== null && sel.length === all.length && all.every((k) => sel.includes(k)) ? null : sel;
+  remember();
+  await fetchUsage(); render();
+}
+function renderUsage() {
+  const u = ui.usage;
+  if (!u) { $("uKpis").innerHTML = ""; $("uProjects").innerHTML = `<div class="empty">Loading…</div>`; return; }
+  const chosen = usageSelected(), rows = u.projects, pick = rows.filter((p) => chosen.includes(p.key));
+  const t = u.totals, sel = { tokens: dictSum(pick.map((p) => p.tokens)), cost: pick.reduce((a, p) => a + p.cost_usd, 0), today: pick.reduce((a, p) => a + p.today, 0) };
+  const selTotal = sum(sel.tokens), top = rows[0];
+  $("uKpis").innerHTML = `
+  <div class="card tile hero">
+    <div class="label">Tokens processed · all projects</div>
+    <div class="value" ${tipAttr(full(t.total) + " tokens across " + t.calls + " CLI calls")}>${compact(t.total)}</div>
+    ${stack(t.tokens, t.total)}
+    ${tokenLegend(t.tokens)}
+    <div class="foot">API-equivalent value <b class="ink2">${usd(t.cost_usd)}</b> · ${rows.length} project${rows.length === 1 ? "" : "s"} · ${t.runs} run${t.runs === 1 ? "" : "s"} · ${full(t.calls)} CLI calls</div>
+  </div>
+  <div class="card tile"><div class="label">Selected projects</div><div class="value">${compact(selTotal)}<small> of ${compact(t.total)}</small></div>
+    <div class="meter" ${tipAttr(`${full(selTotal)} of ${full(t.total)} tokens`)}><i style="width:${t.total ? (selTotal / t.total) * 100 : 0}%"></i></div>
+    <div class="foot">${pick.length} of ${rows.length} project${rows.length === 1 ? "" : "s"} · API-equivalent ${usd(sel.cost)}</div></div>
+  <div class="card tile"><div class="label">Today · all projects</div><div class="value">${compact(t.today)}<small> tokens</small></div>
+    <div class="foot">${compact(sel.today)} in the selected projects</div></div>
+  <div class="card tile"><div class="label">Largest project</div><div class="value" style="font-size:22px">${top && top.total ? esc(top.name) : "—"}</div>
+    <div class="foot">${top && top.total ? `${compact(top.total)} tokens · ${Math.round((top.total / t.total) * 100)}% of the account` : "nothing spent yet"}</div></div>`;
+
+  $("uProjSub").textContent = rows.length ? `${pick.length} of ${rows.length} selected` : "";
+  const max = Math.max(...rows.map((p) => p.total), 1);
+  $("uProjects").innerHTML = !rows.length ? `<div class="empty">No project has run anything yet. Usage is recorded under <span class="mono">~/.katana/projects/</span>.</div>` :
+    `<div class="tbl-wrap"><table><thead><tr><th aria-label="Selected"></th><th>Project</th><th class="n">Runs</th><th class="n">CLI calls</th><th style="min-width:180px">Tokens</th><th class="n">Today</th><th class="n">Cache read</th><th class="n">API-equiv.</th><th>Last activity</th><th></th></tr></thead><tbody>${rows.map((p) => {
+      const on = chosen.includes(p.key);
+      return `<tr>
+        <td><input type="checkbox" data-usage-pick="${esc(p.key)}" ${on ? "checked" : ""} aria-label="Include ${esc(p.name)}" style="accent-color:var(--accent);width:16px;height:16px"></td>
+        <td><b>${esc(p.name)}</b>${p.active ? ` <span class="chip">open now</span>` : p.registered ? "" : ` <span class="chip" title="Taken off the project list; its history is kept">removed</span>`}${p.running ? ` <span class="chip"><span class="dot live"></span>${p.running} live</span>` : ""}
+          <div class="mono muted" style="font-size:11.5px" title="${esc(p.path || "")}">${esc(p.path ? shortPath(p.path) : "unknown folder")}${p.path && !p.exists ? " · folder gone" : ""}</div></td>
+        <td class="n">${p.runs}</td><td class="n">${full(p.calls)}</td>
+        <td><div style="display:grid;gap:3px"><b class="num" ${tipAttr(full(p.total) + " tokens")}>${compact(p.total)}</b><div class="track" style="height:8px"><div style="width:${(p.total / max) * 100}%;min-width:${p.total ? 2 : 0}px">${stack(p.tokens, p.total)}</div></div></div></td>
+        <td class="n">${compact(p.today)}</td><td class="n">${p.total ? Math.round((p.tokens.cache_read / p.total) * 100) : 0}%</td><td class="n">${usd(p.cost_usd)}</td>
+        <td class="muted">${p.last ? esc(ago(p.last)) : "—"}</td>
+        <td><button class="btn ghost" data-usage-only="${esc(p.key)}" title="Look at this project alone">Only</button></td></tr>`;
+    }).join("")}</tbody></table></div>`;
+
+  const ev = u.events;
+  spendPanel(ev, { key: "uspend", state: ui.uspend, filters: "uspendFilters", sub: "uspendSub", body: "uspend", project: "Requirement" });
+  const tot = (v) => TOKEN_TYPES.reduce((a, x) => a + v[x.key], 0);
+  const bm = Object.entries(u.stats.by_model).sort((a, b) => tot(b[1]) - tot(a[1]));
+  $("ubymodelSub").textContent = bm.length ? `${bm.length} model${bm.length === 1 ? "" : "s"}` : "";
+  tokenChart("ubymodel", bm, modelName, "Model");
+  const ba = Object.entries(u.stats.by_agent).sort((a, b) => tot(b[1]) - tot(a[1]));
+  $("ubyagentSub").textContent = ba.length ? `${ba.length} agent${ba.length === 1 ? "" : "s"}` : "";
+  tokenChart("ubyagent", ba, (n) => agentInfo(n).title, "Agent");
+
+  const LIMIT = 100, runs = u.runs;
+  $("uRunsSub").textContent = runs.length > LIMIT ? `latest ${LIMIT} of ${runs.length}` : runs.length ? `${runs.length} run${runs.length === 1 ? "" : "s"}` : "";
+  $("uRuns").innerHTML = !runs.length ? `<div class="empty">${pick.length ? "No runs in the selected projects." : "Select at least one project."}</div>` :
+    `<div class="tbl-wrap"><table><thead><tr><th>Project</th><th>Requirement</th><th>Status</th><th>Started</th><th class="n">CLI calls</th><th class="n">Tokens</th><th class="n">Output</th><th class="n">Agent time</th><th class="n">API-equiv.</th></tr></thead><tbody>${runs.slice(0, LIMIT).map((r) =>
+      `<tr><td>${esc(r.project_name)}</td><td>${esc((r.source || "").replace(/\.md$/, ""))}<div class="mono muted" style="font-size:11.5px">${esc(r.run)}</div></td><td>${esc((STATUS[r.status] || { label: r.status || "—" }).label)}</td><td class="num">${esc(dateTime(r.started))}</td><td class="n">${r.calls}</td><td class="n"><b>${full(sum(r.tokens))}</b></td><td class="n">${full(r.tokens.output)}</td><td class="n">${dur(r.seconds)}</td><td class="n">${usd(r.cost_usd)}</td></tr>`).join("")}</tbody></table></div>`;
+}
+const dictSum = (list) => list.reduce((a, o) => { for (const k in o) a[k] = (a[k] || 0) + o[k]; return a; }, { input: 0, cache_write: 0, cache_read: 0, output: 0 });
+
 /* ---------- render + fetch ---------- */
 function render() {
   const d = ui.data;
-  if (d && !d.project && ui.tab !== "projects") { ui.tab = "projects"; history.replaceState(null, "", "#projects"); }
+  if (d && !d.project && ui.tab !== "projects" && ui.tab !== "usage") { ui.tab = "projects"; history.replaceState(null, "", "#projects"); }
   document.body.classList.toggle("noproj", !!d && !d.project);
   document.querySelectorAll(".nav a").forEach((a) => a.setAttribute("aria-current", a.dataset.nav === ui.tab ? "page" : "false"));
-  ["projects", "overview", "plan", "settings", "setup"].forEach((t) => ($("view-" + t).hidden = ui.tab !== t));
+  ["projects", "overview", "plan", "settings", "setup", "usage"].forEach((t) => ($("view-" + t).hidden = ui.tab !== t));
   if (!d) return;
   const y = window.scrollY;
   if (ui.tab === "projects") renderStart(d);
+  if (ui.tab === "usage") renderUsage();
   if (!d.project) {
-    $("projectName").textContent = "Katana"; $("home").textContent = ""; document.title = "Katana · Choose a project";
+    $("projectName").textContent = "Katana"; $("home").textContent = ""; document.title = ui.tab === "usage" ? "Katana · Usage" : "Katana · Choose a project";
     $("banners").innerHTML = ""; $("foot").innerHTML = "";
     window.scrollTo(0, y);
     return;
@@ -2612,6 +2750,7 @@ function render() {
     renderCharts(d); renderMix(d); renderQueue(d); renderLog(d);
     document.querySelectorAll(".segm").forEach((el) => { if (el.textContent && el.offsetWidth < 24) el.textContent = ""; });
   } else if (ui.tab === "plan") renderPlan(d);
+  if (ui.tab === "usage") document.title = "Katana · Usage";
   window.scrollTo(0, y);
 }
 let pendingRender = false;
@@ -2621,6 +2760,7 @@ async function fetchState() {
     const res = await fetch("/api/state", { cache: "no-store" });
     if (!res.ok) throw new Error(res.status);
     ui.data = await res.json(); ui.lastOk = Date.now(); ui.failing = false;
+    if (ui.tab === "usage") await fetchUsage();
     document.body.classList.remove("stale");
   } catch (e) { ui.failing = true; document.body.classList.add("stale"); }
   const busy = tipEl.classList.contains("show") || (document.activeElement && document.activeElement.matches("select") && document.activeElement.closest("main:not([hidden])"));
@@ -2648,8 +2788,9 @@ setInterval(() => {
 function route() {
   const t = (location.hash || "#overview").slice(1);
   if (ui.tab === "settings" && t !== "settings" && dirty()) toast("You have unsaved settings. They’re kept until you save or discard.");
-  ui.tab = ["projects", "overview", "plan", "settings", "setup"].includes(t) ? t : "overview";
-  if (ui.data && !ui.data.project) ui.tab = "projects";
+  ui.tab = ["projects", "overview", "plan", "settings", "setup", "usage"].includes(t) ? t : "overview";
+  if (ui.data && !ui.data.project && ui.tab !== "usage") ui.tab = "projects";
+  if (ui.tab === "usage") fetchUsage().then(render);
   toggleMenu(false);
   if (ui.tab === "settings" && !ui.cfg) loadSettings(); else if (ui.tab === "settings") { renderSettings(); refreshService(); }
   if (ui.tab !== "setup") ui.wiz = null;
@@ -2679,8 +2820,14 @@ document.addEventListener("click", async (e) => {
   if (t.dataset.runTab) { ui.runTab[t.dataset.runTab] = t.dataset.tab; render(); return; }
   if (t.dataset.report) { openReport(t.dataset.report, t.dataset.name); return; }
   if (t.dataset.spendReset !== undefined) { Object.assign(ui.spend, { model: "all", effort: "all", project: "all", range: "all" }); remember(); render(); return; }
-  const stackSeg = t.closest("[data-spend-stack]");
-  if (stackSeg && t.dataset.v) { ui.spend.stack = t.dataset.v; remember(); render(); return; }
+  if (t.dataset.uspendReset !== undefined) { Object.assign(ui.uspend, { model: "all", effort: "all", project: "all", range: "all" }); remember(); render(); return; }
+  if (t.dataset.usageAll !== undefined) { setUsageSel(null); return; }
+  if (t.dataset.usageNone !== undefined) { setUsageSel([]); return; }
+  if (t.dataset.usageOnly) { setUsageSel([t.dataset.usageOnly]); return; }
+  for (const key of ["spend", "uspend"]) {
+    const stackSeg = t.closest(`[data-${key}-stack]`);
+    if (stackSeg && t.dataset.v) { ui[key].stack = t.dataset.v; remember(); render(); return; }
+  }
   const seg = t.closest(".seg[data-view]");
   if (seg && t.dataset.v) { ui.views[seg.dataset.view] = t.dataset.v; remember(); render(); return; }
   if (t.matches("tr.run")) toggleRun(t.dataset.run);
@@ -2688,6 +2835,11 @@ document.addEventListener("click", async (e) => {
 document.addEventListener("input", (e) => (e.target.closest("#view-setup") ? onWizardInput(e) : onSettingsInput(e)));
 document.addEventListener("change", (e) => {
   if (e.target.dataset.spend) { ui.spend[e.target.dataset.spend] = e.target.value; remember(); render(); return; }
+  if (e.target.dataset.uspend) { ui.uspend[e.target.dataset.uspend] = e.target.value; remember(); render(); return; }
+  if (e.target.dataset.usagePick) {
+    const on = new Set(usageSelected()); e.target.checked ? on.add(e.target.dataset.usagePick) : on.delete(e.target.dataset.usagePick);
+    setUsageSel(usageKeys().filter((k) => on.has(k))); return;
+  }
   if (e.target.id === "planRun") { ui.planRun = e.target.value; render(); return; }
   if (e.target.closest("#view-setup")) { onWizardInput(e); return; }
   onSettingsInput(e);

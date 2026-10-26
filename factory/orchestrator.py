@@ -45,6 +45,7 @@ import budget
 import dispatch
 import gates
 import gitrepo
+import ledger
 import notify
 import projects
 import settings
@@ -88,6 +89,8 @@ def configure(project: Path, settle: int = triggers.SETTLE_SECONDS) -> None:
     LOG_FILE = projects.logs_dir(ROOT) / "factory.log"
     for d in (INPUT_DIR, RUNS_DIR, LOG_FILE.parent):
         d.mkdir(parents=True, exist_ok=True)
+    projects.write_meta(ROOT)
+    ledger.backfill(ROOT)
     TRIGGER = triggers.for_project(ROOT, CONF, log=log, settle=settle)
 
 
@@ -177,6 +180,7 @@ def save(run: dict) -> None:
         tmp = path.with_suffix(".tmp")
         tmp.write_text(json.dumps(run, indent=2))
         tmp.replace(path)
+        ledger.record(ROOT, run, path.parent)
 
 
 def migrate(run: dict) -> dict:
@@ -212,6 +216,7 @@ def start_workspace(run_dir: Path, workspace: Path, run_id: str) -> dict | None:
         try:
             shutil.rmtree(workspace)
             info = gitrepo.clone(repo, ROOT, workspace, run_id)
+            info["publish"] = (CONF.get("git") or {}).get("publish") or gitrepo.DEFAULT_PUBLISH  # frozen per run
             log(f"{run_id}: workspace cloned from {repo} on branch {info['branch']}"
                 + (" (the repository has uncommitted changes, which the run does not see)" if info["dirty"] else ""))
         except (RuntimeError, OSError) as e:
@@ -810,14 +815,36 @@ def run_batch(claude: str, run: dict, batch: list) -> str | None:
     return None
 
 def hand_back(run: dict) -> None:
-    """Fetches the run's branch into the project's repository, once the run has ended."""
+    """Fetches the run's branch into the project's repository, once the run has ended, then publishes it as
+    the run's `git.publish` setting says (pull request, push, merge or nothing)."""
     info = run["git"]
-    if info.get("handed_back") or info.get("error"):
-        return
-    gitrepo.hand_back(info, RUNS_DIR / run["id"] / "workspace")
-    save(run)
-    log(f"{run['id']}: " + (f"branch {info['branch']} handed back to {info['repo']} ({info['commits']} commits)" if info.get("handed_back")
-                            else f"could not hand the branch back: {info['error']}" if info.get("error") else "no new commits to hand back"))
+    if not (info.get("handed_back") or info.get("error")):
+        gitrepo.hand_back(info, RUNS_DIR / run["id"] / "workspace")
+        save(run)
+        log(f"{run['id']}: " + (f"branch {info['branch']} handed back to {info['repo']} ({info['commits']} commits)" if info.get("handed_back")
+                                else f"could not hand the branch back: {info['error']}" if info.get("error") else "no new commits to hand back"))
+    if info.get("handed_back") and "published" not in info:
+        slug = run["id"].split("-", 2)[-1].replace("-", " ")
+        stages = "\n".join(f"- {h['title']}: {h.get('outcome') or '-'}" + (f" ({h['verdict']})" if h.get("verdict") else "") for h in run["history"])
+        body = (f"Opened by Katana for run `{run['id']}` (status: {run['status']}), from `{run['source']}`.\n\n"
+                f"{info['commits']} commit{'s' if info['commits'] != 1 else ''} on `{info['branch']}`.\n\n{stages}\n")
+        gitrepo.publish(info, run["status"], f"Katana: {slug}", body)
+        save(run)
+        pub = info["published"]
+        log(f"{run['id']}: " + (f"could not publish branch {info['branch']}: {pub['error']}" if pub.get("error")
+                                else {"local": "branch kept local", "pushed": f"branch pushed to origin", "pr": f"pull request {pub.get('url')}",
+                                      "merged": f"merged into {pub.get('base')} on origin"}[pub["result"]]
+                                + (f" ({pub['note']})" if pub.get("note") else "")))
+
+
+def publish_line(g: dict) -> str:
+    p = g.get("published")
+    if not p:
+        return ""
+    what = (f" Publishing failed: {p['error']}." if p.get("error")
+            else {"local": " Kept local; merge it yourself.", "pushed": " Pushed to origin; open a pull request.",
+                  "pr": f" Pull request: {p.get('url')}", "merged": f" Merged into `{p.get('base')}` on origin."}[p["result"]])
+    return what + (f" Note: {p['note']}." if p.get("note") else "")
 
 
 def write_summary(run: dict) -> None:
@@ -830,7 +857,7 @@ def write_summary(run: dict) -> None:
     g = run.get("git")
     if g:
         lines.append(f"- Branch: `{g['branch']}` from `{g['base'][:8]}` in `{g['repo']}`: " + (
-            f"{g['commits']} commit{'s' if g['commits'] != 1 else ''} handed back; review with `git log {g['branch']}`, merge it yourself." if g.get("handed_back")
+            f"{g['commits']} commit{'s' if g['commits'] != 1 else ''} handed back; review with `git log {g['branch']}`." + publish_line(g) if g.get("handed_back")
             else f"could not be handed back ({g['error']}); the work is in `workspace/`" if g.get("error")
             else "no new commits" if "commits" in g else "work in progress"))
     lines += ["",

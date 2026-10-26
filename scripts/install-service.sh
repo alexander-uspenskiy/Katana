@@ -27,4 +27,4 @@ launchctl bootout "gui/$(id -u)/$LABEL" 2>/dev/null || true
 launchctl bootstrap "gui/$(id -u)" "$PLIST"
 WATCHED="$(/usr/libexec/PlistBuddy -c 'Print :WatchPaths' "$PLIST" 2>/dev/null | grep -c '/input' || true)"
 echo "Installed $LABEL: checks every ${INTERVAL}s which projects are due, and watches ${WATCHED} input folder(s)."
-echo "Each project's log: <project>/.katana/logs/factory.log · launchd output: ${KATANA_USER_DIR:-$HOME/.katana}/logs/launchd.log"
+echo "Each project's log: ${KATANA_USER_DIR:-$HOME/.katana}/projects/<project>/logs/factory.log · launchd output: ${KATANA_USER_DIR:-$HOME/.katana}/logs/launchd.log"

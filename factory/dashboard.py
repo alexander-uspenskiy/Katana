@@ -4,7 +4,8 @@
     python3 factory/dashboard.py [--port 8787] [--home DIR]
 
 Serves on 127.0.0.1 only. The page polls /api/state every 5 seconds and shows the active project from
-~/.katana/projects.json; with no project selected it opens on the start screen.
+~/.katana/projects.json; with no project selected it opens on the start screen. The Usage page totals the token
+spend of every project, read from the usage ledger in ~/.katana/projects/*/usage/.
 """
 from __future__ import annotations
 
@@ -12,6 +13,7 @@ import argparse
 import json
 import os
 import re
+import shutil
 import subprocess
 import time
 from collections import defaultdict
@@ -25,6 +27,7 @@ import budget
 import dispatch
 import gates
 import gitrepo
+import ledger
 import notify
 import projects
 import settings
@@ -49,6 +52,21 @@ def read_json(path: Path, default=None):
         return json.loads(path.read_text())
     except (OSError, json.JSONDecodeError):
         return default
+
+
+_state_files: dict = {}  # state.json path -> (mtime, run): the account totals read every run of every project
+
+
+def read_state(path: Path):
+    """A run's state.json, parsed again only when the file changed."""
+    try:
+        mtime = path.stat().st_mtime_ns
+    except OSError:
+        return None
+    hit = _state_files.get(path)
+    if not hit or hit[0] != mtime:
+        hit = _state_files[path] = (mtime, read_json(path))
+    return hit[1]
 
 
 def pid_alive(pid) -> bool:
@@ -270,6 +288,95 @@ def aggregate(events: list) -> dict:
     return {"by_model": by_model, "by_agent": by_agent}
 
 
+def usage_runs(state_dir: Path) -> list:
+    """One project's runs for the account totals, from its usage ledger (see ledger.py), with the tokens of any
+    call still running read from that run's stream log while its folder exists."""
+    runs = []
+    for path in sorted((state_dir / "usage").glob("*.json"), reverse=True):
+        rec = read_state(path)
+        if not isinstance(rec, dict) or "id" not in rec:
+            continue
+        live = []
+        for c in rec.get("current") or []:
+            log = Path(rec.get("run_dir") or "") / (c.get("log") or "")
+            s = streamlog.summarize(log) if c.get("log") and log.is_file() else {"model": None, "tokens": dict.fromkeys(TOKEN_KEYS, 0)}
+            live.append(dict(c, live={"model": s["model"] or c.get("model"), "tokens": s["tokens"]}))
+        runs.append(dict(rec, current=live))
+    resolve_models(runs)
+    return runs
+
+
+_ledger = {"at": 0.0}
+
+
+def refresh_ledger() -> None:
+    """Brings the usage ledger up to date for every project this dashboard knows (a few stat calls each), at most
+    every 20 seconds."""
+    if time.time() - _ledger["at"] < 20:
+        return
+    _ledger["at"] = time.time()
+    home = settings.home()
+    for folder in {*projects.registered(), *([home] if home else [])}:
+        if folder.is_dir():
+            ledger.backfill(folder)
+
+
+def sum_tokens(events: list) -> dict:
+    tokens = dict.fromkeys(TOKEN_KEYS, 0)
+    for e in events:
+        for k in TOKEN_KEYS:
+            tokens[k] += e["tokens"].get(k, 0)
+    return tokens
+
+
+def usage_view(selected: list | None = None) -> dict:
+    """Token spend of the whole account: every project that has a usage ledger under ~/.katana/projects/, including ones
+    since removed from the list. `projects` and `totals` always cover all of them; `events`, `stats` and `runs`
+    only the `selected` project keys (all when None), for the deeper look."""
+    refresh_ledger()
+    registered = {projects.project_key(p): p for p in projects.registered()}
+    active = settings.home()
+    active_key = projects.project_key(active) if active else None
+    today = datetime.now().strftime("%Y-%m-%d")
+    rows, chosen, run_rows = [], [], []
+    for entry in projects.known_state():
+        runs = usage_runs(entry["dir"])
+        folder = registered.get(entry["key"])
+        name = (read_json(projects.config_path(folder), {}) if folder else {}).get("project") or entry["name"]
+        events = [dict(e, project_key=entry["key"], project_name=name) for e in spend_events(runs)]
+        calls = [e for e in events if e["kind"] != "live"]
+        tokens = sum_tokens(events)
+        rows.append({"key": entry["key"], "name": name, "path": entry["path"], "registered": bool(folder),
+                     "active": entry["key"] == active_key, "exists": bool(entry["path"]) and Path(entry["path"]).is_dir(),
+                     "runs": len(runs), "calls": len(calls), "tokens": tokens, "total": sum(tokens.values()),
+                     "today": budget.day_tokens(runs), "cost_usd": round(sum(e.get("cost_usd") or 0 for e in calls), 4),
+                     "seconds": sum(e.get("seconds") or 0 for e in calls),
+                     "last": max((e.get("finished") or e["started"] for e in events), default=None),
+                     "running": sum(1 for e in events if e["kind"] == "live")})
+        if selected is None or entry["key"] in selected:
+            chosen += events
+            for run in runs:
+                mine = [e for e in events if e["run"] == run["id"]]
+                run_rows.append({"project_key": entry["key"], "project_name": name, "run": run["id"],
+                                 "source": run["source"], "status": run.get("status"),
+                                 "started": min((e["started"] for e in mine), default=None),
+                                 "tokens": sum_tokens(mine), "calls": sum(e["kind"] != "live" for e in mine),
+                                 "cost_usd": round(sum(e.get("cost_usd") or 0 for e in mine), 4),
+                                 "seconds": sum(e.get("seconds") or 0 for e in mine)})
+    rows.sort(key=lambda r: r["total"], reverse=True)
+    run_rows.sort(key=lambda r: r["started"] or "", reverse=True)
+    totals = dict.fromkeys(TOKEN_KEYS, 0)
+    for r in rows:
+        for k in TOKEN_KEYS:
+            totals[k] += r["tokens"][k]
+    return {"generated": datetime.now().isoformat(), "today": today, "projects": rows,
+            "totals": {"tokens": totals, "total": sum(totals.values()), "cost_usd": round(sum(r["cost_usd"] for r in rows), 4),
+                       "calls": sum(r["calls"] for r in rows), "runs": sum(r["runs"] for r in rows),
+                       "today": sum(r["today"] for r in rows)},
+            "selected": None if selected is None else [r["key"] for r in rows if r["key"] in selected],
+            "events": sorted(chosen, key=lambda e: e["started"]), "stats": aggregate(chosen), "runs": run_rows}
+
+
 def home_status(root: Path) -> dict:
     return {"path": str(root), "exists": root.is_dir(),
             "runs": len(list(projects.runs_dir(root).glob("*/state.json"))) if root.is_dir() else 0,
@@ -332,7 +439,12 @@ def settings_payload() -> dict:
     conf["trigger"] = settings.trigger(conf)
     runs_dir = projects.runs_dir(root) if root else None
     repo, why = gitrepo.detect(root, conf) if root else (None, "no project")
-    return {"settings": conf, "defaults": settings.defaults(), "git": {"repo": str(repo) if repo else None, "why": why},
+    # The draft holds what the project itself chose ("" = follows the user-level setting), not the merged value.
+    conf["git"] = dict(conf.get("git") or {}, publish=settings.project_publish(root) if root else "")
+    conf["user_publish"] = settings.load_user().get("git", {}).get("publish") or gitrepo.DEFAULT_PUBLISH
+    return {"settings": conf, "defaults": settings.defaults(),
+            "git": {"repo": str(repo) if repo else None, "why": why, "remote": gitrepo.remote(repo) if repo else None,
+                    "gh": bool(shutil.which("gh")), "publish": gitrepo.PUBLISH, "default_publish": gitrepo.DEFAULT_PUBLISH},
             "options": {"models": settings.MODELS, "efforts": settings.EFFORTS, "modes": settings.MODES,
                         "router": settings.ROUTER, "triggers": settings.TRIGGERS,
                         "metrics": gates.METRICS, "ops": list(gates.OPS),
@@ -443,7 +555,12 @@ def post_settings(body: dict) -> tuple:
     clean, errors = settings.validate(body)
     if errors:
         return 400, {"ok": False, "errors": errors}
+    user_publish = body.get("user_publish")
+    if user_publish not in (None, *gitrepo.PUBLISH):
+        return 400, {"ok": False, "errors": ["Git: choose how to publish the branch: pull request, push, merge or keep it local."]}
     settings.save(clean, root)
+    if user_publish:
+        settings.save_user("" if user_publish == gitrepo.DEFAULT_PUBLISH else user_publish)
     return 200, dict(settings_payload(), ok=True, note=sync_service())
 
 
@@ -582,6 +699,9 @@ class Handler(BaseHTTPRequestHandler):
             self.send(200, (HERE / "dashboard" / url.path[8:]).read_bytes(), ASSETS[url.path[8:]])
         elif url.path == "/api/state":
             self.json(200, state())
+        elif url.path == "/api/usage":
+            chosen = parse_qs(url.query, keep_blank_values=True).get("projects")
+            self.json(200, usage_view(None if chosen is None else [k for k in chosen[0].split(",") if k]))
         elif url.path == "/api/settings":
             self.json(200, settings_payload())
         elif url.path == "/api/projects":
@@ -631,6 +751,7 @@ def main() -> None:
     parser.add_argument("--port", type=int, default=int(os.environ.get("KATANA_DASHBOARD_PORT", 8787)))
     parser.add_argument("--home", help="open this project folder (registers it and makes it active)")
     args = parser.parse_args()
+    projects.upgrade_all()
     if args.home:
         projects.open_project(Path(args.home).resolve())
     server = ThreadingHTTPServer(("127.0.0.1", args.port), Handler)

@@ -1,4 +1,6 @@
 """Katana settings: defaults in config/defaults.json, each project's changes in <project>/katana.config.json.
+A few settings (`git.publish`) can also be set once for the user, in ~/.katana/settings.json; a project that sets
+one itself always wins, and a project that leaves it empty uses the user's.
 
 Shared by the orchestrator (reads them before every station) and the dashboard (edits them).
 
@@ -87,12 +89,43 @@ def settings_path(project: Path) -> Path:
     return projects.config_path(project)
 
 
+USER_SETTINGS_PATH = projects.USER_DIR / "settings.json"
+
+
+def load_user() -> dict:
+    """The user-level settings, {"git": {"publish": ...}}: only values that are valid are kept."""
+    try:
+        raw = json.loads(USER_SETTINGS_PATH.read_text())
+    except (OSError, json.JSONDecodeError):
+        raw = {}
+    publish = ((raw.get("git") if isinstance(raw, dict) else None) or {}).get("publish")
+    return {"git": {"publish": publish}} if publish in gitrepo.PUBLISH else {}
+
+
+def save_user(publish: str) -> None:
+    """Saves the user-level `git.publish`; an empty value removes it, so the shipped default applies."""
+    USER_SETTINGS_PATH.parent.mkdir(parents=True, exist_ok=True)
+    tmp = USER_SETTINGS_PATH.with_name(USER_SETTINGS_PATH.name + ".tmp")
+    tmp.write_text(json.dumps({"git": {"publish": publish}} if publish else {}, indent=2) + "\n")
+    tmp.replace(USER_SETTINGS_PATH)
+
+
+def project_publish(project: Path | None = None) -> str:
+    """The project's own `git.publish`, "" when it leaves the choice to the user-level setting."""
+    try:
+        value = ((json.loads(settings_path(project or home()).read_text()).get("git")) or {}).get("publish")
+    except (OSError, json.JSONDecodeError, AttributeError):
+        return ""
+    return value if value in gitrepo.PUBLISH else ""
+
+
 def load(project: Path | None = None) -> dict:
     """Defaults merged with the settings of `project` (the active project if omitted)."""
     project = project or home()
     if project:
         projects.upgrade_layout(project)
     merged = defaults()
+    merged["git"] = dict(merged.get("git") or {}, **load_user().get("git", {}))  # user level over the defaults
     try:
         user = json.loads(settings_path(project).read_text()) if project else {}
     except (OSError, json.JSONDecodeError):
@@ -100,6 +133,8 @@ def load(project: Path | None = None) -> dict:
     if project and "project" not in user:
         merged["project"] = Path(project).name
     for key, value in user.items():
+        if key == "git" and isinstance(value, dict):
+            value = {k: v for k, v in value.items() if k != "publish" or v in gitrepo.PUBLISH}  # "" inherits
         if key == "agents" and isinstance(value, dict):
             for name, conf in value.items():
                 merged["agents"].setdefault(name, {}).update(conf)
@@ -341,7 +376,10 @@ def _validate(new: dict) -> tuple:
 
     clean["worktrees"] = bool(new.get("worktrees"))
     gi = new.get("git") or {}
-    clean["git"] = {"mode": gi.get("mode") or "auto", "repo": str(gi.get("repo") or "").strip()[:500]}
+    clean["git"] = {"mode": gi.get("mode") or "auto", "repo": str(gi.get("repo") or "").strip()[:500],
+                    "publish": gi.get("publish") or ""}  # "" = use the user-level setting
+    if clean["git"]["publish"] and clean["git"]["publish"] not in gitrepo.PUBLISH:
+        errors.append("Git: choose how to publish the branch: pull request, push, merge or keep it local.")
     if clean["git"]["mode"] not in gitrepo.MODES:
         errors.append("Git: choose auto or off.")
     if clean["git"]["repo"] and not Path(clean["git"]["repo"]).expanduser().is_dir():
