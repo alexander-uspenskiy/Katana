@@ -22,6 +22,7 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 import gates
+import gitrepo
 import projects
 
 REPO = Path(__file__).resolve().parent.parent
@@ -339,6 +340,12 @@ def _validate(new: dict) -> tuple:
         clean["agents"][name] = dict({"model": model, "effort": effort}, **controls)
 
     clean["worktrees"] = bool(new.get("worktrees"))
+    gi = new.get("git") or {}
+    clean["git"] = {"mode": gi.get("mode") or "auto", "repo": str(gi.get("repo") or "").strip()[:500]}
+    if clean["git"]["mode"] not in gitrepo.MODES:
+        errors.append("Git: choose auto or off.")
+    if clean["git"]["repo"] and not Path(clean["git"]["repo"]).expanduser().is_dir():
+        errors.append("Git repository folder: that folder doesn't exist. Leave it empty to use the project folder.")
     g = new.get("gates") or {}
     clean["gates"] = {"test_command": str(g.get("test_command") or "").strip()[:500],
                       "coverage_command": str(g.get("coverage_command") or "").strip()[:500],

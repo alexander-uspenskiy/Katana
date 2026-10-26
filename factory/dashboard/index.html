@@ -1283,7 +1283,7 @@ function renderLive(d) {
     const maxTool = toolEntries.length ? toolEntries[0][1] : 1;
     const along = c.alongside || [];
     return `<article class="agent">${head(mono(c.agent), esc(info.title))}
-      <div class="chips"><span class="chip accent">${icon("run", 12)}${esc(modelName(L.model || c.model))}</span>${effortMeter(c.effort)}<span class="chip">${esc(L.model || c.model)}</span><span class="chip">${r.mode === "auto" ? "Full auto" : "Deterministic"}</span>${along.length ? `<span class="chip" ${tipAttr("Running at the same time: " + along.join(", "))}>in parallel with ${esc(along.join(", "))}</span>` : ""}${c.worktree ? `<span class="chip">own worktree</span>` : ""}${r.tasks.total ? `<span class="chip">${r.tasks.done}/${r.tasks.total} tasks</span>` : ""}</div>
+      <div class="chips"><span class="chip accent">${icon("run", 12)}${esc(modelName(L.model || c.model))}</span>${effortMeter(c.effort)}<span class="chip">${esc(L.model || c.model)}</span><span class="chip">${r.mode === "auto" ? "Full auto" : "Deterministic"}</span>${along.length ? `<span class="chip" ${tipAttr("Running at the same time: " + along.join(", "))}>in parallel with ${esc(along.join(", "))}</span>` : ""}${c.worktree ? `<span class="chip">own worktree</span>` : ""}${r.git && r.git.branch ? `<span class="chip mono" ${tipAttr(`Branch in ${r.git.repo}${r.git.handed_back ? "\nHanded back: " + r.git.commits + " commits" : r.git.error ? "\nNot handed back: " + r.git.error : "\nHanded back when the run ends"}`)}>${esc(r.git.branch)}</span>` : ""}${r.tasks.total ? `<span class="chip">${r.tasks.done}/${r.tasks.total} tasks</span>` : ""}</div>
       <div class="agent-body"><div class="agent-col">
         <dl class="mini-stats">
           <div><dt>Turns</dt><dd>${L.messages}</dd></div>
@@ -1769,6 +1769,8 @@ function renderSettings() {
     <p class="sec-desc">Off by default: report-only stages just read the shared workspace while the phase’s one code-writing stage changes it. On, each of them reads a snapshot taken when the phase starts (committed code plus uncommitted changes), and Katana copies its report back.</p>
   </div></section>
 
+  ${gitSection(c, s)}
+
   <section class="card"><div class="card-h"><h2>Plan</h2><span class="sub">phases run in order; the stages in a phase run at the same time${s.mode === "auto" ? ". In full auto this is the Orchestrator’s catalogue" : ""}</span>
     <div class="right"><button class="btn primary" data-pg="open-from-settings">Open graph editor</button><button class="btn" data-act="reset-plan">Reset to default</button></div></div><div class="card-b">
     ${s.pipeline.map((ph, i) => {
@@ -1882,6 +1884,9 @@ function onSettingsInput(e) {
     const k = t.dataset.k;
     s[k] = t.type === "checkbox" ? t.checked : t.type === "number" ? (t.value === "" ? "" : Number(t.value)) : t.value;
     if (k === "mode") { renderSettings(); return; }
+  } else if (t.dataset.git) {
+    s.git = Object.assign({}, s.git, { [t.dataset.git]: t.value });
+    if (t.dataset.git === "mode") renderSettings();
   } else if (t.dataset.g) {
     s.gates = Object.assign({}, s.gates, { [t.dataset.g]: t.type === "number" ? (t.value === "" ? "" : Number(t.value)) : t.value });
   } else if (t.dataset.agent && t.dataset.f === "model") {
@@ -2140,6 +2145,21 @@ function draftWarnings(s) {
   return out;
 }
 
+function gitSection(c, s) {
+  const g = Object.assign({ mode: "auto", repo: "" }, s.git), found = c.git || {}, on = g.mode !== "off";
+  const opt = (list, v, fmt) => list.map((x) => `<option value="${esc(x)}" ${x === v ? "selected" : ""}>${esc(fmt(x))}</option>`).join("");
+  const status = !on ? "Git is off: every run starts from an empty repository."
+    : found.repo ? `Detected <span class="mono">${esc(found.repo)}</span>. New runs start from a clone of it.`
+    : `No repository used (${esc(found.why || "none found")}). Runs start from an empty repository.`;
+  return `<section class="card"><div class="card-h"><h2>Git</h2><span class="sub">start runs from your project’s repository</span></div><div class="card-b">
+    <div class="row-fields">
+      <label class="field"><span>Git repository</span><select data-git="mode" aria-label="Git mode">${opt(["auto", "off"], g.mode, (x) => ({ auto: "Auto", off: "Off" }[x]))}</select></label>
+      <label class="field"><span>Repository folder (optional)</span><input type="text" class="mono" data-git="repo" value="${esc(g.repo)}" placeholder="the project folder" spellcheck="false" autocomplete="off" ${on ? "" : "disabled"}><small>Leave empty to use the project folder. Set it when the code lives somewhere else.</small></label>
+    </div>
+    <p class="sec-desc">${status}</p>
+    <p class="sec-desc">A run works in a clone, on the branch <span class="mono">katana/&lt;run-id&gt;</span>, with no link back to your repository. When the run ends, Katana fetches that branch into your repository. Your checkout, current branch and uncommitted files are not touched, and nothing is pushed. Review the branch and merge it yourself. The run sees committed code only.</p>
+  </div></section>`;
+}
 function agentsSection(c, s) {
   return `<section class="card"><div class="card-h"><h2>Agents</h2><span class="sub">a preset, then fine-tune each agent</span>
     <div class="right"><button class="btn" data-act="reset-agents">Reset to defaults</button></div></div><div class="card-b">

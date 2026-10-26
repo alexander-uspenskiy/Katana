@@ -62,6 +62,17 @@ its own phase.
 - If one stage hits a usage limit or errors, the others finish, and the next scan reruns only the stages of
   the phase that did not finish.
 
+### Git
+
+With `git.mode` **auto** (the default), a project folder that is already a git repository with at least one
+commit (or the folder named in `git.repo`) is the starting point of every run: the workspace is a local clone of it
+on the branch `katana/<run-id>`. The clone has no `origin`, so nothing in the workspace can touch your repository.
+When the run ends (done, failed or blocked), Katana commits what the agents left uncommitted and fetches the
+branch into your repository. Your checkout, current branch and uncommitted files are not touched, and Katana never
+pushes: review the branch and merge it yourself. The run sees committed code only; Katana warns in the log when the
+repository has uncommitted changes. `.katana/` is added to the repository's local `.git/info/exclude`.
+Without a repository, or with `git.mode` **off**, a run starts from an empty repository as before.
+
 ### Gateways
 
 A **gateway** is a gate step or a stage with pass verdicts: the plan's decision points. Each has a type:

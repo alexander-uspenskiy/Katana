@@ -24,6 +24,7 @@ import auth
 import budget
 import dispatch
 import gates
+import gitrepo
 import notify
 import projects
 import settings
@@ -330,7 +331,8 @@ def settings_payload() -> dict:
     catalog = settings.agent_catalog(conf)
     conf["trigger"] = settings.trigger(conf)
     runs_dir = projects.runs_dir(root) if root else None
-    return {"settings": conf, "defaults": settings.defaults(),
+    repo, why = gitrepo.detect(root, conf) if root else (None, "no project")
+    return {"settings": conf, "defaults": settings.defaults(), "git": {"repo": str(repo) if repo else None, "why": why},
             "options": {"models": settings.MODELS, "efforts": settings.EFFORTS, "modes": settings.MODES,
                         "router": settings.ROUTER, "triggers": settings.TRIGGERS,
                         "metrics": gates.METRICS, "ops": list(gates.OPS),

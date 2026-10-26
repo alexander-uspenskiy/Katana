@@ -44,6 +44,7 @@ import auth
 import budget
 import dispatch
 import gates
+import gitrepo
 import notify
 import projects
 import settings
@@ -201,6 +202,35 @@ def git(workspace: Path, *args: str) -> None:
     subprocess.run(["git", *args], cwd=workspace, check=True, capture_output=True)
 
 
+def start_workspace(run_dir: Path, workspace: Path, run_id: str) -> dict | None:
+    """Fills a new run's workspace: a clone of the project's git repository on the branch katana/<run-id> when
+    there is one (see gitrepo.py), else an empty git repository. Either way it holds the requirements, committed.
+    Returns the clone's details for the run's state, or None for a fresh repository."""
+    info = None
+    repo, why = gitrepo.detect(ROOT, CONF)
+    if repo:
+        try:
+            shutil.rmtree(workspace)
+            info = gitrepo.clone(repo, ROOT, workspace, run_id)
+            log(f"{run_id}: workspace cloned from {repo} on branch {info['branch']}"
+                + (" (the repository has uncommitted changes, which the run does not see)" if info["dirty"] else ""))
+        except (RuntimeError, OSError) as e:
+            log(f"{run_id}: could not clone {repo} ({e}); starting from an empty repository")
+            shutil.rmtree(workspace, ignore_errors=True)
+            info = None
+    elif (CONF.get("git") or {}).get("mode", "auto") != "off":
+        log(f"{run_id}: starting from an empty repository ({why})")
+    (workspace / "docs").mkdir(parents=True, exist_ok=True)
+    shutil.copy(run_dir / "requirements.md", workspace / "docs/00-requirements.md")
+    if not info:
+        git(workspace, "init", "-q", "-b", "main")
+        git(workspace, "config", "user.name", "Katana")
+        git(workspace, "config", "user.email", "katana@localhost")
+    git(workspace, "add", "-A")
+    git(workspace, "commit", "-q", "--allow-empty", "-m", "Add requirements")
+    return info
+
+
 def claim_new_inputs() -> list:
     runs = []
     for item in TRIGGER.fetch():
@@ -216,17 +246,12 @@ def claim_new_inputs() -> list:
         if not TRIGGER.claim(item, run_dir):
             shutil.rmtree(run_dir)
             continue
-        shutil.copy(run_dir / "requirements.md", workspace / "docs/00-requirements.md")
-        git(workspace, "init", "-q", "-b", "main")
-        git(workspace, "config", "user.name", "Katana")
-        git(workspace, "config", "user.email", "katana@localhost")
-        git(workspace, "add", "-A")
-        git(workspace, "commit", "-q", "-m", "Add requirements")
+        repo_git = start_workspace(run_dir, workspace, run_id)
         # The plan and mode are frozen per run, so editing settings never breaks a run in flight.
         run = {"id": run_id, "source": item.key, "status": "running", "mode": CONF["mode"],
                "origin": {"trigger": TRIGGER.name, "key": item.key, "ref": item.ref},
                "pipeline": CONF["pipeline"], "artifacts": CONF.get("artifacts") or [],
-               "custom_agents": CONF.get("custom_agents") or {},
+               "custom_agents": CONF.get("custom_agents") or {}, "git": repo_git,
                "phase": 0 if CONF["mode"] == "deterministic" else None,
                "next": [], "finished": [], "current": [],
                "visits": {}, "loops": {}, "attempts": 0, "created": datetime.now().isoformat(),
@@ -601,6 +626,9 @@ def run_station(claude: str, run: dict, stage: dict, alongside: list, snapshot: 
                 and (fail_target(run, g) == stage["id"] or (run["mode"] == "auto" and is_build(stage)))]
     if feedback:
         task.append(f"Fix every finding in: {', '.join(feedback)}.")
+    if run.get("git"):
+        task.append(f"The workspace is a clone of an existing repository, on the branch {run['git']['branch']}. Treat its code as "
+                    "the codebase to extend: follow its structure and conventions, leave unrelated files alone, and keep its git history.")
     cmd = [claude, "-p",
            "--append-system-prompt", COMMON_RULES + "\n" + agent["prompt"],
            "--model", agent["model"], "--effort", agent["effort"],
@@ -781,13 +809,31 @@ def run_batch(claude: str, run: dict, batch: list) -> str | None:
     run["attempts"] = 0
     return None
 
+def hand_back(run: dict) -> None:
+    """Fetches the run's branch into the project's repository, once the run has ended."""
+    info = run["git"]
+    if info.get("handed_back") or info.get("error"):
+        return
+    gitrepo.hand_back(info, RUNS_DIR / run["id"] / "workspace")
+    save(run)
+    log(f"{run['id']}: " + (f"branch {info['branch']} handed back to {info['repo']} ({info['commits']} commits)" if info.get("handed_back")
+                            else f"could not hand the branch back: {info['error']}" if info.get("error") else "no new commits to hand back"))
+
+
 def write_summary(run: dict) -> None:
     lines = [f"# Run {run['id']}", "",
              f"- Source: `{run['source']}`",
              f"- Mode: {run['mode']}",
              f"- Status: **{run['status']}**" + (f" ({run['reason']})" if run.get("reason") else ""),
              f"- Rework loops: {sum(run['loops'].values())}",
-             "- Code: `workspace/` (git repo), reports: `reports/`, raw logs: `logs/`, gate measurements: `gates/`", "",
+             "- Code: `workspace/` (git repo), reports: `reports/`, raw logs: `logs/`, gate measurements: `gates/`"]
+    g = run.get("git")
+    if g:
+        lines.append(f"- Branch: `{g['branch']}` from `{g['base'][:8]}` in `{g['repo']}`: " + (
+            f"{g['commits']} commit{'s' if g['commits'] != 1 else ''} handed back; review with `git log {g['branch']}`, merge it yourself." if g.get("handed_back")
+            else f"could not be handed back ({g['error']}); the work is in `workspace/`" if g.get("error")
+            else "no new commits" if "commits" in g else "work in progress"))
+    lines += ["",
              "| # | Phase | Stage | Agent | Run | Outcome | Verdict | Model | Effort | Seconds |",
              "|---|---|---|---|---|---|---|---|---|---|"]
     for n, h in enumerate(run["history"], 1):
@@ -1001,6 +1047,8 @@ def drive(claude: str, run: dict) -> bool:
             return False
         save(run)
     save(run)
+    if run.get("git") and run["status"] in ("done", "failed", "blocked"):
+        hand_back(run)
     write_summary(run)
     log(f"{run['id']}: {run['status']}")
     if run["status"] in ("done", "failed", "blocked"):
