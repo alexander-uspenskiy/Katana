@@ -131,10 +131,26 @@ def project_files(workspace: Path):
             yield p
 
 
+PY_PROJECT_FILES = {"pyproject.toml", "setup.py", "setup.cfg", "requirements.txt", "pytest.ini", "tox.ini"}
+
+
+def is_python_project(workspace: Path) -> bool:
+    """True when the workspace is a Python project. A package.json project that keeps a helper script in
+    Python is not one: only Python project files or Python test files count, unless nothing else is there."""
+    files = list(project_files(workspace))
+    if not any(p.suffix == ".py" for p in files):
+        return False
+    if not (workspace / "package.json").exists():
+        return True
+    return any(p.parent == workspace and p.name in PY_PROJECT_FILES
+               or p.suffix == ".py" and (p.name.startswith("test_") or p.name.endswith("_test.py"))
+               for p in files)
+
+
 def detect(workspace: Path) -> dict:
     """Default test and coverage commands for the project in the workspace."""
     py = sys.executable
-    if any(p.suffix == ".py" for p in project_files(workspace)):
+    if is_python_project(workspace):
         runner = f"-m pytest -q --junitxml={{junit}}" if has_module("pytest") \
             else f"{shlex.quote(str(TOOLS_DIR / 'unittest_junit.py'))} {{junit}}"
         if has_module("coverage"):
