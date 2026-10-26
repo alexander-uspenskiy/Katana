@@ -26,6 +26,9 @@ function pgBadge(agent, size = 28, style = "") {  // the coloured icon tile that
 }
 const PG_MODELS = { fable: "Fable 5.1", opus: "Opus 5.5", sonnet: "Sonnet 5.5", haiku: "Haiku 5.5" };  // alias → the current model it points at
 const pgModel = (m) => (/^claude-/.test(m || "") ? modelName(m) : PG_MODELS[m] || modelName(m));
+const pgWrites = (a) => a.writes_code  // what a step produces: changes to the code, or only reports (documents)
+  ? `<span class="chip wk code" title="Changes the project's code"><svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5.5 4.5L2 8l3.5 3.5M10.5 4.5L14 8l-3.5 3.5"/></svg>changes code</span>`
+  : `<span class="chip wk rep" title="Only creates or updates reports and documents; the code is not touched"><svg width="11" height="11" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 2h5.5L12.5 5v9H4z"/><path d="M6.5 8h4M6.5 10.8h4"/></svg>writes reports</span>`;
 const pgRunWith = (a) => `<span class="chip" title="Model">${esc(pgModel(a.model))}</span>${effortMeter(a.effort)}`;
 const pgSlug = (s) => String(s || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "").slice(0, 30);
 
@@ -180,11 +183,11 @@ function pgGraph(o) {
       return;
     }
     const mode = pgGateway(s);
-    nodes.push(`<div class="gn gn-stage ${klass(s)}" data-pg-node="${esc(s.id)}" role="button" tabindex="0" style="${box}" ${tipAttr(tip)}>${mode ? `<span class="gn-tag" aria-hidden="true">Gateway</span>` : ""}
+    nodes.push(`<div class="gn gn-stage ${a.writes_code ? "wcode" : "wrep"} ${klass(s)}" data-pg-node="${esc(s.id)}" role="button" tabindex="0" style="${box}" ${tipAttr(tip)}>${mode ? `<span class="gn-tag" aria-hidden="true">Gateway</span>` : ""}
       <div class="gn-top">${pgBadge(s.agent)}<div class="gn-t"><b>${esc(s.title)}</b><span class="muted">${esc(a.title)}</span></div><span class="gn-pos">${esc(posn[s.id])}</span></div>
       <div class="gn-model">${pgRunWith(a)}</div>
       <div class="gn-io"><div class="io-row" title="Reads"><i>↓</i>${pgChips(pgReads(s), table, o.flow)}</div><div class="io-row" title="Writes"><i>↑</i>${pgChips(pgProduces(s, table, agents), table, o.flow)}</div></div>
-      <div class="gn-meta"><span class="chip">${a.writes_code ? "changes code" : "report only"}</span>${mode ? `<span class="chip ${mode === "manual" ? "accent" : ""}">${icon("gate", 11)}${esc(s.pass.join("/"))} · ${mode === "manual" ? "manual" : "auto"}</span>` : ""}${a.custom ? `<span class="chip">custom</span>` : ""}</div>${flag(s)}</div>`);
+      <div class="gn-meta">${pgWrites(a)}${mode ? `<span class="chip ${mode === "manual" ? "accent" : ""}" title="Passes on ${esc(s.pass.join(", "))}">${icon("gate", 11)}${mode === "manual" ? "manual" : "auto"}</span>` : ""}${a.custom ? `<span class="chip">custom</span>` : ""}</div>${flag(s)}</div>`);
   });
   const sel0 = o.sel === "$start";
   nodes.push(`<div class="gn-start ${sel0 ? "sel" : ""}" data-pg-node="$start" role="button" tabindex="0" style="left:${L.start.x}px;top:${L.start.y}px;width:${L.start.w}px;height:${L.start.h}px"><div style="display:grid;gap:3px;justify-items:center">Requirement<span class="ach ${o.flow === "requirements" ? "on" : ""}" data-pg-art="requirements" role="button" tabindex="0" title="The requirement Katana took from the trigger · docs/00-requirements.md">requirements</span></div></div>`);

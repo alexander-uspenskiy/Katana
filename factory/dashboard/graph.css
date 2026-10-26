@@ -61,6 +61,12 @@
 .gn.gated::before { content: ""; position: absolute; inset: -5px; border: 1.5px solid var(--warning); border-radius: 15px; pointer-events: none; }
 .gn.gated.manual::before { border-style: dashed; }
 .gn-tag { position: absolute; top: -13px; left: 12px; height: 16px; padding: 0 7px; display: inline-flex; align-items: center; border-radius: 8px; background: var(--warning); color: #3a2a00; font-size: 9.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; pointer-events: none; }
+/* what a step produces: code changes (violet) or only reports (teal), as a stripe on the card's left edge and a matching chip */
+.gn.wcode { --wk: #7c5cd6; }
+.gn.wrep { --wk: #14a3a0; }
+.gn.wcode::after, .gn.wrep::after { content: ""; position: absolute; left: -1px; top: 12px; bottom: 12px; width: 4px; border-radius: 0 3px 3px 0; background: var(--wk); pointer-events: none; }
+.gn-meta .chip.wk { gap: 4px; color: var(--wk); background: color-mix(in srgb, var(--wk) 12%, var(--surface)); border-color: color-mix(in srgb, var(--wk) 45%, var(--border)); }
+.gn-meta .chip.wk svg { flex: none; }
 .gn-model { display: flex; gap: 4px; overflow: hidden; }
 .gn-model .chip { height: 18px; font-size: 11px; padding: 0 6px; white-space: nowrap; }
 .gn-model .effort i { height: 9px; }
