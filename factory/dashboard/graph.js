@@ -164,7 +164,7 @@ function pgGraph(o) {
   const klass = (s) => {
     const x = st[s.id] || { state: "pending" }, state = approval === s.id ? "approval" : x.state;
     const target = o.connect && pgCanTarget(o, s);
-    return [state, o.sel === s.id ? "sel" : "", flowOf(s), target ? "can-target" : "", pgGateway(s) === "manual" ? "manual" : ""].filter(Boolean).join(" ");
+    return [state, o.sel === s.id ? "sel" : "", flowOf(s), target ? "can-target" : "", gated(s) ? "gated" : "", pgGateway(s) === "manual" ? "manual" : ""].filter(Boolean).join(" ");
   };
   stages.forEach((s) => {
     const p = pos[s.id], a = agents[s.agent] || { title: s.agent || "Katana" }, x = st[s.id] || { state: "pending", runs: 0 };
@@ -172,7 +172,7 @@ function pgGraph(o) {
     const tip = `${posn[s.id]}. ${s.title}\n${isGate(s) ? "Gateway measured by Katana, no LLM call" : s.task}\n${approval === s.id ? "Waiting for you" : (x.state === "pending" ? "" : STATE_LABEL[x.state] || x.state) + (x.runs ? " · " + x.runs + " runs" : "")}`.trim();
     if (isGate(s)) {
       const mode = pgGateway(s), n = (s.conditions || []).length;
-      nodes.push(`<div class="gn gn-stage gn-gate ${klass(s)}" data-pg-node="${esc(s.id)}" role="button" tabindex="0" style="${box}" ${tipAttr(tip)}>
+      nodes.push(`<div class="gn gn-stage gn-gate ${klass(s)}" data-pg-node="${esc(s.id)}" role="button" tabindex="0" style="${box}" ${tipAttr(tip)}><span class="gn-tag" aria-hidden="true">Gateway</span>
         <div class="gn-top">${pgBadge(null)}<div class="gn-t"><b>${esc(s.title)}</b><span class="muted">Gateway</span></div><span class="gn-pos">${esc(posn[s.id])}</span></div>
         <div class="gn-model"><span class="chip" title="Katana measures gateways itself">Katana</span><span class="chip" title="No LLM call, so no model or effort">no model</span></div>
         <div class="gn-io"><div class="io-row" title="Reads"><i>↓</i>${pgChips(pgReads(s), table, o.flow)}</div><div class="io-row" title="Writes"><i>↑</i>${pgChips(pgProduces(s, table, agents), table, o.flow)}</div></div>
@@ -180,7 +180,7 @@ function pgGraph(o) {
       return;
     }
     const mode = pgGateway(s);
-    nodes.push(`<div class="gn gn-stage ${klass(s)}" data-pg-node="${esc(s.id)}" role="button" tabindex="0" style="${box}" ${tipAttr(tip)}>
+    nodes.push(`<div class="gn gn-stage ${klass(s)}" data-pg-node="${esc(s.id)}" role="button" tabindex="0" style="${box}" ${tipAttr(tip)}>${mode ? `<span class="gn-tag" aria-hidden="true">Gateway</span>` : ""}
       <div class="gn-top">${pgBadge(s.agent)}<div class="gn-t"><b>${esc(s.title)}</b><span class="muted">${esc(a.title)}</span></div><span class="gn-pos">${esc(posn[s.id])}</span></div>
       <div class="gn-model">${pgRunWith(a)}</div>
       <div class="gn-io"><div class="io-row" title="Reads"><i>↓</i>${pgChips(pgReads(s), table, o.flow)}</div><div class="io-row" title="Writes"><i>↑</i>${pgChips(pgProduces(s, table, agents), table, o.flow)}</div></div>

@@ -57,6 +57,10 @@
 .gn.manual { border-style: dashed; }
 .gn-top { display: flex; gap: 8px; align-items: center; min-width: 0; }
 .rb { color: var(--rc); background: color-mix(in srgb, var(--rc) 13%, var(--surface)); border-color: color-mix(in srgb, var(--rc) 45%, var(--border)); }
+/* gateways: an amber checkpoint ring outside the card (so the state colour on the border still reads) and a tag on its top edge */
+.gn.gated::before { content: ""; position: absolute; inset: -5px; border: 1.5px solid var(--warning); border-radius: 15px; pointer-events: none; }
+.gn.gated.manual::before { border-style: dashed; }
+.gn-tag { position: absolute; top: -13px; left: 12px; height: 16px; padding: 0 7px; display: inline-flex; align-items: center; border-radius: 8px; background: var(--warning); color: #3a2a00; font-size: 9.5px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; pointer-events: none; }
 .gn-model { display: flex; gap: 4px; overflow: hidden; }
 .gn-model .chip { height: 18px; font-size: 11px; padding: 0 6px; white-space: nowrap; }
 .gn-model .effort i { height: 9px; }
