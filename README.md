@@ -10,7 +10,7 @@ and security-audited project out. Phase 0 runs on your Mac with your Claude subs
 Katana works on **projects**. A project is a folder holding `input/` (requirement files),
 `katana.config.json` (that project's settings, JSON, safe to commit) and `.katana/runs/` (everything a run
 generates; keep it out of git). Its logs and a small usage record per run are kept at user level in
-`~/.katana/projects/<key>/`, so the token spend of every project can be totalled in one place (the **Usage**
+`~/.katana/projects/<key>/`, so the token spend of every project can be totalled in one place (the **All projects**
 page). Each requirement `.md` file in `input/` becomes a
 run that follows the project's **plan**: a list of **phases**, each holding one or more stages
 that run at the same time. What starts a run is the project's **trigger**:
@@ -175,7 +175,7 @@ tokens. Each condition has a metric, an operator, a threshold and a severity (`b
 | `<project>/.katana/runs/<id>/` | Per run: `workspace/` (the generated project, its own git repo), `reports/`, `logs/`, `gates/`, `state.json`, `SUMMARY.md` |
 | `~/.katana/projects/<key>/logs/` | That project's `factory.log` and `worker.log` (`<key>` is the project folder's name plus a short hash of its path) |
 | `~/.katana/projects/<key>/usage/<run id>.json` | The usage ledger: a compact copy of each run's status and per-call tokens, cost, model and agent, rewritten whenever the run is saved. The Usage page is built from it, so it survives a removed or deleted project; it can be rebuilt from `state.json`, and Katana never reads it back |
-| `~/.katana/projects/<key>/project.json` | Which folder the key belongs to, so the Usage page can name a project that was since removed from the list |
+| `~/.katana/projects/<key>/project.json` | Which folder the key belongs to, so the All projects page can name a project that was since removed from the list |
 
 **User-level state** lives in `~/.katana/` (set `KATANA_USER_DIR` to move it). The first time Katana starts, it
 moves `config/projects.json`, `config/auth.json` and `config/agents/` there from the repository.
@@ -263,11 +263,13 @@ The project's tabs refresh every 5 seconds:
   - The activity timeline, with a sub-lane per concurrent stage, tokens by model and by agent, models and
     effort, the queue and the log.
   - Run details include a **Gates** tab: every gate run with each condition's measured value and result.
-- **Usage:** the token spend of your whole account, across every project, including projects since removed from
+- **All projects:** the token spend of your whole account, across every project, including projects since removed from
   the list. Totals (tokens by type, today, API-equivalent value) always cover all projects. The **Projects** table
   has a checkbox per project (and **Only** to look at one alone); the chart, the by-model and by-agent
   breakdowns, and the run list below it follow that selection, with the same model, effort and time-range
   filters as the Overview. The selection is remembered in the browser. Reachable without an open project.
+  The Overview itself stays per project; with two or more projects it shows a one-line all-projects summary at
+  the top that links here.
 - **Plan:** the plan as a graph: one column per phase, stages stacked when they run together, gateways as
   diamonds, and every **feedback loop** drawn as a line back to the stage it returns to, labelled with its type
   and limit (`used/max` for a run). Each stage shows the artifacts it reads (↓) and writes (↑); click one to

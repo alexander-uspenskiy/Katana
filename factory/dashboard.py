@@ -4,7 +4,7 @@
     python3 factory/dashboard.py [--port 8787] [--home DIR]
 
 Serves on 127.0.0.1 only. The page polls /api/state every 5 seconds and shows the active project from
-~/.katana/projects.json; with no project selected it opens on the start screen. The Usage page totals the token
+~/.katana/projects.json; with no project selected it opens on the start screen. The All projects page totals the token
 spend of every project, read from the usage ledger in ~/.katana/projects/*/usage/.
 """
 from __future__ import annotations

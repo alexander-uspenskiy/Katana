@@ -197,6 +197,12 @@ select { padding-right: 28px; }
 .axis span { position: absolute; top: 3px; transform: translateX(-50%); font-size: 11px; color: var(--muted); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .axis span:first-child { transform: none; } .axis span:last-child { transform: translateX(-100%); }
 
+/* ---------- all-projects strip ---------- */
+.strip { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 18px; padding: 9px 14px; margin-bottom: 14px; border: 1px solid var(--border); border-radius: 10px; background: var(--surface); color: var(--ink); text-decoration: none; font-size: 13px; }
+.strip[hidden] { display: none; }
+.strip:hover { border-color: var(--accent); }
+.strip b { font-variant-numeric: tabular-nums; }
+.strip .go { margin-left: auto; color: var(--accent); font-weight: 500; }
 /* ---------- spend chart ---------- */
 .spend-sum { display: flex; flex-wrap: wrap; gap: 8px 28px; margin: 14px 0 12px; }
 .spend-sum div { display: grid; }
@@ -659,7 +665,7 @@ footer { max-width: 1560px; margin: 0 auto; padding: 0 24px 32px; color: var(--m
     </div>
     <nav class="nav" aria-label="Sections">
       <a href="#overview" data-nav="overview">Overview</a>
-      <a href="#usage" data-nav="usage">Usage</a>
+      <a href="#usage" data-nav="usage">All projects</a>
       <a href="#plan" data-nav="plan">Plan <span class="count" id="navPlanCount"></span></a>
       <a href="#settings" data-nav="settings">Settings <span class="count" id="navDirty" hidden>unsaved</span></a>
     </nav>
@@ -700,6 +706,7 @@ footer { max-width: 1560px; margin: 0 auto; padding: 0 24px 32px; color: var(--m
 
 <!-- ================= OVERVIEW ================= -->
 <main id="view-overview">
+  <a class="strip" id="acctStrip" href="#usage" hidden></a>
   <section class="kpis" id="kpis" aria-label="Key figures"></section>
 
   <section class="card" aria-labelledby="h-spend">
@@ -917,7 +924,7 @@ const ui = {
   views: { bymodel: "chart", byagent: "chart", log: "all", spend: "chart", uspend: "chart", ubymodel: "chart", ubyagent: "chart" },
   spend: { model: "all", effort: "all", project: "all", stack: "type", range: "all" },
   uspend: { model: "all", effort: "all", project: "all", stack: "type", range: "all" },
-  usage: null, usageSel: null,
+  usage: null, usageSel: null, acct: null,
   cfg: null, draft: null, errors: [], saving: false,
 };
 try { ui.theme = localStorage.getItem("katana-theme") || "auto"; } catch (e) {}
@@ -1668,7 +1675,7 @@ function renderPlan(d) {
 
   const [mName, mDesc] = MODE_TEXT[mode] || [mode, ""];
   const router = conf.orchestrator;
-  const keep = $("pgViewCanvas"), scrolled = keep ? keep.scrollLeft : 0;  // survive the 5 s refresh
+  const keep = $("pgViewCanvas"), scrolled = keep ? [keep.scrollLeft, keep.scrollTop] : null;  // survive the 5 s refresh
   const asking = (chosen ? [chosen] : d.runs).filter((r) => r.status === "approval" && r.approval);
   $("planHead").innerHTML = `
     ${asking.map((r) => `<div class="pg-appr"><div>${icon("warn", 16)} <b>${esc(r.source.replace(/\.md$/, ""))}</b> stopped at the manual gateway <b>${esc(r.approval.title)}</b> and waits for you: ${esc((r.approval.reasons || []).join("; ") || "it didn’t pass")}.</div><div class="acts"><button class="btn primary" data-approve="${esc(r.id)}">Review and decide…</button></div></div>`).join("")}
@@ -1677,7 +1684,7 @@ function renderPlan(d) {
       <div class="ink2" style="font-size:13px;margin-top:4px">Before every step it reads the history and the documents, then picks the next stage or stages from the catalogue below (several at once, if at most one changes code), or <b>done</b>. Katana refuses <b>done</b> until every required gate has passed after the latest build, and stops a run after ${d.settings.max_stations} stages.</div></div></div>` : ""}
     ${pgView(d, chosen, st, mode, phases)}
     ${chosen ? `<div class="statusline" style="margin-top:8px">${statusBadge(shown(chosen))}<span>${chosen.history.length} steps run</span><span>${loops(chosen)} rework loops</span><span>${compact(sum(runTokens(chosen)))} tokens</span>${chosen.reason ? `<span>${esc(chosen.reason)}</span>` : ""}</div>` : ""}`;
-  if (scrolled && $("pgViewCanvas")) $("pgViewCanvas").scrollLeft = scrolled;
+  if ($("pgViewCanvas")) { pgZoomApply(); if (scrolled) { $("pgViewCanvas").scrollLeft = scrolled[0]; $("pgViewCanvas").scrollTop = scrolled[1]; } }
 
   $("stepsSub").textContent = `${stages.length} stages in ${phases.length} phases · ${stages.filter(gated).length} gates`;
   const step = (s) => {
@@ -2665,6 +2672,21 @@ async function fetchUsage() {
     ui.usage = await res.json();
   } catch (e) { ui.failing = true; }
 }
+// Just the account totals (no events), for the strip on the Overview.
+async function fetchAcct() {
+  try {
+    const res = await fetch("/api/usage?projects=", { cache: "no-store" });
+    if (!res.ok) throw new Error(res.status);
+    ui.acct = await res.json();
+  } catch (e) { /* the strip stays as it was */ }
+}
+function renderStrip() {
+  const a = ui.acct, el = $("acctStrip");
+  el.hidden = !a || a.projects.length < 2;  // with one project the Overview already shows everything
+  if (el.hidden) return;
+  const t = a.totals;
+  el.innerHTML = `<span class="muted">All projects</span><span><b>${compact(t.total)}</b> tokens</span><span><b>${t.runs}</b> run${t.runs === 1 ? "" : "s"}</span><span><b>${full(t.calls)}</b> CLI calls</span><span><b>${usd(t.cost_usd)}</b> API-equivalent</span><span class="muted">${a.projects.length} projects</span><span class="go">See all projects →</span>`;
+}
 async function setUsageSel(sel) {
   const all = usageKeys();
   ui.usageSel = sel !== null && sel.length === all.length && all.every((k) => sel.includes(k)) ? null : sel;
@@ -2739,18 +2761,18 @@ function render() {
   if (ui.tab === "projects") renderStart(d);
   if (ui.tab === "usage") renderUsage();
   if (!d.project) {
-    $("projectName").textContent = "Katana"; $("home").textContent = ""; document.title = ui.tab === "usage" ? "Katana · Usage" : "Katana · Choose a project";
+    $("projectName").textContent = "Katana"; $("home").textContent = ""; document.title = ui.tab === "usage" ? "Katana · All projects" : "Katana · Choose a project";
     $("banners").innerHTML = ""; $("foot").innerHTML = "";
     window.scrollTo(0, y);
     return;
   }
   renderTop(d); renderBanners(d);
   if (ui.tab === "overview") {
-    renderKpis(d); renderSpend(d); renderLive(d); renderRoster(d); renderRuns(d); renderTimeline(d);
+    renderStrip(); renderKpis(d); renderSpend(d); renderLive(d); renderRoster(d); renderRuns(d); renderTimeline(d);
     renderCharts(d); renderMix(d); renderQueue(d); renderLog(d);
     document.querySelectorAll(".segm").forEach((el) => { if (el.textContent && el.offsetWidth < 24) el.textContent = ""; });
   } else if (ui.tab === "plan") renderPlan(d);
-  if (ui.tab === "usage") document.title = "Katana · Usage";
+  if (ui.tab === "usage") document.title = "Katana · All projects";
   window.scrollTo(0, y);
 }
 let pendingRender = false;
@@ -2761,6 +2783,7 @@ async function fetchState() {
     if (!res.ok) throw new Error(res.status);
     ui.data = await res.json(); ui.lastOk = Date.now(); ui.failing = false;
     if (ui.tab === "usage") await fetchUsage();
+    if (ui.tab === "overview") await fetchAcct();
     document.body.classList.remove("stale");
   } catch (e) { ui.failing = true; document.body.classList.add("stale"); }
   const busy = tipEl.classList.contains("show") || (document.activeElement && document.activeElement.matches("select") && document.activeElement.closest("main:not([hidden])"));
@@ -2791,6 +2814,7 @@ function route() {
   ui.tab = ["projects", "overview", "plan", "settings", "setup", "usage"].includes(t) ? t : "overview";
   if (ui.data && !ui.data.project && ui.tab !== "usage") ui.tab = "projects";
   if (ui.tab === "usage") fetchUsage().then(render);
+  if (ui.tab === "overview") fetchAcct().then(render);
   toggleMenu(false);
   if (ui.tab === "settings" && !ui.cfg) loadSettings(); else if (ui.tab === "settings") { renderSettings(); refreshService(); }
   if (ui.tab !== "setup") ui.wiz = null;

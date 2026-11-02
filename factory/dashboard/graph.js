@@ -207,7 +207,8 @@ function pgGraph(o) {
     if (o.menu) adds.push(pgMenu(o.menu, mid, cy, L));
   }
   const arrow = (id, cls) => `<marker id="${id}" markerWidth="9" markerHeight="9" refX="8" refY="4.5" orient="auto" markerUnits="userSpaceOnUse"><path d="M0 0L9 4.5L0 9z" class="pg-arrow ${cls}"/></marker>`;
-  return `<div class="pg-stage" style="width:${L.width}px;height:${height}px"><svg class="pg-svg" width="${L.width}" height="${height}" aria-hidden="true"><defs>${arrow("pgA", "")}${arrow("pgL", "loop")}${arrow("pgB", "bad")}</defs>${svg.join("")}</svg>${nodes.join("")}${pills.join("")}${adds.join("")}</div>`;
+  const z = ui.pgScale || 1;  // pgZoomApply() keeps the wrapper (scaled size, so the canvas scrolls right) and the stage's scale in step
+  return `<div class="pg-zoom" style="width:${L.width * z}px;height:${height * z}px"><div class="pg-stage" data-w="${L.width}" data-h="${height}" style="width:${L.width}px;height:${height}px;transform:scale(${z})"><svg class="pg-svg" width="${L.width}" height="${height}" aria-hidden="true"><defs>${arrow("pgA", "")}${arrow("pgL", "loop")}${arrow("pgB", "bad")}</defs>${svg.join("")}</svg>${nodes.join("")}${pills.join("")}${adds.join("")}</div></div>`;
 }
 function pgCanTarget(o, s) {  // while picking a loop target on the graph: is `s` a valid place to go back to?
   const stages = flat(o.phases), from = stages.find((x) => x.id === o.connect), pos = stagePos(o.phases);
@@ -233,12 +234,156 @@ function pgMenu(m, mid, cy, L) {
 
 /* ---------- view mode (the Plan tab as it was, now as a graph) ---------- */
 function pgView(d, chosen, st, mode, phases) {
-  return `<div class="pg"><div class="pg-bar"><span class="muted" style="font-size:12.5px">${mode === "auto" ? "Stage catalogue: the phases are a hint, not a rule" : "Phases run left to right; stages in a phase run at the same time"}</span>
+  return `<div class="pg"><div class="pg-bar"><b class="pg-fs-title">Plan · ${chosen ? esc(chosen.source.replace(/\.md$/, "")) : "current plan"}</b><span class="muted" style="font-size:12.5px">${mode === "auto" ? "Stage catalogue: the phases are a hint, not a rule" : "Phases run left to right; stages in a phase run at the same time"}</span>
     <span class="sp"></span>${chosen ? `<span class="muted" style="font-size:12.5px">A run’s plan is frozen. Choose <b>Current plan</b> to edit it.</span>` : ""}
     <button class="btn primary" data-pg="open" ${chosen ? "disabled" : ""}>Edit plan</button></div>
     ${ui.pgFlow ? pgFlowBar(ui.pgFlow, phases) : ""}
-    <div class="pg-main"><div class="pg-canvas" id="pgViewCanvas">${pgGraph({ phases, mode, states: st, run: chosen, flow: ui.pgFlow, maxIter: d.settings.max_iterations })}</div></div></div>`;
+    <div class="pg-main"><div class="pg-cv">${pgTools()}<div class="pg-canvas" id="pgViewCanvas">${pgGraph({ phases, mode, states: st, run: chosen, flow: ui.pgFlow, maxIter: d.settings.max_iterations })}</div></div></div></div>`;
 }
+
+/* ---------- zoom and full screen (both modes) ---------- */
+const PGZ = { MIN: 0.25, MAX: 2, PRESETS: [2, 1.5, 1.25, 1, 0.75, 0.5, 0.25] };
+const pgCv = () => $("pgCanvas") || $("pgViewCanvas");
+const pgPct = (z) => Math.round(z * 100);
+const PG_FS_ICONS = `<svg class="ico-on" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M2 6V2h4M10 2h4v4M14 10v4h-4M6 14H2v-4"/></svg><svg class="ico-off" width="14" height="14" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 2v4H2M14 6h-4V2M10 14v-4h4M2 10h4v4"/></svg>`;
+function pgTools() {  // one toolbar above the canvas: − 100% + · Fit · full screen. pgZoomSync() keeps its state current without repainting it
+  const z = ui.pgScale || 1, edit = !!ui.pg;
+  const items = PGZ.PRESETS.map((p) => `<button data-pgz="${p}">${pgPct(p)}%</button>`).join("");
+  return `<div class="pg-tools" role="toolbar" aria-label="View controls">
+    <span class="hint muted">Ctrl/⌘ + scroll to zoom · drag to pan</span>
+    <div class="pg-zoomctl">
+      <button class="btn icon" data-pgz="out" title="Zoom out (−)" aria-label="Zoom out">−</button>
+      <details class="pg-pop" data-pg-pop data-pgz-menu ${ui.pgZoomMenu ? "open" : ""}><summary class="btn pg-zval" title="Zoom level" aria-label="Zoom level"><span data-pgz-val>${pgPct(z)}%</span></summary>
+        <div class="pg-menu mid"><div class="h">Zoom</div>${items}<hr>
+          <button data-pgz="fit">Fit whole plan<small class="muted">Fit</small></button>
+          ${edit ? `<button data-pgz="sel">Zoom to selected step</button>` : ""}</div></details>
+      <button class="btn icon" data-pgz="in" title="Zoom in (+)" aria-label="Zoom in">+</button>
+    </div>
+    <button class="btn" data-pgz="fit" title="Fit the whole plan in view" aria-pressed="false">Fit</button>
+    <button class="btn icon" data-pgz="full" title="Full screen" aria-label="Full screen" aria-pressed="${!!ui.pgFull}">${PG_FS_ICONS}</button>
+  </div>`;
+}
+function pgZoomSync() {
+  const z = ui.pgScale || 1, fit = ui.pgZoom === "fit", c = pgCv(), sel = ui.pg && ui.pg.sel;
+  document.querySelectorAll("[data-pgz-val]").forEach((el) => (el.textContent = (fit ? "Fit · " : "") + pgPct(z) + "%"));
+  document.querySelectorAll('.pg-tools [data-pgz="fit"]').forEach((el) => { el.classList.toggle("on", fit); el.setAttribute("aria-pressed", fit); });
+  document.querySelectorAll(".pg-menu [data-pgz]").forEach((el) => {
+    const v = Number(el.dataset.pgz);
+    el.classList.toggle("on", el.dataset.pgz === "fit" ? fit : !fit && v === Math.round(v * 100) / 100 && Math.abs(v - z) < 0.005);
+    if (el.dataset.pgz === "sel") { el.disabled = !sel; el.title = sel ? "" : "Select a step on the graph first"; }
+  });
+  const out = document.querySelector('.pg-tools [data-pgz="out"]'), inn = document.querySelector('.pg-tools [data-pgz="in"]');
+  if (out) out.disabled = z <= PGZ.MIN + 0.001;
+  if (inn) inn.disabled = z >= PGZ.MAX - 0.001;
+  document.querySelectorAll('.pg-tools [data-pgz="full"]').forEach((el) => { el.setAttribute("aria-pressed", !!ui.pgFull); el.title = ui.pgFull ? "Exit full screen (Esc)" : "Full screen"; el.setAttribute("aria-label", el.title); });
+  if (c) c.classList.toggle("pannable", c.scrollWidth > c.clientWidth + 1 || c.scrollHeight > c.clientHeight + 1);
+}
+function pgFitScale(c, w, h) {  // inline the canvas grows with the graph, so only the width limits it; in full screen both do
+  const cs = getComputedStyle(c), px = parseFloat(cs.paddingLeft) + parseFloat(cs.paddingRight), py = parseFloat(cs.paddingTop) + parseFloat(cs.paddingBottom);
+  const aw = c.clientWidth - px, ah = c.clientHeight - py;
+  if (aw <= 0) return ui.pgScale || 1;
+  let z = aw / w;
+  if (ui.pgFull && ah > 0) z = Math.min(z, ah / h);
+  return Math.max(PGZ.MIN, Math.min(ui.pgFull ? PGZ.MAX : 1, Math.floor(z * 100) / 100));
+}
+function pgZoomApply() {  // sets the scale on the graph that is on screen; call after every repaint of the canvas
+  const c = pgCv(), stage = c && c.querySelector(".pg-stage");
+  if (!stage) return;
+  const w = Number(stage.dataset.w), h = Number(stage.dataset.h);
+  const z = (ui.pgScale = ui.pgZoom === "fit" ? pgFitScale(c, w, h) : Math.max(PGZ.MIN, Math.min(PGZ.MAX, ui.pgZoom)));
+  stage.style.transform = `scale(${z})`;
+  stage.parentNode.style.width = w * z + "px"; stage.parentNode.style.height = h * z + "px";
+  c.classList.toggle("zoomed", z > 1);
+  pgZoomSync();
+}
+function pgZoomTo(z, fx, fy) {  // keeps the point (fx, fy) of the canvas, default its centre, under the same pixel
+  const c = pgCv();
+  if (!c) return;
+  const old = ui.pgScale || 1, pad = parseFloat(getComputedStyle(c).paddingLeft) || 0;
+  if (fx === undefined) { fx = c.clientWidth / 2; fy = c.clientHeight / 2; }
+  const ox = (c.scrollLeft + fx - pad) / old, oy = (c.scrollTop + fy - pad) / old;
+  ui.pgZoom = Math.max(PGZ.MIN, Math.min(PGZ.MAX, z));
+  pgZoomApply();
+  c.scrollLeft = ox * ui.pgScale + pad - fx; c.scrollTop = oy * ui.pgScale + pad - fy;
+  pgZoomSync();
+}
+function pgZoomStep(dir) {  // the next preset up or down, so + and − always land on a round number
+  const z = ui.pgScale || 1, up = PGZ.PRESETS.slice().reverse();
+  const next = dir > 0 ? up.find((p) => p > z + 0.005) : PGZ.PRESETS.find((p) => p < z - 0.005);
+  if (next) pgZoomTo(next);
+}
+function pgZoomFit() {
+  ui.pgZoom = "fit"; pgZoomApply();
+  const c = pgCv(); if (c) { c.scrollLeft = 0; c.scrollTop = 0; }
+  pgZoomSync();
+}
+function pgZoomSel() {  // the selected step with some room around it, centred
+  const c = pgCv(), id = ui.pg && ui.pg.sel, n = id && c && c.querySelector(`[data-pg-node="${CSS.escape(id)}"]`);
+  if (!n) return;
+  const m = 90, cs = getComputedStyle(c), pad = parseFloat(cs.paddingLeft) || 0;
+  const ah = ui.pgFull ? c.clientHeight : window.innerHeight * 0.7;
+  const z = Math.min((c.clientWidth - 2 * pad) / (n.offsetWidth + 2 * m), ah / (n.offsetHeight + 2 * m));
+  ui.pgZoom = Math.max(PGZ.MIN, Math.min(PGZ.MAX, z)); pgZoomApply();
+  c.scrollLeft = (n.offsetLeft + n.offsetWidth / 2) * ui.pgScale + pad - c.clientWidth / 2;
+  c.scrollTop = (n.offsetTop + n.offsetHeight / 2) * ui.pgScale + pad - c.clientHeight / 2;
+  pgZoomSync();
+}
+function pgFullSet(on) {  // full screen is the browser's (hides its chrome) plus a fixed overlay, so toasts and dialogs still work and iOS gets the overlay alone
+  on = !!on;
+  if (on === !!ui.pgFull) return;
+  ui.pgFull = on; document.body.classList.toggle("pg-full", on);
+  if (on) {
+    const el = document.documentElement;
+    if (el.requestFullscreen) { ui.pgFullReal = true; el.requestFullscreen({ navigationUI: "hide" }).catch(() => (ui.pgFullReal = false)); }
+  } else {
+    const real = ui.pgFullReal; ui.pgFullReal = false;
+    if (real && document.fullscreenElement) document.exitFullscreen().catch(() => {});
+  }
+  pgZoomApply();
+}
+document.addEventListener("fullscreenchange", () => { if (!document.fullscreenElement && ui.pgFull && ui.pgFullReal) pgFullSet(false); });
+window.addEventListener("hashchange", () => pgFullSet(false));
+window.addEventListener("resize", () => { if (ui.pgZoom === "fit") pgZoomApply(); else pgZoomSync(); });
+document.addEventListener("toggle", (e) => { if (e.target.matches && e.target.matches("[data-pgz-menu]")) ui.pgZoomMenu = e.target.open; }, true);
+document.addEventListener("click", (e) => {
+  const b = e.target.closest && e.target.closest("[data-pgz]");
+  if (!b || b.disabled) return;
+  const v = b.dataset.pgz;
+  if (v === "in") pgZoomStep(1); else if (v === "out") pgZoomStep(-1);
+  else if (v === "fit") pgZoomFit(); else if (v === "full") pgFullSet(!ui.pgFull); else if (v === "sel") pgZoomSel();
+  else pgZoomTo(Number(v));
+  const pop = b.closest("details"); if (pop) pop.open = false;
+});
+document.addEventListener("wheel", (e) => {  // Ctrl/⌘ + wheel, and a trackpad pinch (which arrives as Ctrl + wheel), zoom around the pointer
+  const c = e.target.closest && e.target.closest(".pg-canvas");
+  if (!c || !(e.ctrlKey || e.metaKey)) return;
+  e.preventDefault();
+  const r = c.getBoundingClientRect();
+  pgZoomTo((ui.pgScale || 1) * Math.exp(-Math.max(-40, Math.min(40, e.deltaY)) * 0.005), e.clientX - r.left - c.clientLeft, e.clientY - r.top - c.clientTop);
+}, { passive: false });
+let pgPan = null;  // drag the empty background to pan, like a map; nodes, pills and buttons keep their own clicks
+document.addEventListener("pointerdown", (e) => {
+  const c = e.target.closest && e.target.closest(".pg-canvas");
+  if (!c || e.button !== 0 || e.pointerType === "touch" || e.target.closest(".gn, .gn-start, button, .loop-pill, .ach, .pg-menu, .pg-hint, a, input, select")) return;
+  if (c.scrollWidth <= c.clientWidth + 1 && c.scrollHeight <= c.clientHeight + 1) return;
+  pgPan = { c, x: e.clientX, y: e.clientY, l: c.scrollLeft, t: c.scrollTop };
+  c.classList.add("panning"); c.setPointerCapture(e.pointerId);
+});
+document.addEventListener("pointermove", (e) => { if (pgPan) { pgPan.c.scrollLeft = pgPan.l - (e.clientX - pgPan.x); pgPan.c.scrollTop = pgPan.t - (e.clientY - pgPan.y); } });
+const pgPanEnd = () => { if (pgPan) { pgPan.c.classList.remove("panning"); pgPan = null; } };
+document.addEventListener("pointerup", pgPanEnd);
+document.addEventListener("pointercancel", pgPanEnd);
+document.addEventListener("keydown", (e) => {  // capture phase, so Esc sees the editor's menu or loop picker before the editor closes it
+  if (e.key === "Escape" && ui.pgFull) {
+    if (document.querySelector("dialog[open]") || (ui.pg && (ui.pg.menu || ui.pg.connect))) return;
+    const open = document.querySelector("details[data-pg-pop][open]");
+    if (open) open.open = false; else pgFullSet(false);
+    return;
+  }
+  const t = e.target;
+  if (e.metaKey || e.ctrlKey || e.altKey || !t.closest || !t.closest(".pg-canvas, .pg-tools") || t.matches("input, textarea, select")) return;
+  if (e.key === "+" || e.key === "=") pgZoomStep(1); else if (e.key === "-" || e.key === "_") pgZoomStep(-1); else if (e.key === "0") pgZoomTo(1);
+}, true);
 function pgFlowBar(id, phases) {
   const table = pgTable(), agents = pgAgents(), a = table[id] || { title: id }, stages = flat(phases);
   const w = stages.filter((s) => pgProduces(s, table, agents).includes(id)).map((s) => s.title), r = stages.filter((s) => pgReads(s).includes(id)).map((s) => s.title);
@@ -305,7 +450,7 @@ function pgPaint(parts) {
   const pg = ui.pg, host = $("planHead");
   if (!pg) return;
   if (!document.querySelector("#planHead .pg.editing") || !parts) {
-    host.innerHTML = `<div class="pg editing"><div class="pg-bar" id="pgBar"></div><div id="pgChecks"></div><div id="pgFlow"></div><div class="pg-main"><div class="pg-canvas" id="pgCanvas"></div><aside class="pg-side" aria-label="Inspector"><div class="pg-tabs" id="pgTabs" role="tablist"></div><div class="pg-pane" id="pgSide"></div></aside></div></div>`;
+    host.innerHTML = `<div class="pg editing"><div class="pg-bar" id="pgBar"></div><div id="pgChecks"></div><div id="pgFlow"></div><div class="pg-main"><div class="pg-cv">${pgTools()}<div class="pg-canvas" id="pgCanvas"></div></div><aside class="pg-side" aria-label="Inspector"><div class="pg-tabs" id="pgTabs" role="tablist"></div><div class="pg-pane" id="pgSide"></div></aside></div></div>`;
     parts = ["bar", "checks", "canvas", "side"];
   }
   if (parts.includes("bar")) $("pgBar").innerHTML = pgBar();
@@ -313,6 +458,7 @@ function pgPaint(parts) {
   if (parts.includes("canvas")) {
     const c = $("pgCanvas"), l = c.scrollLeft, t = c.scrollTop;
     c.innerHTML = (pg.connect ? `<div class="pg-hint">${icon("loop", 14)}Click the step the work should go back to <button class="btn" data-pg="connect-off">Cancel</button></div>` : "") + pgGraph(pgOptions());
+    pgZoomApply();
     c.scrollLeft = l; c.scrollTop = t;
     $("pgFlow").innerHTML = pg.flow ? pgFlowBar(pg.flow, pg.draft.pipeline) : "";
   }

@@ -1,4 +1,4 @@
-"""Usage ledger (ledger.py): what the account-wide totals (the dashboard's Usage page) are built from.
+"""Usage ledger (ledger.py): what the account-wide totals (the dashboard's All projects page) are built from.
 
 Each run keeps its real state in <project>/.katana/runs/<id>/state.json, which stays where it is. Whenever the
 orchestrator saves a run it also writes a small copy to ~/.katana/projects/<key>/usage/<run id>.json: the run's
