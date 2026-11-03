@@ -350,6 +350,15 @@ scripts\install-service.ps1
 terminal. Install `secret-tool` (libsecret-tools) to store API keys, `notify-send` for desktop notifications, and
 `zenity` for the folder dialog.
 
+**Agent shell tools on each platform:**
+
+- Agents get shell access only through narrow `Bash(command *)` entries in the `tools:` line of each agent file in [factory/agents](factory/agents). The tool check in [factory/settings.py](factory/settings.py) (`tool_problem`) rejects bare `Bash`, `Bash(*)`, shells and `PowerShell(...)` entries on every platform, and `powershell` and `pwsh` are on its unsafe-command list. So agents have no PowerShell tool on any platform; they use Bash entries.
+- On Windows, Claude Code runs those Bash commands in Git Bash, which comes with Git for Windows (install it first). Write agent prompts and allowlists in POSIX syntax.
+- `python3` is often not on `PATH` on Windows, where the interpreter is `python`, so `Bash(python3 *)` entries do not match there. The architect allows both `Bash(python3 --version)` and `Bash(python --version)`. The developer, tester and general agents list only `Bash(python3 *)`. On Windows, add `Bash(python *)` to that agent's tool allowlist in Settings → Agents & plan in the dashboard. Katana does not add it for you. A `tools:` line in `~/.katana/agents/<name>.md` has no effect on the allowlist, because that file only overrides the prompt.
+- Commands the allowlist does not cover, such as `sed -i`, are denied automatically in headless runs, because nobody can answer a permission prompt. So are compound commands with an unlisted part, such as `cat > file <<EOF`. The developer agent is told to create and change files with the Write and Edit tools instead. A command that uses a shell variable, such as `$LOCALAPPDATA`, also needs approval and is denied.
+- The architect, which does not write code, may run only version probes (`node --version`, `npm --version`, `python3 --version`, `python --version`) and `ls`, so it can check the toolchain before it writes the design.
+- Katana's own code is platform-neutral Python that uses `pathlib` and UTF-8 explicitly. The platform differences stay in [factory/plat.py](factory/plat.py) and [factory/service.py](factory/service.py).
+
 ## Service
 
 ```bash

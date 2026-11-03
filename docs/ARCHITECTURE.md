@@ -114,6 +114,14 @@ Design rules:
 | Tools | MCP servers (GitHub, issue tracker, docs) | same |
 | Observability | `runs/<id>.jsonl`, a daily summary | OpenTelemetry → Grafana / Datadog |
 
+### Platform portability
+
+- Katana runs natively on macOS and Windows. Linux is best effort.
+- One seam: every platform difference (file locks, API key store, notifications, folder dialog, process checks, detached workers, background service) sits in `factory/plat.py` and `factory/service.py`. The orchestrator, gates and dashboard stay platform-neutral, and the later move from the CLI to the Agent SDK or containers (Phase 2+) does not reopen this.
+- The background service is a launchd agent on macOS, where `WatchPaths` gives an instant folder-watch, and a Task Scheduler task on Windows, which polls every minute.
+- Agents run their shell commands through the Claude CLI's Bash tool, which is Git Bash on Windows. Tool allowlists are therefore narrow `Bash(...)` entries that must work on both platforms. The PowerShell tool is deliberately not offered to agents.
+- Known gap: allowlists name `python3`, which Windows usually lacks. Per-agent overrides cover it. See [Platform support](../README.md#platform-support).
+
 ---
 
 ## 4. Scaling strategy
