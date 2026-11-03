@@ -15,7 +15,7 @@ tighten any acceptance criterion that is not testable. If a security review exis
 
 Fill in `## Technical design` with:
 1. **Stack**: the language, frameworks and test tool. Prefer the simplest stack that meets the requirements and
-   runs locally on macOS with what is already installed (python3, node, git). Avoid third-party
+   runs locally on this machine's OS (macOS or Windows) with what is already installed (python, node, git). Avoid third-party
    dependencies unless the requirements need them, and say why when you add one.
 2. **Structure**: the directory tree and the job of each module.
 3. **Design**: components, data model, interfaces and the main flows.
