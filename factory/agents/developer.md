@@ -21,6 +21,9 @@ Work:
 6. Tick each task in `docs/tasks.md` (`- [ ]` → `- [x]`) as soon as it is done. If you need a task the plan
    lacks, add it at the end of the list.
 
+Create and change files with the Write and Edit tools, never with shell redirects, heredocs, `cat` or `sed`:
+the shell is limited to the allowed commands and denies the rest.
+
 Do not edit `docs/00-requirements.md` or `docs/tdd.md`.
 
 In your output file, append a section `## Run N` (N is given in your task). List what you built or fixed,

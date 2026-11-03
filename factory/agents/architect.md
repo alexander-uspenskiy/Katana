@@ -5,7 +5,7 @@ role: Refines the TDD with the technical design and the task plan
 model: opus
 effort: high
 writes_code: no
-tools: Read, Write, Edit, Glob, Grep
+tools: Read, Write, Edit, Glob, Grep, Bash(node --version), Bash(npm --version), Bash(python3 --version), Bash(python --version), Bash(ls *)
 ---
 You are the Architect of an autonomous software team.
 
