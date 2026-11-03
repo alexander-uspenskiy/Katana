@@ -691,8 +691,8 @@ footer { max-width: 1560px; margin: 0 auto; padding: 0 24px 32px; color: var(--m
       <div class="card-h"><h2 id="h-openf">Open or create a project</h2></div>
       <div class="card-b">
         <label class="field"><span>Project folder</span>
-          <div class="pathrow"><input type="text" id="startPath" aria-label="Project folder" placeholder="/Users/you/Projects/my-app" spellcheck="false" autocomplete="off"><button class="btn" id="browseBtn" style="height:32px">Browse…</button></div>
-          <small>Full path. Browse opens the macOS folder dialog on this Mac.</small></label>
+          <div class="pathrow"><input type="text" id="startPath" aria-label="Project folder" placeholder="Full path to the project folder" spellcheck="false" autocomplete="off"><button class="btn" id="browseBtn" style="height:32px">Browse…</button></div>
+          <small>Full path. Browse opens the folder dialog on this computer.</small></label>
         <div class="actions">
           <button class="btn primary" id="openBtn">Open project</button>
           <button class="btn" id="createBtn">Create new project</button>
@@ -1161,7 +1161,7 @@ function renderBanners(d) {
   const svc = d.service || {};
   const auto = SERVICE_TRIGGERS.includes(d.trigger.type);
   if (auto && !svc.loaded && !f.alive && ui.tab === "overview") out.push(["info", `The service isn’t running, so this project isn’t scanned automatically. Start it in <a href="#settings">Settings → Service</a>, run <span class="mono">python3 factory/orchestrator.py watch</span>, or press <b>Run now</b>.`]);
-  else if (d.trigger.type === "folder-watch" && svc.loaded && !svc.watched && ui.tab === "overview") out.push(["info", `The service doesn’t watch this project’s <span class="mono">input/</span> yet, so new files wait for the ${d.trigger.interval_min}-minute fallback scan. Run <span class="mono">scripts/install-service.sh</span> to add it.`]);
+  else if (d.trigger.type === "folder-watch" && svc.instant_watch && svc.loaded && !svc.watched && ui.tab === "overview") out.push(["info", `The service doesn’t watch this project’s <span class="mono">input/</span> yet, so new files wait for the ${d.trigger.interval_min}-minute fallback scan. Run <span class="mono">${esc(svc.install_cmd)}</span> to add it.`]);
   $("banners").innerHTML = out.map(([k, html]) => `<div class="banner"><span class="ico">${icon(k === "err" ? "err" : k === "warn" ? "pause" : "info", 16)}</span><div>${html}</div></div>`).join("");
 }
 
@@ -1764,13 +1764,13 @@ function renderSettings() {
   const stageAgents = agentNames.filter((n) => n !== c.options.router);
   const hs = c.home || { path: "", runs: 0, inputs: 0 };
   const tr = s.trigger, svc = c.service || {};
-  const inputDir = hs.path + "/input";
+  const inputDir = hs.path + (hs.path.includes("\\") ? "\\input" : "/input");
   const watched = (svc.watching || []).includes(inputDir);
   const trigStatus = tr.type === "folder-interval" || tr.type === "folder-watch"
-    ? (!svc.installed ? `${icon("info", 13)} The service isn’t installed yet. Run <span class="mono">scripts/install-service.sh</span> once; it covers every project.`
-      : !svc.loaded ? `${icon("warn", 13)} The service is installed but not loaded. Run <span class="mono">scripts/install-service.sh</span> again.`
-      : tr.type === "folder-watch" && !watched ? `${icon("info", 13)} Saving updates the service so it watches <span class="mono">${esc(inputDir)}</span>.`
-      : `${icon("check", 13)} The service is running${tr.type === "folder-watch" ? ` and watches <span class="mono">${esc(inputDir)}</span>` : ""}.`)
+    ? (!svc.installed ? `${icon("info", 13)} The service isn’t installed yet. Run <span class="mono">${esc(svc.install_cmd)}</span> once; it covers every project.`
+      : !svc.loaded ? `${icon("warn", 13)} The service is installed but not loaded. Run <span class="mono">${esc(svc.install_cmd)}</span> again.`
+      : tr.type === "folder-watch" && svc.instant_watch && !watched ? `${icon("info", 13)} Saving updates the service so it watches <span class="mono">${esc(inputDir)}</span>.`
+      : `${icon("check", 13)} The service is running${tr.type === "folder-watch" ? (svc.instant_watch ? ` and watches <span class="mono">${esc(inputDir)}</span>` : ", checking this folder every minute") : ""}.`)
     : `${icon("info", 13)} The service skips this project. Use <b>Run now</b> in the top bar, or from a terminal:<code class="snippet">python3 factory/orchestrator.py run --project ${esc(hs.path)}</code>`;
   $("settingsBody").innerHTML = `
   <section class="card"><div class="card-h"><h2>Project</h2><div class="right"><a class="btn" href="#projects">Switch project</a></div></div><div class="card-b">
@@ -2289,7 +2289,7 @@ function budgetsSection(c, s) {
 function notifySection(c, s) {
   const n = s.notify || { events: {} };
   return `<section class="card" data-group="Limits & alerts"><div class="card-h"><h2>Notifications</h2><span class="sub">when a run finishes or stops</span></div><div class="card-b">
-    <label class="switch"><input type="checkbox" data-notify="macos" ${n.macos ? "checked" : ""}><span>macOS notifications in Notification Center</span></label>
+    <label class="switch"><input type="checkbox" data-notify="macos" ${n.macos ? "checked" : ""}><span>Desktop notifications (Notification Center on macOS, toasts on Windows)</span></label>
     <div class="field" style="margin-top:14px"><span>Notify when a run is</span><div class="checks">${c.options.notify_events.map((e) => `<label class="check"><input type="checkbox" data-notify-event="${e}" ${(n.events || {})[e] ? "checked" : ""}> ${EVENT_TEXT[e] || e}</label>`).join("")}</div></div>
     <label class="field" style="margin-top:10px"><span>Microsoft Teams incoming webhook (optional)</span><input type="url" data-notify="teams_webhook" value="${esc(n.teams_webhook || "")}" placeholder="https://….webhook.office.com/webhookb2/…" spellcheck="false" autocomplete="off">
       <small>Only called when set. Katana posts a short card with the run, its status and the reason. Use a channel’s Incoming Webhook URL, or a Workflows “post to a channel when a webhook request is received” URL.</small></label>
@@ -2311,8 +2311,8 @@ function authBox(a) {
   const login = cl.subscription ? `${esc(cap1(cl.subscription))}${cl.email ? ` · ${esc(cl.email)}` : ""}` : cl.logged_in ? "Signed in, but not with a subscription" : "Not signed in";
   const keyRow = (p) => `<div class="key-row">
       <div class="who"><div><b>${esc(p.title)}</b> <span class="mono muted" style="font-size:12px">${esc(p.env)}</span></div>
-        <div>${p.saved ? `<span class="chip">${icon("check", 12)}In keychain · ${esc(p.hint)}</span>` : `<span class="chip">Not set</span>`}</div>
-        ${p.env_set ? `<small>${esc(p.env)} is also set in the dashboard’s environment. Katana ignores it and uses the keychain.</small>` : ""}</div>
+        <div>${p.saved ? `<span class="chip">${icon("check", 12)}Saved · ${esc(p.hint)}</span>` : `<span class="chip">Not set</span>`}</div>
+        ${p.env_set ? `<small>${esc(p.env)} is also set in the dashboard’s environment. Katana ignores it and uses the saved key.</small>` : ""}</div>
       <input type="password" data-auth-key="${p.id}" placeholder="${p.saved ? "Paste a new key to replace it" : `Paste your key${p.prefix ? ` (${esc(p.prefix)}…)` : ""}`}" autocomplete="off" spellcheck="false" aria-label="${esc(p.title)} API key">
       <div class="btns"><button class="btn" data-auth-save="${p.id}">${p.saved ? "Replace" : "Save"}</button>${p.saved ? `<button class="btn" data-auth-del="${p.id}">Remove</button>` : ""}</div>
     </div>`;
@@ -2324,7 +2324,7 @@ function authBox(a) {
       ${a.method === "api_key" && !anth.saved ? `<small>${icon("warn", 12)} Save an Anthropic API key below, or scans stop with “API key needed”.</small>` : ""}</div>
     <div class="field" style="margin-top:16px"><span>API keys</span></div>
     ${a.providers.map(keyRow).join("")}
-    <p class="sec-desc">Keys are saved in your macOS login keychain under the service <span class="mono">${esc(a.keychain_service)}</span>, never in a settings file or <span class="mono">.env</span>, and the dashboard never sends them back to this page. Agents get only the Anthropic key, and only when they sign in with an API key. The OpenAI and Gemini keys are stored for later use; agents don’t receive them.</p>`;
+    <p class="sec-desc">Keys are saved in your ${esc(a.key_store || "system keychain")} under the service <span class="mono">${esc(a.keychain_service)}</span>, never in a settings file or <span class="mono">.env</span>, and the dashboard never sends them back to this page. Agents get only the Anthropic key, and only when they sign in with an API key. The OpenAI and Gemini keys are stored for later use; agents don’t receive them.</p>`;
 }
 function paintAuth() { document.querySelectorAll("[data-auth-box]").forEach((el) => (el.innerHTML = authBox(ui.auth))); }
 async function refreshAuth(fresh) {
@@ -2346,14 +2346,14 @@ async function saveKey(id) {
   const input = document.querySelector(`[data-auth-key="${id}"]`), key = input ? input.value.trim() : "";
   if (!key) { toast("Paste the key first."); if (input) input.focus(); return; }
   const p = ui.auth.providers.find((x) => x.id === id);
-  await authAct({ action: "save-key", provider: id, key }, `${p.title} key saved in the keychain.`);
+  await authAct({ action: "save-key", provider: id, key }, `${p.title} key saved.`);
 }
 async function setAuthMethod(m) {
   if (m === "api_key" && !confirm("Switch agents to your Anthropic API key? From the next stage, runs are billed per token to your API account instead of using your subscription.")) { paintAuth(); return; }
   await authAct({ action: "method", method: m }, m === "api_key" ? "Agents now sign in with your Anthropic API key." : "Agents now sign in with your Claude subscription.");
 }
 function serviceSection() {
-  return `<section class="card" data-group="System"><div class="card-h"><h2>Service</h2><span class="sub">the launchd agent that scans on a schedule · buttons act immediately</span>
+  return `<section class="card" data-group="System"><div class="card-h"><h2>Service</h2><span class="sub">the background task that scans on a schedule · buttons act immediately</span>
     <div class="right"><button class="btn" data-act="svc-refresh">Refresh</button></div></div><div class="card-b" data-svc-box>${serviceBox(ui.svc)}</div></section>`;
 }
 function serviceBox(svc, compactView) {
@@ -2365,9 +2365,9 @@ function serviceBox(svc, compactView) {
   const btn = (a, l, off, primary) => `<button class="btn ${primary ? "primary" : ""}" data-svc="${a}" ${off || busy ? "disabled" : ""}>${busy === a ? SVC_BUSY[a] : l}</button>`;
   return `<div class="svc-status"><span class="dot ${dot}"></span><b>${label}</b><span class="ink2" style="font-size:13px">${text}</span></div>
     <div class="svc-btns">${btn("install", svc.installed ? "Reinstall" : "Install", false, !svc.installed)}${btn("start", "Start", !svc.installed || svc.loaded, svc.installed && !svc.loaded)}${btn("stop", "Stop", !svc.loaded)}${btn("uninstall", "Uninstall", !svc.installed)}</div>
-    ${compactView ? "" : `<dl class="facts" style="margin-bottom:14px"><div><dt>Label</dt><dd class="mono" style="word-break:break-all">${esc(svc.label)}</dd></div><div><dt>Checks every</dt><dd>${every}</dd></div><div style="grid-column:1 / -1"><dt>Agent file</dt><dd class="mono" style="word-break:break-all">${esc(svc.plist)}</dd></div></dl>
-    <div class="muted" style="font-size:12px;margin-bottom:6px">launchd.log · last 20 lines · <span class="mono" style="word-break:break-all">${esc(svc.log_path)}</span></div>
-    ${svc.log.length ? `<pre class="log" style="max-height:260px">${svc.log.map(esc).join("\n")}</pre>` : `<div class="empty" style="padding:12px 0">No launchd output yet.</div>`}`}`;
+    ${compactView ? "" : `<dl class="facts" style="margin-bottom:14px"><div><dt>Name</dt><dd class="mono" style="word-break:break-all">${esc(svc.label)}</dd></div><div><dt>Checks every</dt><dd>${every}</dd></div><div style="grid-column:1 / -1"><dt>Stored as</dt><dd class="mono" style="word-break:break-all">${esc(svc.plist)}</dd></div></dl>
+    <div class="muted" style="font-size:12px;margin-bottom:6px">service log · last 20 lines · <span class="mono" style="word-break:break-all">${esc(svc.log_path)}</span></div>
+    ${svc.log.length ? `<pre class="log" style="max-height:260px">${svc.log.map(esc).join("\n")}</pre>` : `<div class="empty" style="padding:12px 0">No service output yet.</div>`}`}`;
 }
 function paintService() { document.querySelectorAll("[data-svc-box]").forEach((el) => (el.innerHTML = serviceBox(ui.svc, el.dataset.svcBox === "compact"))); }
 async function refreshService() {
@@ -2376,7 +2376,7 @@ async function refreshService() {
 }
 async function serviceAct(action) {
   const ask = { stop: "Stop the service? Scheduled scans stop until you start it again. A scan in progress is stopped too; its run resumes from the last finished stage.",
-    uninstall: "Uninstall the service? Its launchd agent file is removed. Runs, input files and settings are kept." }[action];
+    uninstall: "Uninstall the service? Its scheduled task is removed. Runs, input files and settings are kept." }[action];
   if (ask && !confirm(ask)) return;
   ui.svcBusy = action; paintService();
   try {
@@ -2463,7 +2463,7 @@ async function onControlClick(t, s, c) {
   if (t.dataset.authSave) { await saveKey(t.dataset.authSave); return true; }
   if (t.dataset.authDel) {
     const p = ui.auth.providers.find((x) => x.id === t.dataset.authDel);
-    if (confirm(`Remove the ${p.title} key from the keychain?`)) await authAct({ action: "delete-key", provider: p.id }, `${p.title} key removed.`);
+    if (confirm(`Remove the ${p.title} key from the saved keys?`)) await authAct({ action: "delete-key", provider: p.id }, `${p.title} key removed.`);
     return true;
   }
   const act = t.dataset.act;
@@ -2559,7 +2559,7 @@ addWizardStep({
 });
 addWizardStep({
   id: "service", title: "Service", heading: "Run the factory in the background",
-  render: () => `<p>The service is a launchd agent that scans <span class="mono">input/</span> every 10 minutes while you’re logged in. Install it now, or skip this step and run <span class="mono">python3 factory/orchestrator.py watch</span> yourself.</p><div data-svc-box="compact">${serviceBox(ui.svc, true)}</div>`,
+  render: () => `<p>The service is a background task (launchd on macOS, Task Scheduler on Windows) that scans <span class="mono">input/</span> on a schedule while you’re logged in. Install it now, or skip this step and run <span class="mono">python factory/orchestrator.py watch</span> yourself (<span class="mono">python3</span> on macOS).</p><div data-svc-box="compact">${serviceBox(ui.svc, true)}</div>`,
   enter: () => refreshService(),
   summary: () => (ui.svc ? (ui.svc.loaded ? "Running" : ui.svc.installed ? "Installed, stopped" : "Not installed") : "—"),
 });
@@ -2571,7 +2571,7 @@ addWizardStep({
   id: "done", title: "Done", heading: "Ready to go",
   render: (w) => `<p>Finish to save these settings. Then drop a requirements <span class="mono">.md</span> file into <span class="mono">input/</span> to start a run.</p>
     <dl class="summary-list">${wizardSteps().filter((x) => x.summary).map((x) => `<dt>${esc(x.title)}</dt><dd>${esc(x.summary(w))}</dd>`).join("")}
-      <dt>Notifications</dt><dd>${w.draft.notify.macos ? "macOS" : "Off"}${w.draft.notify.teams_webhook ? " and Teams" : ""} · change them in Settings → Notifications</dd></dl>`,
+      <dt>Notifications</dt><dd>${w.draft.notify.macos ? "Desktop" : "Off"}${w.draft.notify.teams_webhook ? " and Teams" : ""} · change them in Settings → Notifications</dd></dl>`,
 });
 const wizardSteps = () => WIZARD_STEPS.filter((x) => !x.when || x.when(ui.wiz));
 function startWizard() {

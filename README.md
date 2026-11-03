@@ -1,7 +1,8 @@
 # Katana
 
 An SDLC factory of autonomous AI agents built on Claude: requirements in, a designed, built, tested, reviewed
-and security-audited project out. Phase 0 runs on your Mac with your Claude subscription only.
+and security-audited project out. Phase 0 runs on your own computer with your Claude subscription only: natively
+on macOS and Windows, and on Linux on a best-effort basis (see [Platform support](#platform-support)).
 
 - Architecture, options and scaling plan: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 
@@ -18,7 +19,7 @@ that run at the same time. What starts a run is the project's **trigger**:
 | Trigger | What starts a run |
 |---|---|
 | `folder-interval` | The service scans `input/` every N minutes (10 by default, set in Settings). |
-| `folder-watch` | launchd starts a scan as soon as `input/` changes, through `WatchPaths`. The service still rescans every N minutes as a fallback, which also resumes runs paused by a usage limit. |
+| `folder-watch` | On macOS, launchd starts a scan as soon as `input/` changes, through `WatchPaths`. On Windows the service checks every minute, so a new file is picked up within a minute. The service still rescans every N minutes as a fallback, which also resumes runs paused by a usage limit. |
 | `once` | No service. **Run now** in the dashboard, or `orchestrator.py run`, processes what is in `input/` and stops. A requirement submitted in the dashboard starts straight away. |
 | `manual` | Nothing starts by itself, not even a submitted requirement. Press **Run now**, or run the CLI. |
 
@@ -165,12 +166,14 @@ tokens. Each condition has a metric, an operator, a threshold and a severity (`b
 | [factory/projects.py](factory/projects.py) | The project registry |
 | [factory/dashboard/](factory/dashboard/) | The dashboard page (`index.html`) and the plan graph and its editor (`graph.js`, `graph.css`) |
 | [factory/dispatch.py](factory/dispatch.py) | Which projects are due, the background workers that scan them, and the launchd plist |
+| [factory/service.py](factory/service.py) | The background service: the launchd agent on macOS, the Task Scheduler task on Windows |
+| [factory/plat.py](factory/plat.py) | The platform differences: file locks, the API key store, notifications, the folder dialog, process checks and background workers |
 | [factory/budget.py](factory/budget.py) | Token counting for the per-run and daily caps |
-| [factory/notify.py](factory/notify.py) | macOS and Teams notifications |
+| [factory/notify.py](factory/notify.py) | Desktop and Teams notifications |
 | [config/defaults.json](config/defaults.json) | Default trigger, mode, limits, parallelism, gate commands, agents, budgets, notifications and plan |
 | `~/.katana/projects.json` | The registered projects and the active one |
 | `<project>/katana.config.json` | That project's changes to the defaults, written by the setup wizard and Settings tab |
-| `~/.katana/auth.json` | How agents sign in: `subscription` or `api_key`. The keys themselves are in the keychain, not in any file |
+| `~/.katana/auth.json` | How agents sign in: `subscription` or `api_key`. The keys themselves are in the system secret store, not in any file |
 | `~/.katana/agents/<name>.md` | Your edited agent prompts, written by Settings → Agents → Prompt. Shared by all projects |
 | `<project>/.katana/runs/<id>/` | Per run: `workspace/` (the generated project, its own git repo), `reports/`, `logs/`, `gates/`, `state.json`, `SUMMARY.md` |
 | `~/.katana/projects/<key>/logs/` | That project's `factory.log` and `worker.log` (`<key>` is the project folder's name plus a short hash of its path) |
@@ -194,8 +197,9 @@ the next time the dashboard or a scan starts.
 use your Claude subscription: before every scan the orchestrator checks `claude auth status` for a subscription
 login, and it removes `ANTHROPIC_API_KEY` and other API or provider variables from the agents' environment.
 Switch to **Anthropic API key** there and the agents get the saved key instead, billed per token. API keys
-(Anthropic, OpenAI, Google Gemini) are saved in your macOS login keychain under the service `katana`, never in a
-file; the dashboard shows only their last four characters. Only the Anthropic key reaches agents, and only in
+(Anthropic, OpenAI, Google Gemini) are saved in your system's secret store under the service `katana`, never in a
+file: the macOS login keychain, Windows Credential Manager, or the Linux keyring through `secret-tool` (from the
+libsecret-tools package). The dashboard shows only their last four characters. Only the Anthropic key reaches agents, and only in
 API key mode. The choice is shared by all projects and saved in `~/.katana/auth.json`.
 
 **Recovery:**
@@ -206,8 +210,8 @@ API key mode. The choice is shared by all projects and saved in `~/.katana/auth.
 **Guardrails:** agents run in `acceptEdits` mode inside their workspace. Shell commands are limited to each
 agent's tool allowlist, and anything else is denied automatically. An allowlist you edit in Settings is
 checked against a safe pattern: built-in tools such as `Read` or `Edit`, or `Bash(command *)` for one named
-command. Bare `Bash`, `Bash(*)`, shells, and network or system commands such as `curl`, `ssh`, `rm` and
-`sudo` are refused.
+command. Bare `Bash`, `Bash(*)`, shells, and network or system commands such as `curl`, `ssh`, `rm`, `sudo`, and on Windows
+`cmd`, `powershell` or `schtasks`, are refused.
 
 **Agents:** each agent can be switched off in Settings.
 - Deterministic mode skips a disabled agent's stages.
@@ -227,8 +231,8 @@ command. Bare `Bash`, `Bash(*)`, shells, and network or system commands such as 
 - **Pause when usage is near the limit:** when the CLI warns that the subscription window is nearly used up,
   the run pauses after the current stage and resumes after the window resets.
 
-**Notifications:** a macOS notification when a run is done, failed, blocked, paused or needs approval, with a toggle for
-each event. If you add a Teams incoming-webhook URL, which must be an https URL on `webhook.office.com`,
+**Notifications:** a desktop notification (macOS Notification Center, a Windows toast, or `notify-send` on Linux) when a
+run is done, failed, blocked, paused or needs approval, with a toggle for each event. If you add a Teams incoming-webhook URL, which must be an https URL on `webhook.office.com`,
 `logic.azure.com` or `powerplatform.com`, Katana also posts a card there. Nothing is sent to Teams
 without one.
 
@@ -239,9 +243,9 @@ python3 factory/dashboard.py
 ```
 
 Then open http://127.0.0.1:8787. With no project selected it opens on the **start screen**: your recent
-projects, a path field with **Browse…** (the native macOS folder dialog), **Open project**, and
+projects, a path field with **Browse…** (the native folder dialog), **Open project**, and
 **Create new project**, which makes the folder with `input/` and `.katana/` inside.
-`--home DIR` opens a folder directly.
+`--home DIR` opens a folder directly. On Windows, use `python` in place of `python3`.
 
 Once a project is open, the project name in the top bar switches between recent projects, and every tab
 follows the project you pick. The top bar also has:
@@ -301,12 +305,50 @@ The project's tabs refresh every 5 seconds:
   - **Limits & alerts:** budgets and notifications, with a test button.
   - **System:**
     - Whether the service is installed and running, with Install, Start, Stop and Uninstall buttons. These
-      act immediately.
+      act immediately. The service is a launchd agent on macOS and a Task Scheduler task on Windows; Linux has none.
     - The last 20 lines of `~/.katana/logs/launchd.log`.
 
 The server listens on localhost only. Every change, including settings, prompts, service actions and test
 notifications, needs a JSON POST with a custom header, so other web pages can't make them. The dollar figures are the API-equivalent list price; your subscription is what
 is billed.
+
+## Platform support
+
+Katana runs natively on macOS and Windows. Linux works on a best-effort basis. The platform differences live in
+[factory/plat.py](factory/plat.py) (file locks, API key store, notifications, folder dialog, background workers)
+and [factory/service.py](factory/service.py) (the background service).
+
+| | macOS | Windows | Linux (best effort) |
+|---|---|---|---|
+| Background service | launchd agent (`scripts/install-service.sh`) | Task Scheduler task `Katana` (`scripts\install-service.ps1`) | None: run `watch` instead |
+| Folder-watch trigger | Starts a scan as soon as `input/` changes | Picked up within a minute | Only while `watch` runs |
+| API key store | Login keychain | Windows Credential Manager | Keyring through `secret-tool` |
+| Notifications | Notification Center | Windows toast | `notify-send` |
+| Folder dialog | Native macOS dialog | Windows folder picker | `zenity`, or type the path |
+
+On every platform you need Python 3.8 or newer (Katana uses only the standard library, so there is nothing to
+install with `pip`), git, and the `claude` CLI signed in with your subscription.
+
+**Running on Windows:**
+
+```powershell
+python factory\dashboard.py
+python factory\orchestrator.py run --project C:\Users\you\Projects\my-app
+scripts\install-service.ps1
+```
+
+- The CLI: install the native Claude Code build, so that `claude.exe` exists. Katana looks for `claude.exe` on
+  `PATH` and in `~/.local/bin` first. If it finds an npm `claude.cmd` shim, it runs the `claude.exe` in that
+  package's `node_modules` folder instead, so prompts never pass through `cmd.exe`.
+- The service is a Task Scheduler task called `Katana`. It runs `orchestrator.py dispatch` every minute through
+  `pythonw`, so no console window opens. It runs only while you are logged in, and scans missed while the PC
+  sleeps run once when it wakes. If PowerShell won't run the script, `python factory\service.py install` does
+  the same. Run the install again if you move the Katana folder.
+- `~/.katana` means `C:\Users\<you>\.katana`.
+
+**Running on Linux:** there is no background service yet, so run `python3 factory/orchestrator.py watch` in a
+terminal. Install `secret-tool` (libsecret-tools) to store API keys, `notify-send` for desktop notifications, and
+`zenity` for the folder dialog.
 
 ## Service
 
@@ -339,8 +381,8 @@ lists a project's runs and where each one is.
 scripts/install-service.sh
 ```
 
-installs the background service, a launchd agent that runs while you are logged in. It generates the plist
-from `~/.katana/projects.json`:
+installs the background service on macOS, a launchd agent that runs while you are logged in. It generates the
+plist from `~/.katana/projects.json`:
 - Every minute, launchd runs `orchestrator.py dispatch`, which starts a background worker for each project
   that is due. A long run in one project never holds up another.
 - `WatchPaths` lists the `input/` folder of every `folder-watch` project, so a new file starts a scan
@@ -350,19 +392,36 @@ Run the script again after adding a `folder-watch` project. When the service is 
 does this for you whenever the watched folders change. `scripts/uninstall-service.sh` removes the service.
 Settings → Service runs the same scripts, and starts or stops the agent with `launchctl`.
 
-Environment variables: `KATANA_DISPATCH_INTERVAL` (60 s), `KATANA_MAX_ATTEMPTS` (3), `KATANA_BUDGET_POLL`
-(how often a running stage is checked against the token caps, 5 s), `KATANA_CLAUDE_BIN` (path to the CLI),
-and `KATANA_HOME`, which pins the dashboard and the orchestrator to one project folder
-for testing.
+On Windows, run this in PowerShell instead:
+
+```powershell
+scripts\install-service.ps1
+```
+
+installs a Task Scheduler task named `Katana` that does the same job every minute. Windows has no `WatchPaths`,
+and each check reads the project list itself, so a new project needs no re-install. `scripts\uninstall-service.ps1`
+removes the task; runs and input files are kept. Settings → Service runs the same install and uninstall, and
+starts or stops the task with `schtasks`.
+
+`python3 factory/service.py install|uninstall|start|stop|status` does the same from the command line on macOS
+(`python` on Windows).
+
+Environment variables: `KATANA_DISPATCH_INTERVAL` (60 s; on Windows it is rounded to whole minutes),
+`KATANA_MAX_ATTEMPTS` (3), `KATANA_BUDGET_POLL` (how often a running stage is checked against the token caps,
+5 s), `KATANA_CLAUDE_BIN` (path to the CLI), and `KATANA_HOME`, which pins the dashboard and the orchestrator to
+one project folder for testing.
 
 The orchestrator finds the CLI on `PATH`, then in `~/.local/bin`, then uses the copy bundled with the
-Claude desktop app. A standalone install is more stable for the service:
+Claude desktop app (macOS). A standalone install is more stable for the service:
 
 ```bash
 curl -fsSL https://claude.ai/install.sh | bash
 ```
 
-The laptop must be awake for scans to run. Scans missed while it sleeps run once when it wakes.
+On Windows, see [Platform support](#platform-support) for the native build.
+
+The laptop or PC must be awake for scans to run, and on Windows you must be logged in. Scans missed while it sleeps
+run once when it wakes.
 
 ## Connectors
 
@@ -392,4 +451,4 @@ Planned connectors would plug in like this; they are not built yet:
 
 A new connector registers its trigger type in `CONNECTORS` in
 [factory/triggers/__init__.py](factory/triggers/__init__.py) and adds its fields to `settings.validate()`.
-Credentials belong in the macOS keychain, not in a settings file.
+Credentials belong in the system secret store (see [factory/plat.py](factory/plat.py)), not in a settings file.

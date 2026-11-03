@@ -1,6 +1,7 @@
 """Which projects the service should scan now, the background workers that scan them, and the launchd plist.
 
-launchd runs `orchestrator.py dispatch` every minute and whenever a folder-watch project's input/ changes.
+The service (launchd on macOS, Task Scheduler on Windows, see service.py) runs `orchestrator.py dispatch` every
+minute; launchd also runs it as soon as a folder-watch project's input/ changes.
 dispatch starts one detached worker (`orchestrator.py run --project P --scheduled`) per project that is due,
 so a long run in one project never holds up another. Each worker takes its project's .katana/runs/.lock.
 """
@@ -9,11 +10,11 @@ from __future__ import annotations
 import json
 import os
 import plistlib
-import subprocess
 import sys
 import time
 from pathlib import Path
 
+import plat
 import projects
 import settings
 from triggers import FolderTrigger
@@ -63,14 +64,13 @@ def busy(folder: Path) -> bool:
 
 
 def spawn_worker(folder: Path, scheduled: bool) -> None:
-    """Starts `orchestrator.py run` for one project in the background, in its own session so it outlives
+    """Starts `orchestrator.py run` for one project in the background, detached so it outlives
     the dispatcher or the dashboard request that started it."""
     folder = Path(folder)
     projects.logs_dir(folder).mkdir(parents=True, exist_ok=True)
     cmd = [sys.executable, str(HERE / "orchestrator.py"), "run", "--project", str(folder)]
-    with open(projects.logs_dir(folder) / "worker.log", "a") as err:
-        subprocess.Popen(cmd + (["--scheduled"] if scheduled else []), stdin=subprocess.DEVNULL,
-                         stdout=subprocess.DEVNULL, stderr=err, start_new_session=True, cwd=str(HERE.parent))
+    with open(projects.logs_dir(folder) / "worker.log", "a", encoding="utf-8") as err:
+        plat.spawn_detached(cmd + (["--scheduled"] if scheduled else []), HERE.parent, err)
 
 
 def watch_paths() -> list:

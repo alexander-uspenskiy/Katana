@@ -11,7 +11,6 @@ The dashboard shows the active project; the service processes every registered p
 """
 from __future__ import annotations
 
-import fcntl
 import hashlib
 import json
 import os
@@ -19,6 +18,8 @@ import re
 import shutil
 from datetime import datetime
 from pathlib import Path
+
+import plat
 
 REPO = Path(__file__).resolve().parent.parent
 USER_DIR = Path(os.environ.get("KATANA_USER_DIR") or Path.home() / ".katana").expanduser()
@@ -156,10 +157,10 @@ def locked(lock_path: Path) -> bool:
         return False
     with open(lock_path, "a") as lock:
         try:
-            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            plat.lock(lock)
         except BlockingIOError:
             return True
-        fcntl.flock(lock, fcntl.LOCK_UN)
+        plat.unlock(lock)
     return False
 
 
@@ -205,7 +206,7 @@ def upgrade_layout(path) -> None:
     if old_logs:
         USER_DIR.mkdir(parents=True, exist_ok=True)
         with open(USER_DIR / ".migrate.lock", "a") as lock:
-            fcntl.flock(lock, fcntl.LOCK_EX)
+            plat.lock(lock, blocking=True)
             for old in old_logs:
                 if old.is_dir():
                     _move_into(old, logs_dir(path))
@@ -227,7 +228,7 @@ def upgrade_all() -> None:
 def check_folder(path: str, must_exist: bool) -> str | None:
     """An error message, or None if `path` can be opened (must_exist) or created as a project."""
     if not path or not Path(path).expanduser().is_absolute():
-        return "Enter the folder's full path, for example /Users/you/Projects/my-app."
+        return f"Enter the folder's full path, for example {plat.example_path()}."
     p = Path(path).expanduser()
     if p.exists() and not p.is_dir():
         return "That path is a file, not a folder."

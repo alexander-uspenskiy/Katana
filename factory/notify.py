@@ -1,25 +1,15 @@
-"""Notifications when a run is done, failed, blocked or paused: macOS Notification Center and, if the user set
-one, a Microsoft Teams incoming webhook. A failed notification is logged and never stops the factory.
+"""Notifications when a run is done, failed, blocked or paused: the desktop (macOS Notification Center, a Windows
+toast, notify-send on Linux) and, if the user set one, a Microsoft Teams incoming webhook. A failed notification
+is logged and never stops the factory.
 """
 from __future__ import annotations
 
 import json
-import shutil
 import subprocess
 import urllib.request
 
+import plat
 import settings
-
-# The message travels as an argument, never as AppleScript source, so its text can't inject commands.
-APPLESCRIPT = ["-e", "on run argv", "-e",
-               "display notification (item 1 of argv) with title (item 2 of argv) subtitle (item 3 of argv)",
-               "-e", "end run"]
-
-
-def macos(title: str, subtitle: str, message: str) -> None:
-    osascript = shutil.which("osascript") or "/usr/bin/osascript"
-    subprocess.run([osascript, *APPLESCRIPT, message[:300], title[:80], subtitle[:120]],
-                   capture_output=True, timeout=15, check=True)
 
 
 def teams_payload(title: str, subtitle: str, message: str) -> dict:
@@ -46,11 +36,11 @@ def send(conf: dict, event: str, subtitle: str, message: str, force: bool = Fals
     if not force and not (n.get("events") or {}).get(event):
         return []
     title, problems = f"{conf.get('project') or 'Katana'}: {event}", []
-    if n.get("macos"):
+    if n.get("macos"):  # the key keeps its old name so saved settings still work; it means desktop notifications
         try:
-            macos(title, subtitle, message)
+            plat.desktop_notify(title, subtitle, message)
         except (OSError, subprocess.SubprocessError) as e:
-            problems.append(f"macOS notification failed: {e}")
+            problems.append(f"{plat.notification_name()} failed: {e}")
     url = n.get("teams_webhook") or ""
     if url:
         if not settings.valid_webhook(url):

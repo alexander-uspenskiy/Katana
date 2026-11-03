@@ -1,9 +1,10 @@
-"""Katana authentication: how the agents sign in to Claude, and the API keys kept in the macOS keychain.
+"""Katana authentication: how the agents sign in to Claude, and the API keys kept in the system secret store.
 
 Agents sign in with the Claude subscription (the default) or an Anthropic API key. The choice is shared by
 every project and lives in ~/.katana/auth.json. API keys never touch a file: they are generic
-passwords in the login keychain under the service "katana", one per provider. The `security` command
-gets each secret on stdin, so it never shows in the process list, and agents may not run `security`.
+passwords under the service "katana", one per provider, in the macOS login keychain, Windows Credential
+Manager or the Linux keyring (see plat.py). On macOS the `security` command gets each secret on stdin, so it
+never shows in the process list, and agents may not run `security`.
 """
 from __future__ import annotations
 
@@ -16,6 +17,7 @@ import subprocess
 import time
 from pathlib import Path
 
+import plat
 import projects
 
 REPO = Path(__file__).resolve().parent.parent
@@ -46,8 +48,12 @@ _status_cache = {"at": 0.0, "value": None}
 # ---------------------------------------------------------------- claude CLI
 
 def find_claude() -> str:
-    candidates = [os.environ.get("KATANA_CLAUDE_BIN"), shutil.which("claude"),
-                  str(Path.home() / ".local/bin/claude")]
+    if plat.IS_WIN:  # prefer the native claude.exe: a .cmd shim would pass the prompts through cmd.exe
+        candidates = [os.environ.get("KATANA_CLAUDE_BIN"), shutil.which("claude.exe"),
+                      str(Path.home() / ".local/bin/claude.exe"), shutil.which("claude")]
+    else:
+        candidates = [os.environ.get("KATANA_CLAUDE_BIN"), shutil.which("claude"),
+                      str(Path.home() / ".local/bin/claude")]
     # Fallback: the CLI bundled with the Claude desktop app, newest version first.
     bundled = glob.glob(str(Path.home() / "Library/Application Support/Claude/claude-code/*/*"
                                           "/claude.app/Contents/MacOS/claude"))
@@ -55,8 +61,18 @@ def find_claude() -> str:
     candidates += sorted(bundled, key=version, reverse=True)
     for c in candidates:
         if c and os.access(c, os.X_OK):
-            return c
+            return native_claude(c)
     raise SystemExit("Claude Code CLI not found. Install it or set KATANA_CLAUDE_BIN.")
+
+
+def native_claude(path: str) -> str:
+    """On Windows an npm install puts a claude.cmd shim on PATH, which would pass every prompt through cmd.exe.
+    Returns the claude.exe next to it when there is one, so the CLI is started directly."""
+    if plat.IS_WIN and path.lower().endswith((".cmd", ".bat")):
+        exe = Path(path).parent / "node_modules/@anthropic-ai/claude-code/bin/claude.exe"
+        if exe.is_file():
+            return str(exe)
+    return path
 
 
 def subscription_env() -> dict:
@@ -120,15 +136,10 @@ def set_method(value: str) -> None:
     tmp.replace(AUTH_PATH)
 
 
-# ---------------------------------------------------------------- keychain
+# ---------------------------------------------------------------- secret store
 
 def get_key(provider: str) -> str | None:
-    try:
-        out = subprocess.run(["security", "find-generic-password", "-s", KEYCHAIN_SERVICE, "-a", provider, "-w"],
-                             capture_output=True, text=True, timeout=30)
-    except (OSError, subprocess.SubprocessError):
-        return None
-    return (out.stdout.strip() or None) if out.returncode == 0 else None
+    return plat.secret_get(KEYCHAIN_SERVICE, provider)
 
 
 def set_key(provider: str, key: str) -> str | None:
@@ -138,22 +149,14 @@ def set_key(provider: str, key: str) -> str | None:
     key = key.strip()
     if not KEY_PATTERN.match(key):
         return "That doesn't look like an API key: paste the whole key, with no spaces."
-    # security -i reads the command from stdin; KEY_PATTERN keeps quotes and spaces out of it.
-    title = PROVIDERS[provider]["title"]
-    line = f'add-generic-password -U -s "{KEYCHAIN_SERVICE}" -a "{provider}" -l "Katana: {title}" -w "{key}"\n'
-    try:
-        out = subprocess.run(["security", "-i"], input=line, capture_output=True, text=True, timeout=30)
-    except (OSError, subprocess.SubprocessError) as e:
-        return f"Couldn't reach the keychain: {e}"
+    # KEY_PATTERN keeps quotes and spaces out of the key, which plat.secret_set relies on.
+    error = plat.secret_set(KEYCHAIN_SERVICE, provider, f"Katana: {PROVIDERS[provider]['title']}", key)
     _status_cache["at"] = 0
-    if out.returncode != 0 or get_key(provider) != key:
-        return (out.stderr.strip() or "The keychain didn't save the key.")[:300]
-    return None
+    return error
 
 
 def delete_key(provider: str) -> None:
-    subprocess.run(["security", "delete-generic-password", "-s", KEYCHAIN_SERVICE, "-a", provider],
-                   capture_output=True, timeout=30)
+    plat.secret_delete(KEYCHAIN_SERVICE, provider)
     _status_cache["at"] = 0
 
 
@@ -196,6 +199,7 @@ def status(fresh: bool = False) -> dict:
                         "auth_method": login.get("authMethod"), "email": login.get("email"),
                         "org": login.get("orgName")},
              "providers": providers, "keychain_service": KEYCHAIN_SERVICE,
+             "key_store": plat.secret_store_name(),
              "env_vars": [v for v in API_ENV_VARS if os.environ.get(v)]}
     _status_cache.update(at=time.time(), value=value)
     return value

@@ -1,6 +1,7 @@
 {
   "version": "0.0.1",
   "configurations": [
-    { "name": "dashboard", "runtimeExecutable": "python3", "runtimeArgs": ["factory/dashboard.py", "--port", "8787"], "port": 8787 }
+    { "name": "dashboard", "runtimeExecutable": "python3", "runtimeArgs": ["factory/dashboard.py", "--port", "8787"], "port": 8787 },
+    { "name": "dashboard-windows", "runtimeExecutable": "python", "runtimeArgs": ["factory/dashboard.py", "--port", "8787"], "port": 8787 }
   ]
 }

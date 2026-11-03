@@ -17,11 +17,20 @@ python3 factory/orchestrator.py status --project <dir>              # list runs
 python3 factory/orchestrator.py tick                                # one scan of all folder-* projects
 python3 factory/orchestrator.py watch                               # foreground scan loop
 scripts/install-service.sh                                          # launchd agent (macOS); uninstall-service.sh removes it
+python3 factory/service.py install|uninstall|start|stop|status      # the same service, on macOS or Windows
+```
+
+Windows (PowerShell), same commands with `python` and the `.ps1` scripts (also .claude/launch.json "dashboard-windows"):
+
+```powershell
+python factory\dashboard.py [--port 8787] [--home <project dir>]
+python factory\orchestrator.py run --project <dir>
+scripts\install-service.ps1                                         # Task Scheduler task "Katana"; uninstall-service.ps1 removes it
 ```
 
 Useful env vars: `KATANA_HOME` (pin one project folder for testing), `KATANA_USER_DIR` (move `~/.katana`), `KATANA_CLAUDE_BIN`, `KATANA_MAX_ATTEMPTS`, `KATANA_DISPATCH_INTERVAL`, `KATANA_BUDGET_POLL`.
 
-**Platform:** the code targets macOS (uses `fcntl`, launchd, the login keychain, native folder dialogs). It will not run natively on this Windows machine; use WSL or a Mac to execute it.
+**Platform:** the code runs natively on macOS and Windows; Linux is best effort (no background service there). Platform differences live only in [factory/plat.py](factory/plat.py) and [factory/service.py](factory/service.py). New platform-specific code goes there. Never call `fcntl`, `msvcrt`, `os.kill(pid, 0)` (on Windows it kills the process), `osascript` or `security` directly from any other module.
 
 ## Architecture
 
@@ -33,7 +42,7 @@ All code is in `factory/`; modules import each other flat (`import settings`, `i
 - **[agents/*.md](factory/agents)**: one prompt per role, with frontmatter (`model`, `effort`, `writes_code`, `tools`) that drives parallelism rules and the tool allowlist. User edits live in `~/.katana/agents/<name>.md` and override these. Allowlists are safety-checked (no bare `Bash`, shells, `curl`, `rm`, `sudo`, …).
 - **[triggers/](factory/triggers)**: requirement sources behind `fetch / claim / ack / report` ([base.py](factory/triggers/base.py)). `FolderTrigger` is the only one; new connectors register in `CONNECTORS` in `triggers/__init__.py` and add fields to `settings.validate()`.
 - **[gitrepo.py](factory/gitrepo.py)**: the workspace is a local clone with no `origin` on branch `katana/<run-id>` so agents cannot touch the user's repo; Katana alone fetches and publishes (pr/push/merge/local).
-- **[dispatch.py](factory/dispatch.py)** (due projects, background workers, launchd plist), **[projects.py](factory/projects.py)** (registry in `~/.katana/projects.json`), **[auth.py](factory/auth.py)** (subscription vs API key; keys in the keychain, API env vars stripped from agents in subscription mode), **[budget.py](factory/budget.py)**, **[ledger.py](factory/ledger.py)** (per-run usage record under `~/.katana/projects/<key>/usage/`), **[notify.py](factory/notify.py)**.
+- **[dispatch.py](factory/dispatch.py)** (due projects, background workers, launchd plist), **[service.py](factory/service.py)** (the background service: launchd agent on macOS, Task Scheduler task `Katana` on Windows; the dashboard's Service controls go through it), **[plat.py](factory/plat.py)** (every platform difference: file locks, API key store, desktop notifications, folder dialog, process checks, detached workers, UTF-8 restart on Windows), **[projects.py](factory/projects.py)** (registry in `~/.katana/projects.json`), **[auth.py](factory/auth.py)** (subscription vs API key; keys in the system secret store via `plat.py`, API env vars stripped from agents in subscription mode; on Windows it prefers `claude.exe`), **[budget.py](factory/budget.py)**, **[ledger.py](factory/ledger.py)** (per-run usage record under `~/.katana/projects/<key>/usage/`), **[notify.py](factory/notify.py)**.
 - **[dashboard.py](factory/dashboard.py)** is a localhost-only `http.server` JSON API (state-changing calls need a JSON POST with a custom header) serving the single-page UI in [factory/dashboard/](factory/dashboard) (`index.html`, plus the plan graph editor `graph.js`/`graph.css`). There is no frontend build; edit the files directly.
 
 State locations: project-level in `<project>/katana.config.json` and `<project>/.katana/` (gitignored); user-level in `~/.katana/`. The old `config/*.json` and `.katana` layouts are auto-migrated on first start, so keep those migrations working when touching `projects.py`/`settings.py`.

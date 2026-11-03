@@ -14,7 +14,6 @@ import json
 import os
 import re
 import shutil
-import subprocess
 import time
 from collections import defaultdict
 from datetime import datetime
@@ -29,22 +28,19 @@ import gates
 import gitrepo
 import ledger
 import notify
+import plat
 import projects
+import service
 import settings
 import streamlog
 import triggers
 
 HERE = Path(__file__).resolve().parent
 PAGE = HERE / "dashboard" / "index.html"
-INSTALL_SCRIPT = HERE.parent / "scripts" / "install-service.sh"
-LABEL = dispatch.LABEL
-SCRIPTS = HERE.parent / "scripts"
-LAUNCHD_LOG = dispatch.LAUNCHD_LOG
-SERVICE_ACTIONS = ("install", "start", "stop", "uninstall")
+SERVICE_ACTIONS = service.ACTIONS
 ASSETS = {"graph.js": "text/javascript; charset=utf-8", "graph.css": "text/css; charset=utf-8"}  # served from dashboard/
 TASK_LINE = re.compile(r"^\s*[-*]\s+\[([ xX])\]\s+(?:(T\d+)[:.)]?\s*)?(.+)$", re.M)
 TOKEN_KEYS = ("input", "cache_write", "cache_read", "output")
-_service_cache = {"at": 0.0, "value": None}
 
 
 def read_json(path: Path, default=None):
@@ -69,72 +65,11 @@ def read_state(path: Path):
     return hit[1]
 
 
-def pid_alive(pid) -> bool:
-    try:
-        os.kill(int(pid), 0)
-        return True
-    except (OSError, TypeError, ValueError):
-        return False
-
-
-def service_status(fresh: bool = False) -> dict:
-    if fresh or time.time() - _service_cache["at"] > 30:  # launchctl is slow-ish; check twice a minute
-        loaded = subprocess.run(["launchctl", "print", f"gui/{os.getuid()}/{LABEL}"],
-                                capture_output=True).returncode == 0
-        _service_cache.update(at=time.time(), value={"installed": dispatch.PLIST_PATH.exists(), "loaded": loaded,
-                                                     "watching": dispatch.installed_watch_paths() or []})
-    return _service_cache["value"]
-
-
-def sync_service() -> str | None:
-    """Rewrites the launchd plist if the folders it should watch changed. Returns a note for the page."""
-    installed = dispatch.installed_watch_paths()
-    if installed is None or os.environ.get("KATANA_HOME") or installed == dispatch.watch_paths():
-        return None
-    out = subprocess.run([str(INSTALL_SCRIPT)], capture_output=True, text=True, timeout=60)
-    _service_cache["at"] = 0
-    return "Service updated to watch the new input folders." if out.returncode == 0 \
-        else f"Couldn't update the service: {(out.stderr or out.stdout).strip()[:300]}"
-
-
-def service_view(fresh: bool = False) -> dict:
-    try:
-        log_tail = LAUNCHD_LOG.read_text(errors="replace").splitlines()[-20:]
-    except OSError:
-        log_tail = []
-    return dict(service_status(fresh), label=LABEL, plist=str(dispatch.PLIST_PATH), log_path=str(LAUNCHD_LOG),
-                log=log_tail, interval=dispatch.DISPATCH_SECONDS)
-
-
-def service_action(action: str) -> tuple:
-    """Runs one service action with the install scripts or launchctl. Returns (ok, message)."""
-    target, status = f"gui/{os.getuid()}", service_status(fresh=True)
-    if action == "install":
-        cmd = [str(SCRIPTS / "install-service.sh")]
-    elif action == "uninstall":
-        cmd = [str(SCRIPTS / "uninstall-service.sh")]
-    elif action == "start":
-        if not status["installed"]:
-            return False, "Install the service first."
-        if status["loaded"]:
-            return True, "The service is already running."
-        cmd = ["launchctl", "bootstrap", target, str(dispatch.PLIST_PATH)]
-    elif action == "stop":
-        if not status["loaded"]:
-            return True, "The service is already stopped."
-        cmd = ["launchctl", "bootout", f"{target}/{LABEL}"]
-    else:
-        return False, "Unknown action."
-    try:
-        out = subprocess.run(cmd, capture_output=True, text=True, timeout=60)
-    except (OSError, subprocess.SubprocessError) as e:
-        return False, str(e)
-    finally:
-        _service_cache["at"] = 0
-    if out.returncode != 0:
-        return False, (out.stdout + out.stderr).strip()[-600:] or f"{action} failed"
-    return True, {"install": "Installed and started.", "uninstall": "Uninstalled.", "start": "Started.",
-                  "stop": "Stopped."}[action]
+pid_alive = plat.pid_alive
+service_status = service.status
+service_view = service.view
+service_action = service.action
+sync_service = service.sync
 
 
 def budget_view(conf: dict, runs: list, beat: dict) -> dict:
@@ -466,19 +401,7 @@ def settings_payload() -> dict:
             "env_override": bool(os.environ.get("KATANA_HOME"))}
 
 
-def choose_folder() -> dict:
-    """Shows the native macOS folder dialog on this Mac. Waits until the user picks a folder or cancels."""
-    script = 'POSIX path of (choose folder with prompt "Choose a Katana project folder")'
-    try:
-        out = subprocess.run(["osascript", "-e", script], capture_output=True, text=True, timeout=600)
-    except (OSError, subprocess.TimeoutExpired) as e:
-        return {"ok": False, "errors": [f"Couldn't open the folder dialog: {e}"]}
-    if out.returncode != 0:
-        if "-128" in out.stderr:  # User canceled.
-            return {"ok": False, "cancelled": True}
-        return {"ok": False, "errors": [out.stderr.strip() or "Couldn't open the folder dialog."]}
-    path = out.stdout.strip()
-    return {"ok": True, "path": path.rstrip("/") or "/"}
+choose_folder = plat.choose_folder
 
 
 def project_action(body: dict) -> tuple:
@@ -646,7 +569,7 @@ def post_notify_test(body: dict) -> tuple:
     if errors:
         return 400, {"ok": False, "errors": errors}
     if not conf["notify"]["macos"] and not conf["notify"]["teams_webhook"]:
-        return 400, {"ok": False, "errors": ["Turn on macOS notifications or add a Teams webhook first."]}
+        return 400, {"ok": False, "errors": ["Turn on desktop notifications or add a Teams webhook first."]}
     problems = notify.send(conf, "test", "Test notification", "Notifications from Katana work.", force=True)
     return (500 if problems else 200), {"ok": not problems, "errors": problems}
 
@@ -761,4 +684,5 @@ def main() -> None:
 
 
 if __name__ == "__main__":
+    plat.ensure_utf8()
     main()

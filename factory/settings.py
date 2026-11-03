@@ -65,6 +65,7 @@ SAFE_TOOL = re.compile(r"^(Read|Write|Edit|MultiEdit|Glob|Grep|LS|NotebookRead|N
                        r"|Bash\([\w./-]+( [\w./=@:,+-]+)*( \*|:\*)?\))$")
 UNSAFE_COMMANDS = {"sudo", "su", "rm", "curl", "wget", "ssh", "scp", "sftp", "rsync", "nc", "ncat", "telnet", "eval",
                    "exec", "sh", "bash", "zsh", "fish", "env", "xargs", "osascript", "launchctl", "security", "open",
+                   "cmd", "powershell", "pwsh", "wscript", "cscript", "reg", "schtasks", "cmdkey", "runas", "start",
                    "dd", "mkfs", "diskutil", "chown", "kill", "killall", "pkill", "crontab", "defaults", "claude"}
 MAX_TOKENS_CAP = 10 ** 11
 TEAMS_HOSTS = (".webhook.office.com", ".logic.azure.com", ".powerplatform.com", ".powerautomate.com")
@@ -297,7 +298,7 @@ def tool_problem(tool: str) -> str | None:
     if not SAFE_TOOL.match(tool):
         return "is not an allowed tool. Use a built-in tool such as Read or Edit, or Bash(command *) for one command"
     command = re.match(r"^Bash\(([^ )]+)", tool)
-    if command and command.group(1).split("/")[-1] in UNSAFE_COMMANDS:
+    if command and re.sub(r"\.(exe|cmd|bat|com)$", "", command.group(1).split("/")[-1].lower()) in UNSAFE_COMMANDS:
         return f"gives {command.group(1)}, which agents may not run"
     return None
 

@@ -21,13 +21,12 @@ reject (the dashboard records the answer in the run's state, and the next scan c
     python3 factory/orchestrator.py run [--project PATH]   # process the current input now, then exit
     python3 factory/orchestrator.py tick      # scan every folder-interval and folder-watch project now
     python3 factory/orchestrator.py watch     # scan those projects when due, in the foreground
-    python3 factory/orchestrator.py dispatch  # what launchd runs: a background worker per due project
+    python3 factory/orchestrator.py dispatch  # what the service runs: a background worker per due project
     python3 factory/orchestrator.py status [--project PATH]   # list runs
 """
 from __future__ import annotations
 
 import argparse
-import fcntl
 import json
 import os
 import re
@@ -47,6 +46,7 @@ import gates
 import gitrepo
 import ledger
 import notify
+import plat
 import projects
 import settings
 import streamlog
@@ -1093,7 +1093,7 @@ def scan(project: Path, scheduled: bool = True) -> None:
     configure(project, settle)
     with open(RUNS_DIR / ".lock", "w") as lock:
         try:
-            fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            plat.lock(lock)
         except BlockingIOError:
             log("another tick is still running, skipping")
             return
@@ -1139,7 +1139,7 @@ def scan_all(only_due: bool) -> None:
 
 
 def dispatch_due() -> None:
-    """What launchd runs: starts a background worker for each project that is due and not already busy."""
+    """What the service runs: starts a background worker for each project that is due and not already busy."""
     for folder, conf in dispatch.service_projects():
         if dispatch.due(folder, conf) and not dispatch.busy(folder):
             dispatch.spawn_worker(folder, scheduled=True)
@@ -1189,6 +1189,7 @@ def main() -> None:
     elif args.command == "tick":
         scan_all(only_due=False)
     elif args.command == "dispatch":
+        plat.redirect_std_streams(dispatch.LAUNCHD_LOG)
         dispatch_due()
     elif args.command == "watch":
         print(f"watching {len(dispatch.service_projects())} project(s); checking every "
@@ -1206,4 +1207,5 @@ def main() -> None:
 
 
 if __name__ == "__main__":
+    plat.ensure_utf8()
     main()
