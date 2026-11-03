@@ -5,8 +5,6 @@ and security-audited project out. Phase 0 runs on your Mac with your Claude subs
 
 - Architecture, options and scaling plan: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 
-▶ **[Watch the Katana overview video](video/katana-overview.mp4)**
-
 ## How it works
 
 Katana works on **projects**. A project is a folder holding `input/` (requirement files),
