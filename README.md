@@ -5,9 +5,7 @@ and security-audited project out. Phase 0 runs on your Mac with your Claude subs
 
 - Architecture, options and scaling plan: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 
-<video src="video/katana-overview.mp4" controls width="100%">
-  <a href="video/katana-overview.mp4">Watch the Katana overview video</a>
-</video>
+▶ **[Watch the Katana overview video](video/katana-overview.mp4)**
 
 ## How it works
 
